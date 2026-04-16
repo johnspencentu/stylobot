@@ -110,7 +110,15 @@ public class DashboardController : Controller
             Endpoints = BuildEndpointsModel("total", "desc", 1, 20, endpointsData, basePath),
             Clusters = BuildClustersModel(basePath),
             UserAgents = BuildUserAgentsModel("all", "requests", "desc", 1, 25, allUserAgents, basePath),
-            TopBots = BuildTopBotsModel(1, 10, "hits", basePath)
+            TopBots = BuildTopBotsModel(1, 10, "hits", basePath),
+            Sessions = new SessionsListModel
+            {
+                Sessions = [],
+                BasePath = basePath,
+                Page = 1,
+                PageSize = 25,
+                TotalCount = 0
+            }
         };
 
         return View(model);
