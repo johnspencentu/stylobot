@@ -42,15 +42,15 @@
 
     <ItemGroup>
         <PackageReference Include="AngleSharp" Version="1.4.0" />
-        <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.3" />
-        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.3" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
-        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.6" />
         <!-- LLM packages moved to Mostlylucid.BotDetection.Llm.Ollama / LlamaSharp projects -->
-        <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.6" />
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
-        <PackageReference Include="System.IO.Hashing" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.6" />
+        <PackageReference Include="System.IO.Hashing" Version="10.0.6" />
         <!-- StyloFlow: NuGet package references -->
         <PackageReference Include="Mostlylucid.StyloFlow.Core" Version="2.4.0" />
         <PackageReference Include="Mostlylucid.StyloFlow.Retrieval.Core" Version="2.4.0" />
@@ -59,15 +59,20 @@
         <PackageReference Include="Mostlylucid.Ephemeral.Atoms.Taxonomy" Version="2.3.2" />
         <PackageReference Include="Mostlylucid.Ephemeral.Atoms.KeyedSequential" Version="2.3.2" />
         <PackageReference Include="Mostlylucid.Ephemeral.Atoms.SlidingCache" Version="2.3.2" />
-        <PackageReference Include="HNSW" Version="26.1.63669" />
-        <PackageReference Include="Qdrant.Client" Version="1.16.1" />
-        <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1" />
+        <PackageReference Include="HNSW" Version="26.4.177" />
+        <PackageReference Include="Qdrant.Client" Version="1.17.0" />
+        <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.4" />
         <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
-        <PackageReference Include="System.Numerics.Tensors" Version="10.0.3" />
+        <PackageReference Include="System.Numerics.Tensors" Version="10.0.6" />
         <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
-        <PackageReference Include="Microsoft.Recognizers.Text" Version="1.8.0" />
-        <PackageReference Include="Microsoft.Recognizers.Text.DateTime" Version="1.8.0" />
-        <PackageReference Include="Microsoft.Recognizers.Text.Sequence" Version="1.8.0" />
+        <PackageReference Include="Microsoft.Recognizers.Text" Version="1.8.13" />
+        <PackageReference Include="Microsoft.Recognizers.Text.DateTime" Version="1.8.13" />
+        <PackageReference Include="Microsoft.Recognizers.Text.Sequence" Version="1.8.13" />
+        <!-- Override transitive NuGet.CommandLine pulled in by Microsoft.Recognizers.Text 1.8.13
+             (it drags in 5.11.5 which has a critical GHSA-68w7-72jg-6qpp advisory). NuGet.CommandLine
+             is a build-tool binary we don't execute at runtime; pinning to 7.3.1 clears the alert
+             without affecting any shipped code. PrivateAssets=all stops this leaking into consumers. -->
+        <PackageReference Include="NuGet.CommandLine" Version="7.3.1" PrivateAssets="all" />
         <PackageReference Include="YamlDotNet" Version="16.3.0" />
         <PackageReference Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" Version="16.3.0">
             <PrivateAssets>all</PrivateAssets>
