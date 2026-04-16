@@ -16,6 +16,7 @@ using Mostlylucid.GeoDetection.Extensions;
 using Mostlylucid.GeoDetection.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Stylobot.Website.Portal;
 using Stylobot.Website.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -289,7 +290,15 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<SeoService>();
 builder.Services.AddSingleton<IMarkdownDocsService, MarkdownDocsService>();
 
+// Customer portal — OIDC relying-party against Keycloak + Postgres orgs/licenses/audit.
+// Controlled by the "Portal" config section; disabled entirely when Portal:Enabled=false.
+// See docs/portal-architecture.md.
+builder.Services.AddStyloBotPortal(builder.Configuration);
+
 var app = builder.Build();
+
+// Apply portal migrations on startup when configured — no-op if portal is disabled.
+await app.Services.ApplyPortalMigrationsAsync();
 
 // Start Vite watch in development
 Process? viteProcess = null;
@@ -401,6 +410,7 @@ app.UseBotDetection();
 // Bot Detection Dashboard - live UI at /_stylobot
 app.UseStyloBotDashboard();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();

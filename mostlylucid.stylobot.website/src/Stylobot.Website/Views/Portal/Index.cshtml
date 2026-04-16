@@ -1,0 +1,51 @@
+@model Stylobot.Website.Portal.PortalIndexViewModel
+@{
+    ViewData["Title"] = "Portal";
+}
+
+<section class="min-h-[70vh] px-6 py-16">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-baseline justify-between mb-8">
+      <div>
+        <div class="text-xs uppercase tracking-widest text-base-content/60">Portal</div>
+        <h1 class="text-3xl font-semibold mt-1">Welcome, @(string.IsNullOrWhiteSpace(Model.DisplayName) ? Model.Email : Model.DisplayName)</h1>
+        <div class="text-sm text-base-content/70 mt-1">@Model.Email</div>
+      </div>
+      <form method="get" asp-controller="Account" asp-action="Logout">
+        <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
+      </form>
+    </div>
+
+    <h2 class="text-lg font-semibold mb-3">Your organizations</h2>
+
+    @if (!Model.Orgs.Any())
+    {
+      <div class="card bg-base-200 p-6">
+        <p>No organizations yet. This usually means sign-in provisioning failed — check the server logs.</p>
+      </div>
+    }
+    else
+    {
+      <div class="grid gap-3 md:grid-cols-2">
+        @foreach (var org in Model.Orgs)
+        {
+          <a asp-controller="Portal" asp-action="Index" class="card bg-base-200 hover:bg-base-300 transition p-5 block" href="/portal/org/@org.Slug">
+            <div class="flex items-baseline justify-between">
+              <div class="font-medium">@org.Name</div>
+              <span class="badge badge-ghost">@org.Role</span>
+            </div>
+            <div class="text-xs text-base-content/60 mt-1">/@org.Slug</div>
+            <div class="text-sm text-base-content/80 mt-3">
+              @(org.ActiveLicenses == 0 ? "No active licenses" : $"{org.ActiveLicenses} active licens{(org.ActiveLicenses == 1 ? "e" : "es")}")
+            </div>
+          </a>
+        }
+      </div>
+    }
+
+    <div class="mt-8 text-xs text-base-content/60">
+      Phase 1a — license issuance, team invites, and API tokens land in subsequent iterations. See
+      <code>docs/portal-architecture.md</code>.
+    </div>
+  </div>
+</section>

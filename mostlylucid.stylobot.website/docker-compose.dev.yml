@@ -79,10 +79,80 @@ services:
     networks:
       - stylobot-dev
 
+  # ──────────────────────────────────────────────────────────────────────
+  # Portal infrastructure — Keycloak (IdP) and a dedicated Postgres for
+  # portal tables (orgs, licenses, audit). Used only by the website's
+  # /portal area; the detection stack above is unchanged.
+  # Admin console: http://localhost:8081 (admin / admin — dev only).
+  # ──────────────────────────────────────────────────────────────────────
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: stylobot-keycloak-db-dev
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=keycloak
+      - POSTGRES_PASSWORD=dev-password
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - stylobot-dev
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: stylobot-keycloak-dev
+    command: start-dev --import-realm
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=dev-password
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak/realm-stylobot.json:/opt/keycloak/data/import/realm-stylobot.json:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - stylobot-dev
+
+  portal-db:
+    image: postgres:16-alpine
+    container_name: stylobot-portal-db-dev
+    environment:
+      - POSTGRES_DB=portal
+      - POSTGRES_USER=portal
+      - POSTGRES_PASSWORD=dev-password
+    ports:
+      - "5433:5432"
+    volumes:
+      - portal-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal -d portal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - stylobot-dev
+
 networks:
   stylobot-dev:
     driver: bridge
 
 volumes:
   timescale-dev-data:
+    driver: local
+  keycloak-db-data:
+    driver: local
+  portal-db-data:
     driver: local

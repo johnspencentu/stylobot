@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<section class="min-h-[60vh] px-6 py-16">
+  <div class="max-w-xl mx-auto text-center">
+    <div class="text-xs uppercase tracking-widest text-base-content/60">Access denied</div>
+    <h1 class="text-3xl font-semibold mt-2">We can't let you in there.</h1>
+    <p class="mt-4 text-base-content/80">
+      Your account is signed in but doesn't have the <code>portal-user</code> role required for this page.
+      If this seems wrong, contact your organization's owner or email support.
+    </p>
+    <div class="mt-8 flex gap-3 justify-center">
+      <a class="btn btn-primary" href="/">Back to home</a>
+      <form method="get" asp-controller="Account" asp-action="Logout"><button class="btn btn-ghost" type="submit">Sign out</button></form>
+    </div>
+  </div>
+</section>
