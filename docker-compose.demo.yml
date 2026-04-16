@@ -96,32 +96,32 @@ services:
       # Explicit opt-in for benchmark-only full bypass key
       - BotDetection__AllowFullDetectorBypassApiKeys=true
       # ---------------------------------------------------------------
-      # Rich API keys — detection policy overlays
+      # Rich API keys - detection policy overlays
       # DEMO ONLY: The SB-* defaults are insecure placeholders for local
       # dev/testing. They are NOT used in production. API keys are for
-      # your own automation (CI, k6, monitoring) — not system-to-system.
+      # your own automation (CI, k6, monitoring) - not system-to-system.
       # For internet-facing deployments, replace with cryptographically
       # random secrets via .env or a secrets manager.
       # ---------------------------------------------------------------
-      # 1. Dashboard monitor — runs all detectors, no action (logonly)
+      # 1. Dashboard monitor - runs all detectors, no action (logonly)
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__Name=Dashboard Monitor
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__ActionPolicyName=logonly
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__RateLimitPerMinute=120
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__Tags__0=monitoring
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__Tags__1=dashboard
-      # 2. Full detection — ALL detectors enabled, no exclusions (tests complete pipeline)
+      # 2. Full detection - ALL detectors enabled, no exclusions (tests complete pipeline)
       - BotDetection__ApiKeys__${BOTDETECTION_FULL_DETECTION_KEY:-SB-K6-FULL-DETECTION}__Name=k6 Full Detection
       - BotDetection__ApiKeys__${BOTDETECTION_FULL_DETECTION_KEY:-SB-K6-FULL-DETECTION}__ActionPolicyName=logonly
       - BotDetection__ApiKeys__${BOTDETECTION_FULL_DETECTION_KEY:-SB-K6-FULL-DETECTION}__RateLimitPerMinute=600
       - BotDetection__ApiKeys__${BOTDETECTION_FULL_DETECTION_KEY:-SB-K6-FULL-DETECTION}__Tags__0=testing
       - BotDetection__ApiKeys__${BOTDETECTION_FULL_DETECTION_KEY:-SB-K6-FULL-DETECTION}__Tags__1=k6
-      # 3. Bypass — disables ALL detectors (latency baseline measurement)
+      # 3. Bypass - disables ALL detectors (latency baseline measurement)
       - BotDetection__ApiKeys__${BOTDETECTION_BYPASS_KEY:-SB-K6-BYPASS}__Name=k6 Bypass Baseline
       - BotDetection__ApiKeys__${BOTDETECTION_BYPASS_KEY:-SB-K6-BYPASS}__DisabledDetectors__0=*
       - BotDetection__ApiKeys__${BOTDETECTION_BYPASS_KEY:-SB-K6-BYPASS}__RateLimitPerMinute=600
       - BotDetection__ApiKeys__${BOTDETECTION_BYPASS_KEY:-SB-K6-BYPASS}__Tags__0=testing
       - BotDetection__ApiKeys__${BOTDETECTION_BYPASS_KEY:-SB-K6-BYPASS}__Tags__1=baseline
-      # 4. No-behavioral — disables only behavioral detectors (isolate fingerprint/header detection)
+      # 4. No-behavioral - disables only behavioral detectors (isolate fingerprint/header detection)
       - BotDetection__ApiKeys__${BOTDETECTION_NO_BEHAVIORAL_KEY:-SB-K6-NO-BEHAVIORAL}__Name=k6 No Behavioral
       - BotDetection__ApiKeys__${BOTDETECTION_NO_BEHAVIORAL_KEY:-SB-K6-NO-BEHAVIORAL}__DisabledDetectors__0=Behavioral
       - BotDetection__ApiKeys__${BOTDETECTION_NO_BEHAVIORAL_KEY:-SB-K6-NO-BEHAVIORAL}__DisabledDetectors__1=AdvancedBehavioral
@@ -195,7 +195,7 @@ services:
       - BotDetection__EnableLegacyApiBypassKeys=true
       - BotDetection__ApiBypassKeys__0=${BOTDETECTION_API_BYPASS_KEY:-}
       # Rich API keys (same dashboard monitor key as gateway)
-      # Dashboard monitor — runs all detectors, no action (logonly)
+      # Dashboard monitor - runs all detectors, no action (logonly)
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__Name=Dashboard Monitor
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__ActionPolicyName=logonly
       - BotDetection__ApiKeys__${BOTDETECTION_DASHBOARD_API_KEY:-SB-DASHBOARD-MONITOR}__RateLimitPerMinute=120

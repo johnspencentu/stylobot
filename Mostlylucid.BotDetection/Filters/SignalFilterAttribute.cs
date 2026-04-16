@@ -73,7 +73,7 @@ public class BlockIfSignalAttribute : ActionFilterAttribute
 
 /// <summary>
 ///     Action filter that allows requests only when a specific signal condition is met.
-///     Inverse of <see cref="BlockIfSignalAttribute" /> — blocks when the condition is NOT met.
+///     Inverse of <see cref="BlockIfSignalAttribute" /> - blocks when the condition is NOT met.
 /// </summary>
 /// <example>
 ///     // Only allow requests from the US

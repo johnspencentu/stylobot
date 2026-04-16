@@ -73,5 +73,5 @@ federated members of the blackboard/quorum, providing additional signals and con
 
 ---
 
-This spec positions external services as **federated immune cells** in your architecture — augmenting your innate and
+This spec positions external services as **federated immune cells** in your architecture - augmenting your innate and
 adaptive detectors with global intelligence, while still preserving explainability and quorum balance.

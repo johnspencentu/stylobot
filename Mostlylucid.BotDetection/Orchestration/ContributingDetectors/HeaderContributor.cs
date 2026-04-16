@@ -53,7 +53,7 @@ public class HeaderContributor : ConfiguredContributorBase
         state.WriteSignal("header.is_websocket_upgrade", isWebSocketUpgrade);
 
         // Sec-Fetch-* headers (Fetch Metadata Request Headers, W3C spec).
-        // Modern browsers send these on ALL requests — they attest the request's origin,
+        // Modern browsers send these on ALL requests - they attest the request's origin,
         // mode, and destination. Bots/scrapers rarely send them correctly.
         // A same-origin fetch() sends Sec-Fetch-Site: same-origin + Sec-Fetch-Mode: cors.
         var secFetchSite = headers["Sec-Fetch-Site"].FirstOrDefault();
@@ -92,7 +92,7 @@ public class HeaderContributor : ConfiguredContributorBase
         // Missing Accept header - confidence from YAML
         // Skip for WebSocket upgrades which legitimately use Upgrade: websocket instead of Accept
         // Skip when Fetch Metadata is present: any Sec-Fetch-Site value (same-origin, cross-site,
-        // same-site, none) means a real browser sent this — bots rarely send Sec-Fetch-* headers.
+        // same-site, none) means a real browser sent this - bots rarely send Sec-Fetch-* headers.
         // Also skip for API key holders (trusted programmatic clients).
         if (!hasAccept && !isWebSocketUpgrade && !hasFetchMetadata && !hasApiKey)
             contributions.Add(BotContribution(
@@ -104,7 +104,7 @@ public class HeaderContributor : ConfiguredContributorBase
         // Missing Accept-Language with browser UA
         // Skip for WebSocket upgrades which don't carry Accept-Language
         // Skip for same-origin fetch: browser fetch() doesn't always include Accept-Language
-        // (depends on the fetch() call — programmatic requests from JS often omit it)
+        // (depends on the fetch() call - programmatic requests from JS often omit it)
         var userAgent = state.UserAgent ?? "";
         var looksLikeBrowser = userAgent.Contains("Mozilla/") &&
                                (userAgent.Contains("Chrome") || userAgent.Contains("Firefox") ||
@@ -133,7 +133,7 @@ public class HeaderContributor : ConfiguredContributorBase
                 botType: BotType.Scraper.ToString()));
 
         // Check for bot-specific headers
-        // Skip for same-origin fetch — browser fetch() with X-Requested-With is legitimate
+        // Skip for same-origin fetch - browser fetch() with X-Requested-With is legitimate
         if (headers.ContainsKey("X-Requested-With") &&
             headers["X-Requested-With"].ToString() == "XMLHttpRequest" &&
             !hasAcceptLanguage && !hasFetchMetadata && !hasApiKey)
@@ -142,26 +142,26 @@ public class HeaderContributor : ConfiguredContributorBase
                 "AJAX request without Accept-Language",
                 botType: BotType.Scraper.ToString()));
 
-        // Same-origin fetch with browser UA is a strong human signal — browsers attest
+        // Same-origin fetch with browser UA is a strong human signal - browsers attest
         // the request origin via Sec-Fetch-Site which bots can't easily forge while also
         // maintaining consistency across all other detection layers.
         if (isSameOriginFetch && looksLikeBrowser)
             contributions.Add(HumanContribution(
                 "Header",
-                "Same-origin browser fetch — Sec-Fetch-Site attestation present"));
+                "Same-origin browser fetch - Sec-Fetch-Site attestation present"));
 
-        // Any Fetch Metadata (even cross-site) indicates a real browser — bots rarely
+        // Any Fetch Metadata (even cross-site) indicates a real browser - bots rarely
         // send Sec-Fetch-* headers, and when they do, cross-layer correlation catches them.
         else if (hasFetchMetadata && !isSameOriginFetch)
             contributions.Add(HumanContribution(
                 "Header",
                 $"Browser fetch metadata present (Sec-Fetch-Site: {secFetchSite})"));
 
-        // API key holder — trusted programmatic client, mild human signal
+        // API key holder - trusted programmatic client, mild human signal
         if (hasApiKey)
             contributions.Add(HumanContribution(
                 "Header",
-                "Valid API key — trusted programmatic client"));
+                "Valid API key - trusted programmatic client"));
 
         // No bot indicators found - emit human signal from YAML config
         if (contributions.Count == 0)
@@ -175,7 +175,7 @@ public class HeaderContributor : ConfiguredContributorBase
     /// <summary>
     ///     Detects WebSocket upgrade requests (RFC 6455).
     ///     These legitimately omit Accept, Accept-Language, Accept-Encoding,
-    ///     and Client Hints headers — browsers don't send them on WS upgrades.
+    ///     and Client Hints headers - browsers don't send them on WS upgrades.
     /// </summary>
     private static bool IsWebSocketUpgrade(Microsoft.AspNetCore.Http.HttpRequest request)
     {

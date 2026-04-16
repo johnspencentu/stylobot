@@ -312,7 +312,7 @@ public sealed class DashboardShellModel
 
 /// <summary>
 ///     View model for the sessions list partial.
-///     Sessions are the primary activity unit — each represents a compressed
+///     Sessions are the primary activity unit - each represents a compressed
 ///     behavioral snapshot with Markov chain transitions.
 /// </summary>
 public sealed class SessionsListModel

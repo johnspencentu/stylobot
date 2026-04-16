@@ -1,6 +1,6 @@
 # Account Takeover Detector - Detects credential stuffing, brute force, and ATO patterns
 name: AccountTakeoverContributor
-priority: 25  # Wave 1 — runs after UA, IP, Geo, Behavioral
+priority: 25  # Wave 1 - runs after UA, IP, Geo, Behavioral
 enabled: true
 description: Detects credential stuffing, brute force attacks, phishing-sourced account takeover, geographic velocity anomalies, and post-login behavioral drift with decay-aware baselines
 
@@ -202,10 +202,10 @@ defaults:
     # ============================================
     # Drift score thresholds
     # ============================================
-    # < 0.3  — Normal variance, no action
-    # 0.3-0.6 — Elevated, log + increase monitoring
-    # 0.6-0.8 — Suspicious, trigger challenge action
-    # > 0.8  — High confidence ATO, trigger block-soft (429)
+    # < 0.3  - Normal variance, no action
+    # 0.3-0.6 - Elevated, log + increase monitoring
+    # 0.6-0.8 - Suspicious, trigger challenge action
+    # > 0.8  - High confidence ATO, trigger block-soft (429)
     drift_threshold_elevated: 0.3
     drift_threshold_suspicious: 0.6
     drift_threshold_ato: 0.8

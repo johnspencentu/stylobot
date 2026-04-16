@@ -286,13 +286,13 @@ function aggregateSignalStats(detections: any[]): SignalStats {
             }
         }
 
-        // Protocol — check detector signals (h2.fingerprint, h2.settings_hash) AND
+        // Protocol - check detector signals (h2.fingerprint, h2.settings_hash) AND
         // enriched protocol signals (h2.protocol, h3.protocol) from DetectionBroadcastMiddleware
         if (sigs['h3.protocol'] || sigs['h3.version']) stats.protocols['HTTP/3'] = (stats.protocols['HTTP/3'] || 0) + 1;
         else if (sigs['h2.fingerprint'] || sigs['h2.settings_hash'] || sigs['h2.protocol']) stats.protocols['HTTP/2'] = (stats.protocols['HTTP/2'] || 0) + 1;
         else stats.protocols['HTTP/1.1'] = (stats.protocols['HTTP/1.1'] || 0) + 1;
 
-        // TLS — tls.protocol is what TlsFingerprintContributor writes (SignalKeys.TlsProtocol)
+        // TLS - tls.protocol is what TlsFingerprintContributor writes (SignalKeys.TlsProtocol)
         const tlsVer = sigs['tls.protocol'] || sigs['tls.version'] || sigs['tls.protocol_version'];
         if (tlsVer) {
             const t = String(tlsVer);
@@ -485,8 +485,8 @@ function dashboardApp() {
         },
 
         async init() {
-            // Hydrate ALL tabs from SSR data first — the page must NEVER be empty.
-            // XHR and SignalR are UPDATE ONLY — never primary data sources.
+            // Hydrate ALL tabs from SSR data first - the page must NEVER be empty.
+            // XHR and SignalR are UPDATE ONLY - never primary data sources.
             const ssrSummary = toCamel(this._readSsr('ssr-summary'));
             const ssrCountries = toCamel(this._readSsr('ssr-countries'));
             const ssrClusters = toCamel(this._readSsr('ssr-clusters'));
@@ -555,7 +555,7 @@ function dashboardApp() {
                             this.yourSignature = parsed.signature || '';
                         } else if (parsed.signature) {
                             this.yourSignature = parsed.signature;
-                            // Signature only — visitor cache wasn't populated yet.
+                            // Signature only - visitor cache wasn't populated yet.
                             // Retry after a short delay to pick up cached detection data.
                             this.retryFetchMe();
                         }
@@ -610,7 +610,7 @@ function dashboardApp() {
             };
             const cfg = rangeMap[this.timeRange];
             if (!cfg) {
-                // "All" — use a 90-day window with hourly buckets; TimescaleDB time_bucket handles this efficiently
+                // "All" - use a 90-day window with hourly buckets; TimescaleDB time_bucket handles this efficiently
                 const start = new Date(now.getTime() - 90 * 24 * 3600000);
                 return { bucket: 3600, start: start.toISOString(), end: now.toISOString() };
             }
@@ -652,7 +652,7 @@ function dashboardApp() {
                 const res = await fetch('/_stylobot/api/detections?limit=50');
                 if (res.ok) {
                     const all = toCamel(await res.json());
-                    // Merge new entries instead of replacing — prevents disappearing detections
+                    // Merge new entries instead of replacing - prevents disappearing detections
                     const existingIds = new Set(this.recentDetections.map((d: any) => d.requestId));
                     const newEntries = all.filter((d: any) => !isStaticAsset(d) && !existingIds.has(d.requestId));
                     if (newEntries.length > 0) {
@@ -871,7 +871,7 @@ function dashboardApp() {
         async switchTab(t: string) {
             this.tab = t as any;
             // Only fetch via XHR if we have NO data (SSR didn't provide it).
-            // Never clear existing data — SSR data persists across tab switches.
+            // Never clear existing data - SSR data persists across tab switches.
             if (t === 'visitors' && this.visitors.length === 0) await this.loadVisitors();
             if (t === 'clusters' && this.clusters.length === 0) await this.loadClusters();
             if (t === 'countries') {
@@ -1033,7 +1033,7 @@ function dashboardApp() {
                     }
                 });
 
-                // Live top bots list — replaces the static snapshot with server-authoritative data.
+                // Live top bots list - replaces the static snapshot with server-authoritative data.
                 // Sent periodically by DashboardSummaryBroadcaster, reflects classification changes.
                 this.connection.on('BroadcastTopBots', (raw: any) => {
                     if (this.timeRange === 'All') {
@@ -1098,7 +1098,7 @@ function dashboardApp() {
             if (botIdx >= 0) {
                 this.topBots[botIdx] = { ...this.topBots[botIdx], ...sig };
             } else {
-                // New bot — add it
+                // New bot - add it
                 this.topBots.push(sig);
             }
             // Re-sort by hit count and trim to top 10
@@ -1139,7 +1139,7 @@ function dashboardApp() {
                     }
                 }
 
-                // Update "you" if matches — create full detection from event if we only had signature
+                // Update "you" if matches - create full detection from event if we only had signature
                 const sigMatch = this.yourSignature && d.primarySignature === this.yourSignature;
                 if (sigMatch && d.isBot !== undefined) {
                     const update = {
@@ -1418,7 +1418,7 @@ function signatureDetailApp() {
             this.signature = (this.$el as HTMLElement).dataset.signature || '';
             if (!this.signature) return;
 
-            // Hydrate from SSR data first — page must never show a spinner.
+            // Hydrate from SSR data first - page must never show a spinner.
             const ssrSig = toCamel(this._readSsr('ssr-sig'));
             const ssrDetections = toCamel(this._readSsr('ssr-detections'));
 

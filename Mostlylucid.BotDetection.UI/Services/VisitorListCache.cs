@@ -136,7 +136,7 @@ public class VisitorListCache
                     if (detection.ProcessingTimeMs < existing.MinProcessingTimeMs || existing.MinProcessingTimeMs == 0)
                         existing.MinProcessingTimeMs = detection.ProcessingTimeMs;
 
-                    // Push to ring buffers (max 20 entries) — O(1) enqueue/dequeue
+                    // Push to ring buffers (max 20 entries) - O(1) enqueue/dequeue
                     existing.ProcessingTimeHistory.Enqueue(detection.ProcessingTimeMs);
                     if (existing.ProcessingTimeHistory.Count > 20)
                         existing.ProcessingTimeHistory.Dequeue();
@@ -366,12 +366,12 @@ public class VisitorListCache
     /// <summary>
     ///     Infer bot name and type from behavioral signals when the detection ledger
     ///     didn't provide them. Uses paths visited, user-agent, and hit rate.
-    ///     Returns (name, type) — either may be null if inference fails.
+    ///     Returns (name, type) - either may be null if inference fails.
     /// </summary>
     internal static (string? Name, string? Type) InferBotIdentity(
         IReadOnlyList<string> paths, string? userAgent, int hits, DateTime firstSeen, DateTime lastSeen)
     {
-        // 1. Path-based inference — what they're scanning tells us who they are
+        // 1. Path-based inference - what they're scanning tells us who they are
         var pathSet = string.Join(" ", paths).ToLowerInvariant();
 
         if (WpPathRegex.IsMatch(pathSet))
@@ -387,7 +387,7 @@ public class VisitorListCache
         if (CmsPathRegex.IsMatch(pathSet))
             return ("CMS Scanner", "Scraper");
 
-        // 2. UA-based inference — extract identity from user-agent string
+        // 2. UA-based inference - extract identity from user-agent string
         if (!string.IsNullOrEmpty(userAgent))
         {
             var ua = userAgent;
@@ -437,7 +437,7 @@ public class VisitorListCache
                 return ("Puppeteer Bot", "Scraper");
         }
 
-        // 3. Rate-based inference — high hit rate suggests aggressive bot
+        // 3. Rate-based inference - high hit rate suggests aggressive bot
         if (hits > 10 && lastSeen > firstSeen)
         {
             var seconds = (lastSeen - firstSeen).TotalSeconds;
@@ -451,7 +451,7 @@ public class VisitorListCache
             }
         }
 
-        // 4. Fallback — we know it's a bot but can't identify it further
+        // 4. Fallback - we know it's a bot but can't identify it further
         return ("Unknown Bot", null);
     }
 
@@ -540,7 +540,7 @@ public class VisitorListCache
 /// </summary>
 public class CachedVisitor
 {
-    /// <summary>Synchronization root — lock before mutating any collection field.</summary>
+    /// <summary>Synchronization root - lock before mutating any collection field.</summary>
     internal readonly object SyncRoot = new();
 
     public required string PrimarySignature { get; set; }

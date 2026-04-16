@@ -196,8 +196,8 @@ Configure automatic blocking in appsettings:
 
 StyloBot exposes two independent scores:
 
-- **Bot Probability** (`GetBotProbability()`) — How likely is this request from a bot? Range 0.0 (definitely human) to 1.0 (definitely bot).
-- **Detection Confidence** (`GetDetectionConfidence()`) — How certain is the system in its verdict? Range 0.0 (guessing) to 1.0 (certain). Based on detector coverage, agreement between detectors, and total evidence weight.
+- **Bot Probability** (`GetBotProbability()`) - How likely is this request from a bot? Range 0.0 (definitely human) to 1.0 (definitely bot).
+- **Detection Confidence** (`GetDetectionConfidence()`) - How certain is the system in its verdict? Range 0.0 (guessing) to 1.0 (certain). Based on detector coverage, agreement between detectors, and total evidence weight.
 
 These are independent. You can be 95% confident that something is human (low probability, high confidence). Or you can see a suspicious request but have low confidence because only one detector ran.
 
@@ -230,9 +230,9 @@ public IActionResult SensitiveEndpoint() { }
 
 Confidence is computed from three factors (independent of bot probability):
 
-1. **Agreement** (40%) — What fraction of detector evidence points in the same direction. If all detectors agree, agreement = 1.0.
-2. **Weight Coverage** (35%) — Total evidence weight collected vs expected baseline. More weighted evidence = more confident.
-3. **Detector Count** (25%) — Number of distinct detectors that contributed. 4+ detectors = full count score.
+1. **Agreement** (40%) - What fraction of detector evidence points in the same direction. If all detectors agree, agreement = 1.0.
+2. **Weight Coverage** (35%) - Total evidence weight collected vs expected baseline. More weighted evidence = more confident.
+3. **Detector Count** (25%) - Number of distinct detectors that contributed. 4+ detectors = full count score.
 
 Then `ComputeCoverageConfidence()` caps the final value based on which specific detectors ran (e.g., UserAgent, Header, ClientSide, Behavioral, Heuristic have higher weight).
 
@@ -247,7 +247,7 @@ bool isHuman = context.IsHuman();
 double probability = context.GetBotProbability();   // How likely it's a bot
 double confidence = context.GetDetectionConfidence(); // How sure we are
 
-// Legacy (returns bot probability — prefer GetBotProbability())
+// Legacy (returns bot probability - prefer GetBotProbability())
 double legacyConf = context.GetBotConfidence();
 
 // Bot type checks

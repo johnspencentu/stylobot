@@ -61,7 +61,7 @@ input:
 output:
   produces:
     - type: botdetection.contribution
-      description: Intent analysis contribution (always neutral — threat is orthogonal to bot probability)
+      description: Intent analysis contribution (always neutral - threat is orthogonal to bot probability)
 
   signals:
     - key: intent.threat_score
@@ -149,7 +149,7 @@ defaults:
     escalation_threshold: 0.5
 
   timing:
-    timeout_ms: 10  # Fast — HNSW lookup + feature extraction
+    timeout_ms: 10  # Fast - HNSW lookup + feature extraction
     cache_refresh_sec: 0
 
   features:

@@ -1,6 +1,6 @@
 # Response Behavior Detector - Historical response pattern analysis
 name: ResponseBehaviorContributor
-priority: 12  # Early wave 0 — provides feedback from previous requests
+priority: 12  # Early wave 0 - provides feedback from previous requests
 enabled: true
 description: Analyzes historical response patterns (404 scanning, honeypot hits, auth brute-forcing, error harvesting)
 

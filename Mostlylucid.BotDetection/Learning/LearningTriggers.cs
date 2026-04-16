@@ -60,10 +60,10 @@ public class UserAgentPatternTrigger : ILearningTrigger
 
     public bool ShouldTrigger(BlackboardState state, string signal, object? signalValue)
     {
-        // Specific pattern matches are high-confidence quick matches — always trigger
+        // Specific pattern matches are high-confidence quick matches - always trigger
         if (signal is "ua.pattern_match" or "ua.headless_detected" or "ua.automation_detected") return true;
 
-        // High bot probability for UA signal — but gate on detection confidence
+        // High bot probability for UA signal - but gate on detection confidence
         if (signal == "ua.bot_probability" && signalValue is double prob)
             return prob >= 0.85 && state.DetectionConfidence >= 0.7;
 
@@ -174,12 +174,12 @@ public class HeuristicWeightTrigger : ILearningTrigger
         // Always trigger on user feedback (ground truth)
         if (signal == "user.feedback_received") return true;
 
-        // Trigger on high-confidence detections (for online learning — learn from certain verdicts)
+        // Trigger on high-confidence detections (for online learning - learn from certain verdicts)
         if (signal == "detection.high_confidence")
             return state.DetectionConfidence >= 0.85;
 
         // Key learning trigger: high bot probability BUT low confidence.
-        // This means "we think it's a bot but aren't sure" — run full learning pipeline
+        // This means "we think it's a bot but aren't sure" - run full learning pipeline
         // to gather more evidence and improve future detection.
         if (signal == "detection.completed")
         {

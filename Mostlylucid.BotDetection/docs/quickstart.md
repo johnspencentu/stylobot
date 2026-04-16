@@ -115,7 +115,7 @@ app.MapGet("/api/data", () => "sensitive")
 app.MapPost("/api/submit", () => "ok")
    .BotPolicy("strict", actionPolicy: "block", blockThreshold: 0.8);
 
-// Route group defaults — apply to all endpoints in the group
+// Route group defaults - apply to all endpoints in the group
 var api = app.MapGroup("/api").WithBotProtection(allowSearchEngines: true);
 api.MapGet("/products", () => "data");
 api.MapGet("/categories", () => "cats");
@@ -134,7 +134,7 @@ app.MapBotDetectionEndpoints();
 app.Run();
 ```
 
-That's a complete bot-protected API. Every `.BlockBots()` call blocks all bot types by default — you opt specific types *in* with the `Allow*` parameters.
+That's a complete bot-protected API. Every `.BlockBots()` call blocks all bot types by default - you opt specific types *in* with the `Allow*` parameters.
 
 ---
 
@@ -163,7 +163,7 @@ app.Run();
 [Route("[controller]")]
 public class ProductsController : ControllerBase
 {
-    // No protection — detection runs, results available, nothing blocked
+    // No protection - detection runs, results available, nothing blocked
     [HttpGet]
     public IActionResult List() => Ok(new { products = "all" });
 
@@ -276,7 +276,7 @@ public IActionResult Browse() => Ok();
 [BotPolicy("default", ActionPolicy = "api-block")]
 public IActionResult Confirm() => Ok();
 
-// MVC: shadow mode — log everything, block nothing
+// MVC: shadow mode - log everything, block nothing
 [BotPolicy("default", ActionPolicy = "shadow-mode")]
 public IActionResult PublicApi() => Ok();
 ```
@@ -323,7 +323,7 @@ No `appsettings.json` section needed. Defaults:
 | Setting | Default | Effect |
 |---------|---------|--------|
 | `BotThreshold` | 0.7 | 70%+ bot probability = classified as bot |
-| `BlockDetectedBots` | false | Detection only — use `.BlockBots()` to block |
+| `BlockDetectedBots` | false | Detection only - use `.BlockBots()` to block |
 | `EnableLlmDetection` | false | No LLM needed |
 | Storage | SQLite (auto) | File-based, self-creating `botdetection.db` |
 
@@ -371,7 +371,7 @@ app.UseStyloBotDashboard();
 app.Run();
 ```
 
-The dashboard UI is at `/stylobot/`. No separate frontend build required — it's entirely self-contained.
+The dashboard UI is at `/stylobot/`. No separate frontend build required - it's entirely self-contained.
 
 ### Authorization
 
@@ -409,7 +409,7 @@ All endpoints are under `{BasePath}/api/`:
 
 All API endpoints are **rate-limited** to 60 requests per minute per IP (diagnostics: 10/min). Rate limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`) are included in responses. HTTP 429 is returned when exceeded.
 
-The dashboard page (`/stylobot/`) is **server-side rendered** — all data is embedded in the HTML on first load. SignalR provides live updates only. No XHR calls are made on page load.
+The dashboard page (`/stylobot/`) is **server-side rendered** - all data is embedded in the HTML on first load. SignalR provides live updates only. No XHR calls are made on page load.
 
 ### Embed Mode
 
@@ -430,33 +430,33 @@ curl http://localhost:5001/stylobot/api/diagnostics
 ```
 
 Response includes:
-- `summary` — aggregate counts and rates
-- `filterCounts` — breakdown by bot type, risk band, action
-- `topBots` — top 10 detected bots with sparkline histories
-- `detections` — recent detection events with per-detector contributions and signals
-- `signatures` — unique visitor fingerprints
+- `summary` - aggregate counts and rates
+- `filterCounts` - breakdown by bot type, risk band, action
+- `topBots` - top 10 detected bots with sparkline histories
+- `detections` - recent detection events with per-detector contributions and signals
+- `signatures` - unique visitor fingerprints
 
 Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`. Returns HTTP 429 when exceeded.
 
 Query parameters (same as `/api/detections`):
-- `?isBot=true` — filter by bot/human
-- `?riskBand=High` — filter by risk band
-- `?botType=Scraper` — filter by bot type
-- `?limit=100` — max results (capped at 500)
+- `?isBot=true` - filter by bot/human
+- `?riskBand=High` - filter by risk band
+- `?botType=Scraper` - filter by bot type
+- `?limit=100` - max results (capped at 500)
 
 ### Persistence-Only Mode (Gateway/Proxy)
 
 If you run detection on a gateway but serve the dashboard elsewhere:
 
 ```csharp
-// Gateway — saves detections, no UI
+// Gateway - saves detections, no UI
 builder.Services.AddBotDetection();
 builder.Services.AddBotDetectionPersistence();
 // ...
 app.UseBotDetection();
 app.UseBotDetectionPersistence();
 
-// Dashboard host — serves UI, reads shared database
+// Dashboard host - serves UI, reads shared database
 builder.Services.AddStyloBotDashboard();
 builder.Services.AddStyloBotPostgreSQL(connectionString);
 ```
@@ -508,7 +508,7 @@ All blocked by default. Opt specific types in per-endpoint:
 
 ## How StyloBot Scales
 
-StyloBot is designed to start with zero dependencies and scale to a full production stack. Every tier uses the same detection pipeline — you're only changing storage and enrichment.
+StyloBot is designed to start with zero dependencies and scale to a full production stack. Every tier uses the same detection pipeline - you're only changing storage and enrichment.
 
 ### Tier 1: Self-Contained (You Are Here)
 
@@ -532,7 +532,7 @@ Your App + AddBotDetection() + AddGeoRouting() + AddGeoDetectionContributor()
     └── Local IP database (DataHubCsv free, no account) or MaxMind GeoLite2
     └── 20+ geo signals: country, VPN, proxy, Tor, datacenter
     └── Bot origin verification (Googlebot from China = suspicious)
-    └── All lookups local — no per-request HTTP calls
+    └── All lookups local - no per-request HTTP calls
 ```
 
 ```csharp
@@ -594,7 +594,7 @@ services:
 
 **Good for:** >100K requests/day, multiple servers, need analytics.
 
-### Tier 4: Full Stack — YARP Gateway + Qdrant + LLM
+### Tier 4: Full Stack - YARP Gateway + Qdrant + LLM
 
 ```
 Internet → Caddy (TLS) → Stylobot Gateway (YARP) → Your App
@@ -604,7 +604,7 @@ Internet → Caddy (TLS) → Stylobot Gateway (YARP) → Your App
                               └── LLamaSharp CPU LLM (bot classification)
 ```
 
-The gateway runs detection on all traffic and forwards results as HTTP headers. Your app reads headers — no SDK needed, any language.
+The gateway runs detection on all traffic and forwards results as HTTP headers. Your app reads headers - no SDK needed, any language.
 
 ```yaml
 # docker-compose.yml (production)
@@ -653,7 +653,7 @@ services:
 **Your app (any language) just reads headers:**
 
 ```csharp
-// ASP.NET Core — trust upstream detection
+// ASP.NET Core - trust upstream detection
 builder.Services.AddBotDetection();
 builder.Services.Configure<BotDetectionOptions>(o =>
 {
@@ -665,7 +665,7 @@ builder.Services.Configure<BotDetectionOptions>(o =>
 ```
 
 ```python
-# Python/Flask — read headers directly
+# Python/Flask - read headers directly
 @app.route('/api/data')
 def api_data():
     if request.headers.get('X-Bot-Detected') == 'true':
@@ -688,7 +688,7 @@ app.get('/api/data', (req, res) => {
 | Component | Purpose | Required? |
 |-----------|---------|-----------|
 | **TimescaleDB** | Time-series analytics, compressed storage, continuous aggregates | Recommended |
-| **Qdrant** | Vector similarity — find bots even when they rotate UAs | Optional |
+| **Qdrant** | Vector similarity - find bots even when they rotate UAs | Optional |
 | **LLamaSharp** | CPU-only LLM for bot cluster naming and classification | Optional |
 | **Caddy/Nginx** | TLS termination, static files | Your choice |
 | **Gateway** | Centralized detection for multi-app / non-.NET backends | For multi-service |
@@ -703,17 +703,17 @@ Starting a new project?
 └── Multiple apps or non-.NET? → Tier 4 (Gateway)
 ```
 
-All tiers use the same detection pipeline. Moving between them is a DI registration change — your endpoint protection code stays the same.
+All tiers use the same detection pipeline. Moving between them is a DI registration change - your endpoint protection code stays the same.
 
 ---
 
 ## Further Reading
 
-- [blocking-and-filters.md](blocking-and-filters.md) — Full attribute and filter reference
-- [signals-and-custom-filters.md](signals-and-custom-filters.md) — Signal access API, custom filters, signal-based endpoint filtering
-- [action-policies.md](action-policies.md) — Block, Throttle, Challenge, Redirect, LogOnly
-- [configuration.md](configuration.md) — Full `BotDetectionOptions` reference
-- [integration-levels.md](integration-levels.md) — Detailed 5-level integration guide
-- [deployment-guide.md](deployment-guide.md) — Docker, Kubernetes, production deployment
-- [ai-detection.md](ai-detection.md) — Heuristic model and LLM escalation
-- [yarp-integration.md](yarp-integration.md) — YARP reverse proxy setup
+- [blocking-and-filters.md](blocking-and-filters.md) - Full attribute and filter reference
+- [signals-and-custom-filters.md](signals-and-custom-filters.md) - Signal access API, custom filters, signal-based endpoint filtering
+- [action-policies.md](action-policies.md) - Block, Throttle, Challenge, Redirect, LogOnly
+- [configuration.md](configuration.md) - Full `BotDetectionOptions` reference
+- [integration-levels.md](integration-levels.md) - Detailed 5-level integration guide
+- [deployment-guide.md](deployment-guide.md) - Docker, Kubernetes, production deployment
+- [ai-detection.md](ai-detection.md) - Heuristic model and LLM escalation
+- [yarp-integration.md](yarp-integration.md) - YARP reverse proxy setup

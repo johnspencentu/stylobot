@@ -4,14 +4,14 @@ using Mostlylucid.BotDetection.Attributes;
 namespace Mostlylucid.BotDetection.MinimalDemo.Controllers;
 
 /// <summary>
-///     Demonstrates [SkipBotDetection] — completely bypasses detection.
+///     Demonstrates [SkipBotDetection] - completely bypasses detection.
 ///     Use for health checks, metrics, internal endpoints.
 /// </summary>
 [ApiController]
 [Route("[controller]")]
 public class HealthController : ControllerBase
 {
-    // GET /health — no bot detection at all
+    // GET /health - no bot detection at all
     [HttpGet]
     [SkipBotDetection]
     public IActionResult Check()

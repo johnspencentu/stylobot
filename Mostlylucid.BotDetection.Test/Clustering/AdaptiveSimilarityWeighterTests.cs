@@ -191,7 +191,7 @@ public class AdaptiveSimilarityWeighterTests
 
         // Rate weight should shift significantly
         var shifts = weighter.GetRecentShifts();
-        // May or may not have shifts depending on magnitude — just verify no crash
+        // May or may not have shifts depending on magnitude - just verify no crash
         Assert.NotNull(shifts);
     }
 

@@ -130,7 +130,7 @@ public sealed record AggregatedEvidence
 
     /// <summary>
     /// Unified threat score (0.0 = benign, 1.0 = malicious).
-    /// Orthogonal to BotProbability — a human probing .env files has low BotProbability but high ThreatScore.
+    /// Orthogonal to BotProbability - a human probing .env files has low BotProbability but high ThreatScore.
     /// </summary>
     public double ThreatScore { get; init; }
 
@@ -198,7 +198,7 @@ public enum RecommendedAction
 
 /// <summary>
 /// Threat classification bands for intent scoring.
-/// Orthogonal to RiskBand — measures malicious intent, not bot probability.
+/// Orthogonal to RiskBand - measures malicious intent, not bot probability.
 /// </summary>
 public enum ThreatBand
 {

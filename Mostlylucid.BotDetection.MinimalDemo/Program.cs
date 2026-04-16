@@ -13,7 +13,7 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Bot detection middleware — runs on every request, populates HttpContext
+// Bot detection middleware - runs on every request, populates HttpContext
 app.UseBotDetection();
 app.MapControllers();
 
@@ -21,10 +21,10 @@ app.MapControllers();
 // Minimal API: per-endpoint protection with fluent filters
 // ============================================================
 
-// Open endpoint — detection runs (results in HttpContext) but nothing blocks
+// Open endpoint - detection runs (results in HttpContext) but nothing blocks
 app.MapGet("/", (HttpContext ctx) => Results.Ok(new
 {
-    message = "StyloBot Minimal Demo — zero external dependencies",
+    message = "StyloBot Minimal Demo - zero external dependencies",
     you = new
     {
         isBot = ctx.IsBot(),
@@ -36,7 +36,7 @@ app.MapGet("/", (HttpContext ctx) => Results.Ok(new
     endpoints = new Dictionary<string, string>
     {
         // Minimal API (fluent filters)
-        ["GET /"] = "Open — detection runs, never blocks",
+        ["GET /"] = "Open - detection runs, never blocks",
         ["GET /api/data"] = ".BlockBots(allowSearchEngines: true)",
         ["GET /api/submit"] = ".RequireHuman()",
         ["GET /api/premium"] = ".BlockBots(minConfidence: 0.9)",
@@ -48,7 +48,7 @@ app.MapGet("/", (HttpContext ctx) => Results.Ok(new
         ["GET /admin/settings"] = "[RequireHuman] inherited from controller",
         ["GET /checkout"] = "[BotPolicy(\"default\", ActionPolicy = \"api-throttle\")]",
         ["GET /checkout/confirm"] = "[BotPolicy(\"default\", ActionPolicy = \"api-block\")]",
-        ["GET /health"] = "[SkipBotDetection] — no detection at all",
+        ["GET /health"] = "[SkipBotDetection] - no detection at all",
 
         // Diagnostics
         ["GET /bot-detection/check"] = "Full detection breakdown (built-in)",
@@ -65,15 +65,15 @@ app.MapGet("/", (HttpContext ctx) => Results.Ok(new
     }
 }));
 
-// .BlockBots() — blocks bots, allows search engines
+// .BlockBots() - blocks bots, allows search engines
 app.MapGet("/api/data", (HttpContext ctx) => Results.Ok(new
 {
-    message = "API data — search engines welcome, scrapers blocked",
+    message = "API data - search engines welcome, scrapers blocked",
     data = new[] { "item1", "item2", "item3" }
 }))
 .BlockBots(allowSearchEngines: true);
 
-// .RequireHuman() — blocks ALL bots including verified crawlers
+// .RequireHuman() - blocks ALL bots including verified crawlers
 app.MapGet("/api/submit", (HttpContext ctx) => Results.Ok(new
 {
     message = "Form submitted successfully",
@@ -81,10 +81,10 @@ app.MapGet("/api/submit", (HttpContext ctx) => Results.Ok(new
 }))
 .RequireHuman();
 
-// .BlockBots(minConfidence: 0.9) — only blocks high-confidence bots
+// .BlockBots(minConfidence: 0.9) - only blocks high-confidence bots
 app.MapGet("/api/premium", (HttpContext ctx) => Results.Ok(new
 {
-    message = "Premium content — only high-confidence bots are blocked",
+    message = "Premium content - only high-confidence bots are blocked",
     confidence = ctx.GetBotConfidence()
 }))
 .BlockBots(minConfidence: 0.9);

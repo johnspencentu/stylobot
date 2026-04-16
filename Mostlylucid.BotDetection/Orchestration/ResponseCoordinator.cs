@@ -108,7 +108,7 @@ public sealed class ResponseCoordinatorOptions
     };
 
     /// <summary>
-    ///     Honeypot path patterns — glob wildcards (* and ?) supported.
+    ///     Honeypot path patterns - glob wildcards (* and ?) supported.
     ///     Paths without wildcards match as prefix.
     ///     Override via appsettings.json: BotDetection:ResponseCoordinator:HoneypotPaths
     ///     Examples: "/wp-*" matches /wp-admin, /wp-login.php, /wp-config.php
@@ -345,7 +345,7 @@ public sealed class ResponseCoordinator : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            // Log but do NOT rethrow — rethrowing would kill the KeyedSequentialAtom processing loop
+            // Log but do NOT rethrow - rethrowing would kill the KeyedSequentialAtom processing loop
             _logger.LogError(ex,
                 "Failed to process response signal for {ClientId}",
                 signal.ClientId);
@@ -518,7 +518,7 @@ internal sealed class ClientResponseTrackingAtom : IDisposable
         // Count auth failures (401/403)
         var authFailures = responseList.Count(r => r.StatusCode == 401 || r.StatusCode == 403);
 
-        // Count honeypot hits — patterns support * and ? glob wildcards
+        // Count honeypot hits - patterns support * and ? glob wildcards
         // e.g. "/wp-*" matches /wp-admin, /wp-login.php, /wp-config.php
         var honeypotHits = responseList.Count(r =>
             _options.HoneypotPaths.Any(hp => MatchesHoneypotPattern(r.Path, hp)));
@@ -584,12 +584,12 @@ internal sealed class ClientResponseTrackingAtom : IDisposable
         var score = 0.0;
         var weights = _options.FeatureWeights;
 
-        // 4xx ratio — high proportion of client errors is unusual for real browsers
+        // 4xx ratio - high proportion of client errors is unusual for real browsers
         var fourXxRatio = (double)count4xx / total;
         if (fourXxRatio > 0.4)
             score += weights.FourXxRatio * fourXxRatio;
 
-        // 404 scan pattern — real humans rarely hit multiple unique 404 paths
+        // 404 scan pattern - real humans rarely hit multiple unique 404 paths
         // 3+ unique 404 paths is suspicious, 5+ is scanning
         if (unique404Paths >= 3)
         {
@@ -640,7 +640,7 @@ internal sealed class ClientResponseTrackingAtom : IDisposable
             return System.IO.Enumeration.FileSystemName.MatchesSimpleExpression(
                 pattern, path, ignoreCase: true);
 
-        // No wildcards — treat as prefix match (backward compatible with old StartsWith behavior)
+        // No wildcards - treat as prefix match (backward compatible with old StartsWith behavior)
         return path.StartsWith(pattern, StringComparison.OrdinalIgnoreCase);
     }
 }

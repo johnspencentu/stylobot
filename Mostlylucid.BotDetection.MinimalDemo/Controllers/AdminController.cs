@@ -13,19 +13,19 @@ namespace Mostlylucid.BotDetection.MinimalDemo.Controllers;
 [RequireHuman]
 public class AdminController : ControllerBase
 {
-    // GET /admin — humans only
+    // GET /admin - humans only
     [HttpGet]
     public IActionResult Dashboard()
     {
         return Ok(new
         {
-            message = "Admin dashboard — humans only",
+            message = "Admin dashboard - humans only",
             confidence = HttpContext.GetBotConfidence(),
             riskBand = HttpContext.GetRiskBand().ToString()
         });
     }
 
-    // GET /admin/settings — humans only (inherited)
+    // GET /admin/settings - humans only (inherited)
     [HttpGet("settings")]
     public IActionResult Settings()
     {

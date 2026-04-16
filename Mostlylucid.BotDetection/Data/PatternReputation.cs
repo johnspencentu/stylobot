@@ -86,7 +86,7 @@ public record PatternReputation
     /// </summary>
     public double FastPathWeight => State switch
     {
-        ReputationState.ConfirmedBad => Math.Min(BotScore * 0.6, 0.5), // Capped — can't dominate alone
+        ReputationState.ConfirmedBad => Math.Min(BotScore * 0.6, 0.5), // Capped - can't dominate alone
         ReputationState.Suspect => Math.Min(BotScore * 0.3, 0.25), // Moderate bias, never overwhelming
         ReputationState.Neutral => BotScore * 0.05, // Negligible
         ReputationState.ConfirmedGood => -0.2, // Reduces suspicion
@@ -366,7 +366,7 @@ public class PatternReputationUpdater
         // Scale factor: 0.5 (confidence=0) to 1.0 (confidence=1.0)
         var confidenceScale = 0.5 + reputation.Confidence * 0.5;
 
-        // ConfirmedBad patterns use longer decay tau — they earned their status through
+        // ConfirmedBad patterns use longer decay tau - they earned their status through
         // strong evidence (score >= 0.9, support >= 50) and shouldn't lose it easily.
         // This prevents the decay→demotion→re-evaluation→oscillation cycle.
         var isConfirmedBad = reputation.State == ReputationState.ConfirmedBad;
@@ -428,7 +428,7 @@ public class PatternReputationUpdater
             case ReputationState.ConfirmedBad:
                 // Demote to Suspect when score drops (via new human evidence or time decay).
                 // Two paths: (1) enough support to credibly downgrade (high evidence), or
-                // (2) support has decayed below the original promotion threshold — the
+                // (2) support has decayed below the original promotion threshold - the
                 // "confirmed" status is no longer supported by sufficient observations.
                 if (score <= _options.DemoteFromBadScore &&
                     (support >= _options.DemoteFromBadSupport || support < _options.PromoteToBadSupport))

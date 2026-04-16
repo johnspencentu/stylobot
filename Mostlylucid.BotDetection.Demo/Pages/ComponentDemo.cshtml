@@ -123,7 +123,7 @@
 </head>
 <body>
 <h1>sb-* Component TagHelpers Demo</h1>
-<p class="subtitle">Content gating, data display, and form protection — all from simple HTML tags</p>
+<p class="subtitle">Content gating, data display, and form protection - all from simple HTML tags</p>
 
 <div class="nav-buttons">
     <a href="/bot-test" class="nav-btn">&#8592; Main Demo</a>
@@ -183,7 +183,7 @@
 <div class="section">
     <h2>Summary Card</h2>
     <div class="info-box">
-        <strong>&lt;sb-summary variant="card" /&gt;</strong> — a boxed layout with badge, risk pill, and stats.
+        <strong>&lt;sb-summary variant="card" /&gt;</strong> - a boxed layout with badge, risk pill, and stats.
     </div>
     <sb-summary variant="card" />
 </div>
@@ -192,23 +192,23 @@
 <div class="section">
     <h2>Content Gating TagHelpers</h2>
     <div class="info-box">
-        <strong>Conditional rendering</strong> — content is shown or hidden based on detection results.
+        <strong>Conditional rendering</strong> - content is shown or hidden based on detection results.
         If you're viewing this in a browser, you should see the "human" blocks and not the "bot" blocks.
     </div>
 
-    <h3 style="color: #58a6ff; font-size: 1em; margin-bottom: 12px;">&lt;sb-human&gt; — Human-only content</h3>
+    <h3 style="color: #58a6ff; font-size: 1em; margin-bottom: 12px;">&lt;sb-human&gt; - Human-only content</h3>
     <div class="gated-content visible">
         <sb-human>This content is only visible to humans. Welcome, real person!</sb-human>
         <sb-human fallback="hide"><em>(This also shows only for humans, but hides if detection hasn't run)</em></sb-human>
     </div>
 
-    <h3 style="color: #58a6ff; font-size: 1em; margin: 20px 0 12px;">&lt;sb-bot&gt; — Bot-only content</h3>
+    <h3 style="color: #58a6ff; font-size: 1em; margin: 20px 0 12px;">&lt;sb-bot&gt; - Bot-only content</h3>
     <div class="gated-content">
         <sb-bot>This content is only visible to bots. You are automated.</sb-bot>
-        <span class="hidden-note">(If you see nothing here, that means you're human — the bot-only content is hidden)</span>
+        <span class="hidden-note">(If you see nothing here, that means you're human - the bot-only content is hidden)</span>
     </div>
 
-    <h3 style="color: #58a6ff; font-size: 1em; margin: 20px 0 12px;">&lt;sb-gate&gt; — Universal gate</h3>
+    <h3 style="color: #58a6ff; font-size: 1em; margin: 20px 0 12px;">&lt;sb-gate&gt; - Universal gate</h3>
     <div class="gated-content visible">
         <sb-gate human-only>
             <strong>human-only gate:</strong> You passed the human-only gate.
@@ -218,24 +218,24 @@
         <sb-gate bot-only>
             <strong>bot-only gate:</strong> You passed the bot-only gate.
         </sb-gate>
-        <span class="hidden-note">(bot-only gate — hidden for humans)</span>
+        <span class="hidden-note">(bot-only gate - hidden for humans)</span>
     </div>
     <div class="gated-content visible">
         <sb-gate max-risk="Low">
-            <strong>max-risk="Low" gate:</strong> Your risk is Low or below — content visible.
+            <strong>max-risk="Low" gate:</strong> Your risk is Low or below - content visible.
         </sb-gate>
         <sb-gate min-risk="Medium">
-            <strong>min-risk="Medium" gate:</strong> Your risk is Medium or above — content visible.
+            <strong>min-risk="Medium" gate:</strong> Your risk is Medium or above - content visible.
         </sb-gate>
     </div>
     <div class="gated-content visible">
         <sb-gate human-only negate>
             <strong>negate test:</strong> This shows when the human-only condition is NEGATED (i.e., you're a bot).
         </sb-gate>
-        <span class="hidden-note">(negated human-only — hidden for actual humans)</span>
+        <span class="hidden-note">(negated human-only - hidden for actual humans)</span>
     </div>
 
-    <h3 style="color: #58a6ff; font-size: 1em; margin: 20px 0 12px;">&lt;sb-risk&gt; — Risk band gate</h3>
+    <h3 style="color: #58a6ff; font-size: 1em; margin: 20px 0 12px;">&lt;sb-risk&gt; - Risk band gate</h3>
     <div class="gated-content visible">
         <sb-risk max="Elevated">
             <strong>max="Elevated":</strong> Visible when risk is Elevated or below.
@@ -245,7 +245,7 @@
         <sb-risk min="High" fallback="hide">
             <strong>min="High":</strong> Visible only for High risk or above.
         </sb-risk>
-        <span class="hidden-note">(min="High" — hidden for low-risk visitors)</span>
+        <span class="hidden-note">(min="High" - hidden for low-risk visitors)</span>
     </div>
 </div>
 
@@ -253,7 +253,7 @@
 <div class="section">
     <h2>Signal-Based Gating: &lt;sb-signal&gt;</h2>
     <div class="info-box">
-        <strong>Gate content on detection signals</strong> — VPN, country, datacenter, bot UA, and more.
+        <strong>Gate content on detection signals</strong> - VPN, country, datacenter, bot UA, and more.
     </div>
 
     <div class="gated-content">
@@ -301,11 +301,11 @@
     {
         if (honeypotTriggered)
         {
-            <div class="honeypot-result triggered">Honeypot triggered — a trap field was filled in. This looks like a bot!</div>
+            <div class="honeypot-result triggered">Honeypot triggered - a trap field was filled in. This looks like a bot!</div>
         }
         else
         {
-            <div class="honeypot-result clean">Honeypot clean — no trap fields filled. This looks like a human submission.</div>
+            <div class="honeypot-result clean">Honeypot clean - no trap fields filled. This looks like a human submission.</div>
         }
     }
 </div>

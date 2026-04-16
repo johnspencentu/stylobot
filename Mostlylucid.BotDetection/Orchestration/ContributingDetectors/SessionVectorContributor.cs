@@ -82,12 +82,12 @@ public class SessionVectorContributor : ConfiguredContributorBase
                 path,
                 statusCode > 0 ? statusCode : 200);
 
-            // Build fingerprint context from blackboard signals — these are per-session
+            // Build fingerprint context from blackboard signals - these are per-session
             // constants that become dimensions in the unified vector. Fingerprint mutation
             // across sessions appears as velocity in these dimensions.
             var fpContext = BuildFingerprintContext(state);
 
-            // Record request — may return a completed session snapshot (retrogressive boundary)
+            // Record request - may return a completed session snapshot (retrogressive boundary)
             var completedSession = _sessionStore.RecordRequest(signature, sessionRequest, fpContext);
 
             // Write session signals

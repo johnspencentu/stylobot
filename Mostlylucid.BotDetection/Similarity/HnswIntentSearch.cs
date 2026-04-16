@@ -8,7 +8,7 @@ namespace Mostlylucid.BotDetection.Similarity;
 
 /// <summary>
 ///     File-backed HNSW similarity search for intent patterns.
-///     Separate index from signature similarity — stores WHAT sessions do (intent vectors)
+///     Separate index from signature similarity - stores WHAT sessions do (intent vectors)
 ///     rather than WHO they are (identity vectors). Enables the learning loop where
 ///     LLM classifications get embedded for future fast-path matching.
 /// </summary>

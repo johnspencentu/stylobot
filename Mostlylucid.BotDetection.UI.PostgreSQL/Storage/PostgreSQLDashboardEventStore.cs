@@ -42,7 +42,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
     private void TripCircuit()
     {
         var newTicks = (DateTime.UtcNow + CircuitBreakDuration).Ticks;
-        // Only extend, never shorten — compare-and-swap loop
+        // Only extend, never shorten - compare-and-swap loop
         long current;
         do
         {
@@ -50,7 +50,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
             if (current >= newTicks) return;
         } while (Interlocked.CompareExchange(ref _circuitOpenUntilTicks, newTicks, current) != current);
 
-        _logger.LogWarning("PostgreSQL circuit breaker tripped — skipping DB calls for {Seconds}s", CircuitBreakDuration.TotalSeconds);
+        _logger.LogWarning("PostgreSQL circuit breaker tripped - skipping DB calls for {Seconds}s", CircuitBreakDuration.TotalSeconds);
     }
 
     public async Task AddDetectionAsync(DashboardDetectionEvent detection)
@@ -566,7 +566,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
     {
         if (IsCircuitOpen) return [];
 
-        // Query detections grouped by signature — works even when dashboard_signatures
+        // Query detections grouped by signature - works even when dashboard_signatures
         // is empty (e.g. upstream-trusted mode where signatures aren't stored separately).
         var timeFilter = "";
         var parameters = new DynamicParameters();
@@ -1105,7 +1105,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
             Path = row.Path,
             StatusCode = row.StatusCode,
             ProcessingTimeMs = row.ProcessingTimeMs,
-            // IP and UA are stored as hashes — never return raw PII from DB
+            // IP and UA are stored as hashes - never return raw PII from DB
             IpAddress = row.IpAddressHash,
             UserAgent = row.UserAgentHash,
             TopReasons = string.IsNullOrEmpty(row.TopReasons)

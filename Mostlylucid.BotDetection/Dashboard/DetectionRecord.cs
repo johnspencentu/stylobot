@@ -240,7 +240,7 @@ public static class DetectionRecordFactory
         IReadOnlyDictionary<string, object> signals)
     {
         // Pass all signals EXCEPT known PII keys (blocklist approach).
-        // The old allowedPrefixes whitelist was too restrictive — it missed most
+        // The old allowedPrefixes whitelist was too restrictive - it missed most
         // detector signals (bot.*, cluster.*, similarity.*, heuristic.*, fingerprint.*,
         // reputation.*, cache.*, response.*, version.*, tls.*, tcpip.*, h2.*, h3.*, etc.)
         var blockedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

@@ -1,6 +1,6 @@
 @using Mostlylucid.BotDetection.UI.Models
 @*
-    Shared Top Bots component — used on both dashboard and marketing home page.
+    Shared Top Bots component - used on both dashboard and marketing home page.
     Renders a sortable, paginated table with inline SVG sparklines.
 
     Usage:
@@ -71,7 +71,7 @@
                                   :class="bot.botProbability >= 0.85 ? 'text-error' : bot.botProbability >= 0.6 ? 'text-warning' : 'text-info'"
                                   x-text="Math.round(bot.botProbability * 100) + '%'"></span>
                         </td>
-                        <!-- Sparkline (programmatic SVG — no x-html to avoid XSS) -->
+                        <!-- Sparkline (programmatic SVG - no x-html to avoid XSS) -->
                         <td class="text-center hidden sm:table-cell">
                             <svg width="60" height="20" class="inline-block"
                                  x-effect="renderSparklineTo($el, bot)"></svg>
@@ -252,7 +252,7 @@
                 const avg = data.reduce((a, b) => a + b, 0) / data.length;
                 const color = avg >= 0.85 ? '#f87171' : avg >= 0.6 ? '#fbbf24' : '#38bdf8';
 
-                // Programmatic SVG creation — safe, no innerHTML/XSS risk
+                // Programmatic SVG creation - safe, no innerHTML/XSS risk
                 const ns = 'http://www.w3.org/2000/svg';
                 const poly = document.createElementNS(ns, 'polyline');
                 poly.setAttribute('points', points);

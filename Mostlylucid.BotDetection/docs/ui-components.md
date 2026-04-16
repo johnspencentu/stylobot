@@ -1,6 +1,6 @@
 # UI Components (Tag Helpers & View Components)
 
-The `Mostlylucid.BotDetection.UI` package provides Razor Tag Helpers and View Components for rendering bot detection results directly in your pages. All components read detection data from `HttpContext.Items` — no manual wiring needed.
+The `Mostlylucid.BotDetection.UI` package provides Razor Tag Helpers and View Components for rendering bot detection results directly in your pages. All components read detection data from `HttpContext.Items` - no manual wiring needed.
 
 ## Setup
 
@@ -171,7 +171,7 @@ Inline detection badge showing bot/human status with risk colouring. Renders via
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `variant` | string | `"full"` | `"full"` (icon + label + risk), `"compact"` (icon + risk), `"icon"` (icon only) |
-| `class` | string | — | Additional CSS classes |
+| `class` | string | - | Additional CSS classes |
 
 ```cshtml
 <!-- Full badge with icon, label, and risk -->
@@ -204,7 +204,7 @@ Bot probability confidence meter. Renders via the `SbConfidenceViewComponent`.
 |-----------|------|---------|-------------|
 | `display` | string | `"bar"` | `"bar"`, `"text"`, or `"both"` |
 | `width` | string | `"120px"` | CSS width for the bar |
-| `class` | string | — | Additional CSS classes |
+| `class` | string | - | Additional CSS classes |
 
 ```cshtml
 <!-- Default bar display -->
@@ -219,11 +219,11 @@ Bot probability confidence meter. Renders via the `SbConfidenceViewComponent`.
 
 ### `<sb-risk-pill />`
 
-Compact coloured risk band pill. Renders a single `<span>` — no ViewComponent needed.
+Compact coloured risk band pill. Renders a single `<span>` - no ViewComponent needed.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `class` | string | — | Additional CSS classes |
+| `class` | string | - | Additional CSS classes |
 
 ```cshtml
 <sb-risk-pill />
@@ -241,7 +241,7 @@ Full detection summary. Renders via the `SbSummaryViewComponent` with two varian
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `variant` | string | `"inline"` | `"inline"` (compact one-liner) or `"card"` (full card with stats) |
-| `class` | string | — | Additional CSS classes |
+| `class` | string | - | Additional CSS classes |
 
 ```cshtml
 <!-- Inline summary -->
@@ -278,7 +278,7 @@ public IActionResult Submit()
 {
     if (HoneypotValidator.IsTriggered(Request))
     {
-        // Bot detected — fake success or block
+        // Bot detected - fake success or block
         return Ok("Thank you!"); // Stealth response
     }
     // Process real submission...
@@ -303,8 +303,8 @@ All components use the `sb-` prefix. Include `sb-components.css` for default sty
 
 All gating tag helpers support a `fallback` attribute that controls what happens when bot detection hasn't run for the current request (e.g. the path is excluded):
 
-- `"show"` (default for most) — fail-open, content is visible
-- `"hide"` — fail-closed, content is suppressed
+- `"show"` (default for most) - fail-open, content is visible
+- `"hide"` - fail-closed, content is suppressed
 
 Choose based on your security requirements. For sensitive content, use `fallback="hide"`.
 
@@ -312,4 +312,4 @@ Choose based on your security requirements. For sensitive content, use `fallback
 
 1. `BotDetectionMiddleware` runs the detection pipeline and stores results in `HttpContext.Items`
 2. Tag helpers read results via `DetectionDataExtractor`, which pulls from `HttpContext.Items`
-3. No extra HTTP calls or database lookups — all data is in-memory per request
+3. No extra HTTP calls or database lookups - all data is in-memory per request

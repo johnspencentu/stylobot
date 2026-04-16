@@ -40,7 +40,7 @@ public sealed class VerifiedBotRegistryOptions
 ///     Singleton service that verifies bot identity using published IP ranges and FCrDNS.
 ///     Bots claim identity via User-Agent, but UA is trivially spoofable.
 ///     This service verifies claims by checking:
-///     1. Published CIDR ranges (Google, Bing, OpenAI) — instant O(n) lookup
+///     1. Published CIDR ranges (Google, Bing, OpenAI) - instant O(n) lookup
 ///     2. Forward-Confirmed reverse DNS (FCrDNS) for bots without published ranges
 ///     IP ranges are refreshed periodically via a background timer.
 ///     DNS verified results cached (configurable), failed results cached shorter.
@@ -58,7 +58,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
     private Timer? _refreshTimer;
     private int _refreshing; // Guard against overlapping refreshes
 
-    // Configurable timing — bound from VerifiedBotRegistryOptions (appsettings.json)
+    // Configurable timing - bound from VerifiedBotRegistryOptions (appsettings.json)
     private readonly TimeSpan _dnsVerifiedCacheTtl;
     private readonly TimeSpan _dnsFailedCacheTtl;
     private readonly TimeSpan _refreshInterval;
@@ -146,7 +146,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
 
             // Has IP ranges loaded but IP didn't match any.
             // If this bot ALSO has FCrDNS domains, try that as fallback.
-            // Otherwise, the IP is definitely not from this bot — spoofed.
+            // Otherwise, the IP is definitely not from this bot - spoofed.
             if (matchedBot.FcrDnsDomains is not { Length: > 0 })
                 return new VerifiedBotResult(matchedBot.Name, "ip_range", false);
         }
@@ -163,7 +163,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
     }
 
     /// <summary>
-    ///     Synchronous quick check — returns the bot name if UA matches, null otherwise.
+    ///     Synchronous quick check - returns the bot name if UA matches, null otherwise.
     ///     Does NOT verify IP. Use <see cref="VerifyBotAsync"/> for full verification.
     /// </summary>
     public string? MatchBotUserAgent(string? userAgent)
@@ -189,7 +189,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
     ///     2. Check hostname suffix matches expected domains
     ///     3. Forward DNS: hostname → IP (A/AAAA record)
     ///     4. Verify the original IP appears in the forward result
-    ///     This prevents DNS spoofing — an attacker can set a PTR record for their IP
+    ///     This prevents DNS spoofing - an attacker can set a PTR record for their IP
     ///     to claim "googlebot.com", but the forward lookup of that hostname won't resolve
     ///     back to the attacker's IP.
     /// </summary>
@@ -267,7 +267,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
                 return false;
             }
 
-            // Step 3: Forward DNS — confirm hostname resolves back to the original IP
+            // Step 3: Forward DNS - confirm hostname resolves back to the original IP
             using var fwdCts = new CancellationTokenSource(_dnsTimeout);
             IPAddress[] forwardAddresses;
             try
@@ -298,7 +298,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
             if (!verified)
             {
                 _logger.LogDebug(
-                    "FCrDNS forward lookup for {Hostname} did not return expected IP — possible PTR spoof",
+                    "FCrDNS forward lookup for {Hostname} did not return expected IP - possible PTR spoof",
                     hostname);
             }
 
@@ -417,14 +417,14 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        // Best-effort initial load — don't block app startup if IP range endpoints are down
+        // Best-effort initial load - don't block app startup if IP range endpoints are down
         try
         {
             await RefreshAllRangesAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to load IP ranges on startup — will retry in {Hours}h",
+            _logger.LogWarning(ex, "Failed to load IP ranges on startup - will retry in {Hours}h",
                 _refreshInterval.TotalHours);
         }
 
@@ -444,7 +444,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Periodic IP range refresh failed — will retry in {Hours}h",
+            _logger.LogWarning(ex, "Periodic IP range refresh failed - will retry in {Hours}h",
                 _refreshInterval.TotalHours);
         }
     }

@@ -49,10 +49,10 @@ public static class LeidenClustering
         {
             var improved = false;
 
-            // Phase 1: Local moving — try moving each node to best neighboring community
+            // Phase 1: Local moving - try moving each node to best neighboring community
             improved |= LocalMovingPhase(adjacency, communities, nodeCount, resolution, totalWeight, rng);
 
-            // Phase 2: Refinement — ensure communities are well-connected
+            // Phase 2: Refinement - ensure communities are well-connected
             RefinePhase(adjacency, communities, nodeCount, resolution);
 
             if (!improved)

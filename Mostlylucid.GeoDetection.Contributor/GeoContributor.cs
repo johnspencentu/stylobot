@@ -423,11 +423,11 @@ public class GeoContributor : ContributingDetectorBase
         if (addr.IsIPv6LinkLocal)
             return true;
 
-        // IPv6 site-local (fec0::/10 — deprecated but still used)
+        // IPv6 site-local (fec0::/10 - deprecated but still used)
         if (addr.IsIPv6SiteLocal)
             return true;
 
-        // IPv6 unique local address (fc00::/7 — ULA, equivalent to RFC 1918)
+        // IPv6 unique local address (fc00::/7 - ULA, equivalent to RFC 1918)
         if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
         {
             var bytes = addr.GetAddressBytes();

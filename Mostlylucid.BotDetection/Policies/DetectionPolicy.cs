@@ -79,7 +79,7 @@ public sealed record DetectionPolicy
     ///     Even if bot probability exceeds <see cref="ImmediateBlockThreshold" />,
     ///     blocking only occurs when confidence meets this gate.
     ///     This prevents low-evidence verdicts from triggering blocks.
-    ///     Default: 0.0 (no confidence gate — backwards compatible).
+    ///     Default: 0.0 (no confidence gate - backwards compatible).
     /// </summary>
     public double MinConfidence { get; init; }
 
@@ -174,7 +174,7 @@ public sealed record DetectionPolicy
         // Wave 0 (no triggers): FastPathReputation, TimescaleReputation, UserAgent, Header, Ip, SecurityTool, Behavioral, CacheBehavior
         // Wave 1 (trigger on ua.raw): Inconsistency, VersionAge, Heuristic, HeuristicLate, ReputationBias
         // Wave 1+ (trigger on fingerprint): ClientSide
-        // NOTE: ProjectHoneypot is EXCLUDED from default — DNS lookups run via BackgroundEnrichmentService
+        // NOTE: ProjectHoneypot is EXCLUDED from default - DNS lookups run via BackgroundEnrichmentService
         // and feed results into reputation for next request. Still runs in Learning/Demo policies.
         FastPathDetectors =
         [

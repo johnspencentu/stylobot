@@ -51,7 +51,7 @@ public class VisitorCacheWarmupService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to warm visitor cache from event store — will populate from live traffic");
+            _logger.LogWarning(ex, "Failed to warm visitor cache from event store - will populate from live traffic");
         }
     }
 }

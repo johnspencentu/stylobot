@@ -11,7 +11,7 @@ namespace Mostlylucid.BotDetection.Services;
 /// <summary>
 ///     Background service that processes LLM classification requests sequentially.
 ///     Uses a bounded Channel&lt;T&gt; with DropOldest backpressure.
-///     Fire-and-forget from the detection pipeline — no parallelism, one at a time.
+///     Fire-and-forget from the detection pipeline - no parallelism, one at a time.
 ///     Tracks queue depth and provides adaptive sampling rates.
 ///     When no LlmClassificationService is registered (no LLM provider), becomes a no-op.
 /// </summary>
@@ -202,7 +202,7 @@ public class LlmClassificationCoordinator : BackgroundService
             _reputationCache.Update(updated);
         }
 
-        // Score change narrative — if score changed by >0.2, generate a narrative
+        // Score change narrative - if score changed by >0.2, generate a narrative
         var scoreChange = Math.Abs(result.Confidence - previousScore);
         if (scoreChange > 0.2 && _resultCallback != null)
         {

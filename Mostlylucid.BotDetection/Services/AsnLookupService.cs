@@ -54,7 +54,7 @@ public interface IAsnLookupService
 
 public class AsnLookupService : IAsnLookupService
 {
-    // Known datacenter ASNs — maps ASN number to friendly provider name
+    // Known datacenter ASNs - maps ASN number to friendly provider name
     private static readonly Dictionary<int, string> KnownDatacenterAsns = new()
     {
         // Major cloud providers

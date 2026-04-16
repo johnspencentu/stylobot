@@ -1,4 +1,4 @@
-﻿Here we go — a **Content Inspector** spec that plugs cleanly into your existing semantic firewall / botdetection /
+﻿Here we go - a **Content Inspector** spec that plugs cleanly into your existing semantic firewall / botdetection /
 gateway ideas, with as many detectors & “contributors” as I can cram in without turning it into an RFC.
 
 ---

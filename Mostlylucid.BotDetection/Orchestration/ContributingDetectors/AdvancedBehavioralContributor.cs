@@ -121,7 +121,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 }
             }
 
-            // 2. Timing Entropy — still applies to streaming (machine-gun reconnects are suspicious)
+            // 2. Timing Entropy - still applies to streaming (machine-gun reconnects are suspicious)
             var timingEntropy = _analyzer.CalculateTimingEntropy(clientIp);
             if (timingEntropy > 0)
                 // Very low timing entropy (<0.3) = too regular (bot)
@@ -138,7 +138,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                     });
                 }
 
-            // 3. Timing Anomaly Detection — still applies to streaming
+            // 3. Timing Anomaly Detection - still applies to streaming
             var (isAnomaly, zScore, anomalyDesc) = _analyzer.DetectTimingAnomaly(clientIp, currentTime);
             if (isAnomaly)
             {
@@ -153,7 +153,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 });
             }
 
-            // 4. Regular Pattern Detection (Coefficient of Variation) — still applies to streaming
+            // 4. Regular Pattern Detection (Coefficient of Variation) - still applies to streaming
             var (isTooRegular, cv, cvDesc) = _analyzer.DetectRegularPattern(clientIp);
             if (isTooRegular)
             {
@@ -168,7 +168,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 });
             }
 
-            // 5. Navigation Pattern Analysis (Markov) — skip for streaming
+            // 5. Navigation Pattern Analysis (Markov) - skip for streaming
             if (!isStreaming)
             {
                 var (transitionScore, navPattern) = _analyzer.AnalyzeNavigationPattern(clientIp, currentPath);
@@ -186,7 +186,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 }
             }
 
-            // 6. Burst Detection — skip for streaming (SignalR reconnect storms are normal;
+            // 6. Burst Detection - skip for streaming (SignalR reconnect storms are normal;
             // BehavioralWaveformContributor handles streaming-specific bursts with higher thresholds)
             if (!isStreaming)
             {

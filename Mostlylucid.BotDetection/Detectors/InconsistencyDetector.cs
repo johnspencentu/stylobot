@@ -46,14 +46,14 @@ public partial class InconsistencyDetector : IDetector
             var acceptLanguage = headers.AcceptLanguage.ToString();
             var accept = headers.Accept.ToString();
 
-            // Check for programmatic request attestation — legitimate API/fetch
+            // Check for programmatic request attestation - legitimate API/fetch
             // requests don't carry all browser headers and should not be penalized.
             var secFetchSite = headers["Sec-Fetch-Site"].FirstOrDefault();
             var hasFetchMetadata = !string.IsNullOrEmpty(secFetchSite);
             var hasApiKey = context.Items.ContainsKey("BotDetection.ApiKeyContext");
 
             // WebSocket upgrades and streaming transports legitimately omit Accept-Language,
-            // cookies, and other browser headers — per RFC 6455 and HTTP spec.
+            // cookies, and other browser headers - per RFC 6455 and HTTP spec.
             var isWebSocketUpgrade = string.Equals(
                 headers.Upgrade.ToString(), "websocket", StringComparison.OrdinalIgnoreCase);
             var acceptHeader = headers.Accept.ToString();
@@ -100,7 +100,7 @@ public partial class InconsistencyDetector : IDetector
             }
 
             // === Check 3: Browser claims vs headers ===
-            // Skip for WebSocket upgrades — Sec-Fetch-Mode and sec-ch-ua are not sent on WS handshakes
+            // Skip for WebSocket upgrades - Sec-Fetch-Mode and sec-ch-ua are not sent on WS handshakes
             if (uaClaims.ClaimsChrome && !headers.ContainsKey("Sec-Fetch-Mode") &&
                 !headers.ContainsKey("sec-ch-ua") && !isWebSocketUpgrade)
                 // Modern Chrome always sends these headers
@@ -134,7 +134,7 @@ public partial class InconsistencyDetector : IDetector
             // === Check 5: Generic Accept header with specific browser UA ===
             // Skip for programmatic requests: browser fetch() sends Accept: */* by default,
             // and API clients correctly use */* per HTTP spec. Only flag when there's no
-            // fetch metadata or API key — pure UA spoofing without browser attestation.
+            // fetch metadata or API key - pure UA spoofing without browser attestation.
             if (accept == "*/*" && (uaClaims.ClaimsChrome || uaClaims.ClaimsFirefox || uaClaims.ClaimsSafari)
                 && !isProgrammatic)
             {
@@ -148,7 +148,7 @@ public partial class InconsistencyDetector : IDetector
             }
 
             // === Check 6: HTTP/2 claims but using HTTP/1.1 features ===
-            // Skip for WebSocket — Connection: Upgrade is required by RFC 6455
+            // Skip for WebSocket - Connection: Upgrade is required by RFC 6455
             var connection = headers.Connection.ToString().ToLowerInvariant();
             if (connection == "keep-alive" && uaClaims.ClaimsChrome && uaClaims.ChromeVersion >= 90
                 && !isWebSocketUpgrade)

@@ -5,7 +5,7 @@ using Mostlylucid.BotDetection.UI.Services;
 namespace Mostlylucid.BotDetection.UI.TagHelpers;
 
 /// <summary>
-///     Renders a colored risk band pill. No ViewComponent needed — outputs a single span.
+///     Renders a colored risk band pill. No ViewComponent needed - outputs a single span.
 /// </summary>
 /// <example>
 ///     <code>&lt;sb-risk-pill /&gt;</code>

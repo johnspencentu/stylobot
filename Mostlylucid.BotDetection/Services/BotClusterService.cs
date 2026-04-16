@@ -197,7 +197,7 @@ public class BotClusterService : BackgroundService
         // 1. Snapshot all behaviors from the signature coordinator
         var allBehaviors = _signatureCoordinator.GetFamilyAwareBehaviors();
 
-        // Cluster ALL traffic — Leiden naturally forms communities for bots AND humans
+        // Cluster ALL traffic - Leiden naturally forms communities for bots AND humans
         var behaviors = allBehaviors.ToList();
 
         if (behaviors.Count < _options.MinClusterSize)
@@ -347,7 +347,7 @@ public class BotClusterService : BackgroundService
                 .ToDictionary(k => k.Key, v => v.Value)
         };
 
-        // Always fire event — even when clusters dissolve, so callbacks can update
+        // Always fire event - even when clusters dissolve, so callbacks can update
         ClustersUpdated?.Invoke(newClusters.Values.ToList(), behaviors);
     }
 
@@ -648,7 +648,7 @@ public class BotClusterService : BackgroundService
                 return 1.0;
 
             // Same country, no region data or different regions
-            // When neither has lat/lon, country is our best data — score high
+            // When neither has lat/lon, country is our best data - score high
             var neitherHasLatLon = !a.Latitude.HasValue && !b.Latitude.HasValue;
             return neitherHasLatLon ? 1.0 : 0.7;
         }
@@ -657,11 +657,11 @@ public class BotClusterService : BackgroundService
             string.Equals(a.ContinentCode, b.ContinentCode, StringComparison.OrdinalIgnoreCase))
             return 0.4;
 
-        // No geo data available for either — neutral (no penalty, no bonus)
+        // No geo data available for either - neutral (no penalty, no bonus)
         if (string.IsNullOrEmpty(a.CountryCode) && string.IsNullOrEmpty(b.CountryCode))
             return 1.0;
 
-        // One has geo, other doesn't — slight penalty
+        // One has geo, other doesn't - slight penalty
         return 0.3;
     }
 
@@ -840,7 +840,7 @@ public class BotClusterService : BackgroundService
 
         // Average similarity across connected pairs only (not all possible pairs).
         // Dividing by all-pairs dilutes the average because non-edges are below the
-        // similarity threshold, not zero-similarity — using connected pairs gives
+        // similarity threshold, not zero-similarity - using connected pairs gives
         // a truthful representation of intra-cluster cohesion.
         var totalPossiblePairs = memberIndices.Count * (memberIndices.Count - 1) / 2;
         var avgSimilarity = simCount > 0 ? totalSim / simCount : 0;
@@ -863,7 +863,7 @@ public class BotClusterService : BackgroundService
         }
         else if (avgBotProb < 0.5)
         {
-            // Mixed — some borderline, some human
+            // Mixed - some borderline, some human
             clusterType = BotClusterType.Mixed;
         }
         else if (avgSimilarity >= _options.ProductSimilarityThreshold)

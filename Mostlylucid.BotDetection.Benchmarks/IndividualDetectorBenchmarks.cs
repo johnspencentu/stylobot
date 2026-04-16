@@ -66,7 +66,7 @@ public class IndividualDetectorBenchmarks
 
         _serviceProvider = services.BuildServiceProvider();
 
-        // Get detectors — all registered as IContributingDetector, resolve by type
+        // Get detectors - all registered as IContributingDetector, resolve by type
         var allDetectors = _serviceProvider.GetServices<IContributingDetector>().ToList();
         _userAgentDetector = allDetectors.OfType<UserAgentContributor>().First();
         _ipDetector = allDetectors.OfType<IpContributor>().First();
@@ -265,7 +265,7 @@ public class IndividualDetectorBenchmarks
 
     // ===== State creation helpers =====
 
-    /// <summary>Normal GET to / — should be zero-allocation fast path.</summary>
+    /// <summary>Normal GET to / - should be zero-allocation fast path.</summary>
     private BlackboardState CreateHaxxorCleanState()
     {
         var context = new DefaultHttpContext();
@@ -289,7 +289,7 @@ public class IndividualDetectorBenchmarks
         };
     }
 
-    /// <summary>SQL injection in query string — should trigger detection.</summary>
+    /// <summary>SQL injection in query string - should trigger detection.</summary>
     private BlackboardState CreateHaxxorSqliState()
     {
         var context = new DefaultHttpContext();
@@ -312,7 +312,7 @@ public class IndividualDetectorBenchmarks
         };
     }
 
-    /// <summary>WordPress admin probe — should trigger path probe detection.</summary>
+    /// <summary>WordPress admin probe - should trigger path probe detection.</summary>
     private BlackboardState CreateHaxxorPathProbeState()
     {
         var context = new DefaultHttpContext();
@@ -334,7 +334,7 @@ public class IndividualDetectorBenchmarks
         };
     }
 
-    /// <summary>Normal GET — no waveform signature signal, returns immediately.</summary>
+    /// <summary>Normal GET - no waveform signature signal, returns immediately.</summary>
     private BlackboardState CreateAtoCleanState()
     {
         var context = new DefaultHttpContext();
@@ -361,7 +361,7 @@ public class IndividualDetectorBenchmarks
         };
     }
 
-    /// <summary>POST to /login — triggers login tracking.</summary>
+    /// <summary>POST to /login - triggers login tracking.</summary>
     private BlackboardState CreateAtoLoginState()
     {
         var context = new DefaultHttpContext();

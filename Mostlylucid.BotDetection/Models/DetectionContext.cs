@@ -229,7 +229,7 @@ public static class SignalKeys
     /// <summary>Boolean: true if Sec-Fetch-Site is "same-origin" (browser attestation of programmatic fetch)</summary>
     public const string HeaderSecFetchSameOrigin = "header.sec_fetch_same_origin";
 
-    // Programmatic request attestation — signals that a request is a legitimate
+    // Programmatic request attestation - signals that a request is a legitimate
     // programmatic call (browser fetch, API client with key, SignalR) rather than
     // a scraping bot. Downstream detectors use this to downweight false-positive
     // signals like missing cookies, missing referer, regular timing, etc.
@@ -241,7 +241,7 @@ public static class SignalKeys
     /// <summary>Boolean: true if request carries a valid API key</summary>
     public const string ProgrammaticApiKey = "attestation.api_key";
 
-    /// <summary>Boolean: composite — true if ANY programmatic attestation signal is present</summary>
+    /// <summary>Boolean: composite - true if ANY programmatic attestation signal is present</summary>
     public const string ProgrammaticRequest = "attestation.programmatic";
 
     public const string ClientIp = "ip.address";
@@ -879,16 +879,16 @@ public static class SignalKeys
     // Set by TransportProtocolContributor for downstream stream-aware detectors
     // ==========================================
 
-    /// <summary>String: transport class — "http" | "websocket" | "sse"</summary>
+    /// <summary>String: transport class - "http" | "websocket" | "sse"</summary>
     public const string TransportClass = "transport.transport_class";
 
-    /// <summary>String: protocol class — "document" | "api" | "signalr" | "grpc" | "static" | "unknown"</summary>
+    /// <summary>String: protocol class - "document" | "api" | "signalr" | "grpc" | "static" | "unknown"</summary>
     public const string TransportProtocolClass = "transport.protocol_class";
 
     /// <summary>Boolean: true if request is part of a SignalR connection (negotiate, connect, or long-poll)</summary>
     public const string TransportIsSignalR = "transport.is_signalr";
 
-    /// <summary>String: SignalR transport type — "negotiate" | "websocket" | "sse" | "longpolling"</summary>
+    /// <summary>String: SignalR transport type - "negotiate" | "websocket" | "sse" | "longpolling"</summary>
     public const string TransportSignalRType = "transport.signalr_type";
 
     /// <summary>Boolean: true if SSE reconnect detected (Last-Event-ID header present)</summary>

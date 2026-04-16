@@ -145,7 +145,7 @@ public class IntentClassificationCoordinator : BackgroundService
                 }
                 else
                 {
-                    // LLM returned unparseable response — use heuristic
+                    // LLM returned unparseable response - use heuristic
                     threatScore = request.HeuristicThreatScore;
                     category = "unknown";
                     reasoning = "LLM response could not be parsed";
@@ -161,7 +161,7 @@ public class IntentClassificationCoordinator : BackgroundService
         }
         else
         {
-            // No LLM provider — use heuristic score directly
+            // No LLM provider - use heuristic score directly
             threatScore = request.HeuristicThreatScore;
             category = InferCategoryFromSignals(request.Signals);
             reasoning = "No LLM provider, used heuristic";

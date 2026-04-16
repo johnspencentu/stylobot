@@ -11,7 +11,7 @@
 const SERVER_LAT = 51.2;
 const SERVER_LNG = 10.4;
 
-// Country centroids [lat, lng] — same as worldmap.ts
+// Country centroids [lat, lng] - same as worldmap.ts
 const CENTROIDS: Record<string, [number, number]> = {
     US: [39.8, -98.5], CA: [56.1, -106.3], MX: [23.6, -102.5],
     BR: [-14.2, -51.9], AR: [-38.4, -63.6], CL: [-35.7, -71.5], CO: [4.6, -74.3],
@@ -147,7 +147,7 @@ export class AttackArcRenderer {
     /**
      * Fire an attack arc from a country to the server.
      * @param countryCode 2-letter ISO code
-     * @param risk 'high' | 'medium' | 'low' — determines arc color
+     * @param risk 'high' | 'medium' | 'low' - determines arc color
      */
     fire(countryCode: string, risk: 'high' | 'medium' | 'low' = 'high') {
         const code = countryCode.toUpperCase();

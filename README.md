@@ -1,29 +1,29 @@
 # StyloBot
 by ***mostly*lucid**
 
-> **NOTE:** StyloBot is a FOSS project under active development. To tune detection against real traffic I collect REAL traffic on [stylobot.net](https://www.stylobot.net) (zero PII — see the [API docs](Mostlylucid.BotDetection/docs/api-reference.md)), so the live site may be temporarily broken as I test improvements. Expect rough edges!
+> **NOTE:** StyloBot is a FOSS project under active development. To tune detection against real traffic I collect REAL traffic on [stylobot.net](https://www.stylobot.net) (zero PII - see the [API docs](Mostlylucid.BotDetection/docs/api-reference.md)), so the live site may be temporarily broken as I test improvements. Expect rough edges!
 
-Enterprise bot detection framework for ASP.NET Core. 31 detectors, wave-based orchestration, adaptive AI learning, session-level Markov chain behavioral compression, intent classification with threat scoring, real-time dashboard with session drill-in, and reverse-proxy integration — all in two lines of code.
+Enterprise bot detection framework for ASP.NET Core. 31 detectors, wave-based orchestration, adaptive AI learning, session-level Markov chain behavioral compression, intent classification with threat scoring, real-time dashboard with session drill-in, and reverse-proxy integration - all in two lines of code.
 
 <img src="https://raw.githubusercontent.com/scottgal/stylobot/refs/heads/main/mostlylucid.stylobot.website/src/Stylobot.Website/wwwroot/img/stylowall.svg?raw=true" alt="StyloBot" style="max-width:200px; height:auto;" />
 
 ## What's New in v5.5
 
-- **Session Vector Architecture** — per-request Markov chain transitions compressed into 118-dimensional normalized vectors (100 transitions + 10 stationary + 8 temporal + 8 fingerprint). Sessions are the primary behavioral unit with retrogressive boundary detection, inter-session velocity analysis, and snapshot compaction
-- **Unified Fingerprint Dimensions** — TLS/TCP/H2 network fingerprints are vector dimensions in the same space as behavioral features. Fingerprint mutation across sessions appears as velocity — no separate fingerprint tracking needed
-- **SQLite Persistence** — sessions, signatures, and aggregated counters stored in SQLite (zero-dependency). PostgreSQL + pgvector is the commercial upgrade path for scale. ~100x compression vs per-request storage
-- **Transport-Aware Detection** — 7 detectors now consume transport protocol context (API, SignalR, WebSocket, gRPC) to suppress false positives on non-document traffic
-- **Oscillation Prevention** — configurable probability ceiling (0.90), state-aware reputation decay (12h for ConfirmedBad vs 3h), widened hysteresis gap, configurable browser attestation downgrade
-- **Session Dashboard** — new Sessions tab with Markov chain previews, behavioral radar charts (ApexCharts), transition bar visualization, HTMX drill-in
-- **Signature 404 Fix** — event store fallback when in-memory cache evicts signatures
+- **Session Vector Architecture** - per-request Markov chain transitions compressed into 118-dimensional normalized vectors (100 transitions + 10 stationary + 8 temporal + 8 fingerprint). Sessions are the primary behavioral unit with retrogressive boundary detection, inter-session velocity analysis, and snapshot compaction
+- **Unified Fingerprint Dimensions** - TLS/TCP/H2 network fingerprints are vector dimensions in the same space as behavioral features. Fingerprint mutation across sessions appears as velocity - no separate fingerprint tracking needed
+- **SQLite Persistence** - sessions, signatures, and aggregated counters stored in SQLite (zero-dependency). PostgreSQL + pgvector is the commercial upgrade path for scale. ~100x compression vs per-request storage
+- **Transport-Aware Detection** - 7 detectors now consume transport protocol context (API, SignalR, WebSocket, gRPC) to suppress false positives on non-document traffic
+- **Oscillation Prevention** - configurable probability ceiling (0.90), state-aware reputation decay (12h for ConfirmedBad vs 3h), widened hysteresis gap, configurable browser attestation downgrade
+- **Session Dashboard** - new Sessions tab with Markov chain previews, behavioral radar charts (ApexCharts), transition bar visualization, HTMX drill-in
+- **Signature 404 Fix** - event store fallback when in-memory cache evicts signatures
 
 ### What's New in v5.0
 
-- **Intent Classification** — new HNSW-backed detector classifies request intent (reconnaissance, exploitation, scraping, benign) with adaptive learning
-- **Threat Scoring** — independent threat dimension (Low/Elevated/High/Critical) orthogonal to bot probability, surfaced across all dashboard views, APIs, and SignalR broadcasts
-- **Stream Abuse Detection** — dedicated StreamAbuseContributor catches connection churn, payload flooding, and protocol switching hidden in streaming traffic
-- **Stream-Aware Pipeline** — TransportProtocolContributor classifies WebSocket/SSE/SignalR/gRPC early; 5 downstream detectors suppress false positives on legitimate streaming
-- **Dashboard Threat Visualization** — threat badges on detections, visitors, clusters; cluster-level dominant intent and threat percentage; threat-prefixed narratives
+- **Intent Classification** - new HNSW-backed detector classifies request intent (reconnaissance, exploitation, scraping, benign) with adaptive learning
+- **Threat Scoring** - independent threat dimension (Low/Elevated/High/Critical) orthogonal to bot probability, surfaced across all dashboard views, APIs, and SignalR broadcasts
+- **Stream Abuse Detection** - dedicated StreamAbuseContributor catches connection churn, payload flooding, and protocol switching hidden in streaming traffic
+- **Stream-Aware Pipeline** - TransportProtocolContributor classifies WebSocket/SSE/SignalR/gRPC early; 5 downstream detectors suppress false positives on legitimate streaming
+- **Dashboard Threat Visualization** - threat badges on detections, visitors, clusters; cluster-level dominant intent and threat percentage; threat-prefixed narratives
 
 See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 
@@ -41,7 +41,7 @@ This repository is a monorepo for the StyloBot ecosystem:
 ## Requirements
 
 - .NET SDK `10.0` (repo projects target `net10.0`)
-- No external database required — SQLite is the default persistence (ships with .NET)
+- No external database required - SQLite is the default persistence (ships with .NET)
 - Docker + Docker Compose (optional, for containerized flows)
 - Optional for advanced scenarios:
   - PostgreSQL + pgvector (commercial, for vector similarity at scale)
@@ -77,32 +77,32 @@ curl http://localhost:8080/admin/health
 
 If `ADMIN_SECRET` is configured, include header `X-Admin-Secret` for `/admin/*` endpoints.
 
-## Detection Surface — 31 Detectors
+## Detection Surface - 31 Detectors
 
 All detectors run in a wave-based pipeline. Fast-path detectors execute in parallel in <1ms; advanced detectors fire only when triggered by upstream signals.
 
 | Wave | Detectors | Latency |
 |------|-----------|---------|
-| **Wave 0 — Fast Path** | UserAgent, Header, IP, SecurityTool, TransportProtocol, VersionAge, AiScraper, FastPathReputation, ReputationBias, VerifiedBot | <1ms |
-| **Wave 1 — Behavioral** | Behavioral, AdvancedBehavioral, BehavioralWaveform, CacheBehavior, ClientSide, GeoChange, ResponseBehavior, StreamAbuse, **SessionVector** | 1-5ms |
-| **Wave 2 — Fingerprinting** | TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI), HTTP/3 (QUIC), MultiLayerCorrelation | <1ms |
-| **Wave 3 — AI + Learning** | Heuristic, HeuristicLate, Similarity, Cluster (Leiden), Intent, TimescaleReputation, LLM (optional) | 1-500ms |
+| **Wave 0 - Fast Path** | UserAgent, Header, IP, SecurityTool, TransportProtocol, VersionAge, AiScraper, FastPathReputation, ReputationBias, VerifiedBot | <1ms |
+| **Wave 1 - Behavioral** | Behavioral, AdvancedBehavioral, BehavioralWaveform, CacheBehavior, ClientSide, GeoChange, ResponseBehavior, StreamAbuse, **SessionVector** | 1-5ms |
+| **Wave 2 - Fingerprinting** | TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI), HTTP/3 (QUIC), MultiLayerCorrelation | <1ms |
+| **Wave 3 - AI + Learning** | Heuristic, HeuristicLate, Similarity, Cluster (Leiden), Intent, TimescaleReputation, LLM (optional) | 1-500ms |
 | **Slow Path** | ProjectHoneypot (DNS lookup) | ~100ms |
 
 Real contributor lists are controlled by `BotDetection:Policies` in each app config.
 
 ### Key Capabilities
 
-- **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent (reconnaissance, exploitation, scraping, benign) and assigns a threat score orthogonal to bot probability — a human probing `.env` files gets low bot probability but high threat score
-- **Protocol-level fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 — detect bots even when they spoof headers perfectly
+- **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent (reconnaissance, exploitation, scraping, benign) and assigns a threat score orthogonal to bot probability - a human probing `.env` files gets low bot probability but high threat score
+- **Protocol-level fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 - detect bots even when they spoof headers perfectly
 - **Stream-aware detection**: WebSocket, SSE, SignalR, and gRPC traffic classified early; downstream detectors suppress false positives; dedicated stream abuse detection catches connection churn, payload flooding, and protocol switching
 - **Bot network discovery**: Leiden clustering finds coordinated bot campaigns across thousands of signatures
-- **Session behavioral vectors**: Markov chain transitions compressed into 118-dim vectors with unified fingerprint dimensions — enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
-- **Adaptive AI**: Heuristic model extracts ~130 features per request (including transport context) and learns from feedback — detection improves over time
+- **Session behavioral vectors**: Markov chain transitions compressed into 118-dim vectors with unified fingerprint dimensions - enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
+- **Adaptive AI**: Heuristic model extracts ~130 features per request (including transport context) and learns from feedback - detection improves over time
 - **Geo intelligence**: Country reputation tracking, geographic drift detection, VPN/proxy/Tor/datacenter identification
 - **Verified bot authentication**: DNS-verified identification of Googlebot, Bingbot, and 30+ legitimate crawlers
 - **AI scraper detection**: GPTBot, ClaudeBot, PerplexityBot, Google-Extended and Cloudflare AI signals
-- **Zero PII**: All persistence uses HMAC-SHA256 hashed signatures — no raw IPs or user agents stored
+- **Zero PII**: All persistence uses HMAC-SHA256 hashed signatures - no raw IPs or user agents stored
 
 ### Training Data API
 
@@ -148,9 +148,9 @@ app.UseStyloBotDashboard();  // Dashboard at /_stylobot/
 - **Speed with intelligence**: <1ms fast path across 31 detectors with explainable evidence per decision
 - **Protocol-deep fingerprinting**: TLS, TCP/IP, HTTP/2, HTTP/3 fingerprints catch bots that spoof everything else
 - **Temporal behavior resolution**: cross-request, windowed signal correlation for stronger bot/human discrimination
-- **Adaptive learning**: Heuristic weights evolve based on detection outcomes — gets smarter over time
+- **Adaptive learning**: Heuristic weights evolve based on detection outcomes - gets smarter over time
 - **Powered by `mostlylucid.ephemeral`**: efficient ephemeral state and coordinator patterns that enable across-time analysis without heavy per-request latency
-- **Operator-first control**: composable action policies — you decide how to respond (block, throttle, challenge, honeypot, log)
+- **Operator-first control**: composable action policies - you decide how to respond (block, throttle, challenge, honeypot, log)
 
 ## Common Dev Commands
 
@@ -201,33 +201,33 @@ Library and component docs:
 
 Detector docs (31 detectors):
 
-- [`user-agent-detection.md`](Mostlylucid.BotDetection/docs/user-agent-detection.md) — UA parsing, bot pattern matching
-- [`header-detection.md`](Mostlylucid.BotDetection/docs/header-detection.md) — HTTP header anomalies
-- [`ip-detection.md`](Mostlylucid.BotDetection/docs/ip-detection.md) — Datacenter, botnet, proxy IP ranges
-- [`behavioral-analysis.md`](Mostlylucid.BotDetection/docs/behavioral-analysis.md) — Request pattern analysis
-- [`advanced-behavioral-detection.md`](Mostlylucid.BotDetection/docs/advanced-behavioral-detection.md) — Entropy, Markov chains, anomaly detection
-- [`behavioral-waveform.md`](Mostlylucid.BotDetection/docs/behavioral-waveform.md) — FFT spectral timing fingerprinting
-- [`client-side-fingerprinting.md`](Mostlylucid.BotDetection/docs/client-side-fingerprinting.md) — Headless browser detection via JS
-- [`version-age-detection.md`](Mostlylucid.BotDetection/docs/version-age-detection.md) — Browser/OS version freshness
-- [`security-tools-detection.md`](Mostlylucid.BotDetection/docs/security-tools-detection.md) — Burp, Metasploit, sqlmap, etc.
-- [`cache-behavior-detection.md`](Mostlylucid.BotDetection/docs/cache-behavior-detection.md) — ETag, gzip, cache header analysis
-- [`response-behavior.md`](Mostlylucid.BotDetection/docs/response-behavior.md) — Honeypot and response-side patterns
-- [`ai-detection.md`](Mostlylucid.BotDetection/docs/ai-detection.md) — Heuristic model + LLM escalation
-- [`ai-scraper-detection.md`](Mostlylucid.BotDetection/docs/ai-scraper-detection.md) — GPTBot, ClaudeBot, PerplexityBot
-- [`cluster-detection.md`](Mostlylucid.BotDetection/docs/cluster-detection.md) — Leiden clustering for bot networks
-- [`AdvancedFingerprintingDetectors.md`](Mostlylucid.BotDetection/docs/AdvancedFingerprintingDetectors.md) — TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI)
-- [`http3-fingerprinting.md`](Mostlylucid.BotDetection/docs/http3-fingerprinting.md) — QUIC transport fingerprinting
-- [`multi-layer-correlation.md`](Mostlylucid.BotDetection/docs/multi-layer-correlation.md) — Cross-layer consistency
-- [`transport-protocol-detection.md`](Mostlylucid.BotDetection/docs/transport-protocol-detection.md) — WebSocket, gRPC, GraphQL, SSE protocol validation
-- [`stream-transport-detection.md`](Mostlylucid.BotDetection/docs/stream-transport-detection.md) — Stream-aware detection, SignalR classification, stream abuse
-- [`dashboard-threat-scoring.md`](Mostlylucid.BotDetection/docs/dashboard-threat-scoring.md) — Intent/threat scoring dashboard integration, data flow, API endpoints
-- [`learning-and-reputation.md`](Mostlylucid.BotDetection/docs/learning-and-reputation.md) — Adaptive learning system
-- [`timescale-reputation.md`](Mostlylucid.BotDetection/docs/timescale-reputation.md) — TimescaleDB reputation tracking
-- [`training-data-api.md`](Mostlylucid.BotDetection/docs/training-data-api.md) — ML training data export
+- [`user-agent-detection.md`](Mostlylucid.BotDetection/docs/user-agent-detection.md) - UA parsing, bot pattern matching
+- [`header-detection.md`](Mostlylucid.BotDetection/docs/header-detection.md) - HTTP header anomalies
+- [`ip-detection.md`](Mostlylucid.BotDetection/docs/ip-detection.md) - Datacenter, botnet, proxy IP ranges
+- [`behavioral-analysis.md`](Mostlylucid.BotDetection/docs/behavioral-analysis.md) - Request pattern analysis
+- [`advanced-behavioral-detection.md`](Mostlylucid.BotDetection/docs/advanced-behavioral-detection.md) - Entropy, Markov chains, anomaly detection
+- [`behavioral-waveform.md`](Mostlylucid.BotDetection/docs/behavioral-waveform.md) - FFT spectral timing fingerprinting
+- [`client-side-fingerprinting.md`](Mostlylucid.BotDetection/docs/client-side-fingerprinting.md) - Headless browser detection via JS
+- [`version-age-detection.md`](Mostlylucid.BotDetection/docs/version-age-detection.md) - Browser/OS version freshness
+- [`security-tools-detection.md`](Mostlylucid.BotDetection/docs/security-tools-detection.md) - Burp, Metasploit, sqlmap, etc.
+- [`cache-behavior-detection.md`](Mostlylucid.BotDetection/docs/cache-behavior-detection.md) - ETag, gzip, cache header analysis
+- [`response-behavior.md`](Mostlylucid.BotDetection/docs/response-behavior.md) - Honeypot and response-side patterns
+- [`ai-detection.md`](Mostlylucid.BotDetection/docs/ai-detection.md) - Heuristic model + LLM escalation
+- [`ai-scraper-detection.md`](Mostlylucid.BotDetection/docs/ai-scraper-detection.md) - GPTBot, ClaudeBot, PerplexityBot
+- [`cluster-detection.md`](Mostlylucid.BotDetection/docs/cluster-detection.md) - Leiden clustering for bot networks
+- [`AdvancedFingerprintingDetectors.md`](Mostlylucid.BotDetection/docs/AdvancedFingerprintingDetectors.md) - TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI)
+- [`http3-fingerprinting.md`](Mostlylucid.BotDetection/docs/http3-fingerprinting.md) - QUIC transport fingerprinting
+- [`multi-layer-correlation.md`](Mostlylucid.BotDetection/docs/multi-layer-correlation.md) - Cross-layer consistency
+- [`transport-protocol-detection.md`](Mostlylucid.BotDetection/docs/transport-protocol-detection.md) - WebSocket, gRPC, GraphQL, SSE protocol validation
+- [`stream-transport-detection.md`](Mostlylucid.BotDetection/docs/stream-transport-detection.md) - Stream-aware detection, SignalR classification, stream abuse
+- [`dashboard-threat-scoring.md`](Mostlylucid.BotDetection/docs/dashboard-threat-scoring.md) - Intent/threat scoring dashboard integration, data flow, API endpoints
+- [`learning-and-reputation.md`](Mostlylucid.BotDetection/docs/learning-and-reputation.md) - Adaptive learning system
+- [`timescale-reputation.md`](Mostlylucid.BotDetection/docs/timescale-reputation.md) - TimescaleDB reputation tracking
+- [`training-data-api.md`](Mostlylucid.BotDetection/docs/training-data-api.md) - ML training data export
 
 Release notes:
 
-- [`CHANGELOG.md`](CHANGELOG.md) — Version history and release notes
+- [`CHANGELOG.md`](CHANGELOG.md) - Version history and release notes
 
 ## Notes on Existing Docs
 

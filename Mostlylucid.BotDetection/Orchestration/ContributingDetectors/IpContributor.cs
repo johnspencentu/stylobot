@@ -29,7 +29,7 @@ public class IpContributor : ConfiguredContributorBase
         "172.29.", "172.30.", "172.31.", "192.168.", "::1", "fe80:", "localhost"
     ];
 
-    // Hardcoded datacenter prefix hints — used as fast fallback when dynamic CIDR ranges
+    // Hardcoded datacenter prefix hints - used as fast fallback when dynamic CIDR ranges
     // don't cover a provider (e.g., Hetzner, OVH, Vultr don't publish machine-readable lists).
     // More specific prefixes are preferred over broad ones to avoid misidentification.
     private static readonly Dictionary<string, string[]> DatacenterPrefixes = new()
@@ -138,7 +138,7 @@ public class IpContributor : ConfiguredContributorBase
             // 1. Fast path: check hardcoded prefixes first (O(n) string prefix match, sub-microsecond)
             (isDatacenter, datacenterName) = CheckDatacenterPrefix(clientIp);
 
-            // 2. ASN lookup via Team Cymru DNS — authoritative source for datacenter identification.
+            // 2. ASN lookup via Team Cymru DNS - authoritative source for datacenter identification.
             //    This runs async but results are cached (1hr TTL), so subsequent requests are instant.
             //    If ASN lookup succeeds, its result overrides the prefix-based guess.
             if (_asnLookup != null)
@@ -153,7 +153,7 @@ public class IpContributor : ConfiguredContributorBase
                         if (!string.IsNullOrEmpty(asnInfo.OrgName))
                             state.WriteSignal("ip.asn_org", asnInfo.OrgName);
 
-                        // ASN lookup is authoritative — override prefix-based guess
+                        // ASN lookup is authoritative - override prefix-based guess
                         if (asnInfo.IsDatacenter)
                         {
                             isDatacenter = true;
@@ -161,10 +161,10 @@ public class IpContributor : ConfiguredContributorBase
                         }
                         else if (isDatacenter)
                         {
-                            // Prefix said datacenter but ASN says no — trust ASN
+                            // Prefix said datacenter but ASN says no - trust ASN
                             // (e.g., residential ISP that happens to share a first octet with a cloud provider)
                             _logger.LogDebug(
-                                "Prefix matched {Provider} but ASN {Asn} ({Org}) is not a known datacenter — downgrading",
+                                "Prefix matched {Provider} but ASN {Asn} ({Org}) is not a known datacenter - downgrading",
                                 datacenterName, asnInfo.Asn, asnInfo.OrgName);
                             isDatacenter = false;
                             datacenterName = null;
@@ -310,7 +310,7 @@ public class IpContributor : ConfiguredContributorBase
     {
         var connectionIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "";
 
-        // If connection IP is already public, UseForwardedHeaders did its job — use it
+        // If connection IP is already public, UseForwardedHeaders did its job - use it
         if (!string.IsNullOrEmpty(connectionIp) && !IsLocalIp(connectionIp))
             return connectionIp;
 
@@ -318,13 +318,13 @@ public class IpContributor : ConfiguredContributorBase
         var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
         if (!string.IsNullOrEmpty(forwardedFor))
         {
-            // X-Forwarded-For format: "client, proxy1, proxy2" — leftmost is the original client
+            // X-Forwarded-For format: "client, proxy1, proxy2" - leftmost is the original client
             var firstIp = forwardedFor.Split(',', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
             if (!string.IsNullOrEmpty(firstIp) && !IsLocalIp(firstIp))
                 return firstIp;
         }
 
-        // No forwarded header or it's also private — return what we have
+        // No forwarded header or it's also private - return what we have
         return connectionIp;
     }
 
@@ -345,11 +345,11 @@ public class IpContributor : ConfiguredContributorBase
             if (addr.IsIPv6LinkLocal)
                 return true;
 
-            // IPv6 site-local (fec0::/10 — deprecated but still used)
+            // IPv6 site-local (fec0::/10 - deprecated but still used)
             if (addr.IsIPv6SiteLocal)
                 return true;
 
-            // IPv6 unique local address (fc00::/7 — ULA, equivalent to RFC 1918)
+            // IPv6 unique local address (fc00::/7 - ULA, equivalent to RFC 1918)
             if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
             {
                 var bytes = addr.GetAddressBytes();

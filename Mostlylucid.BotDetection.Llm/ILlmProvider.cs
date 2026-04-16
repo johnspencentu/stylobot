@@ -2,7 +2,7 @@ namespace Mostlylucid.BotDetection.Llm;
 
 /// <summary>
 ///     Abstraction over LLM inference backends (Ollama, LlamaSharp, etc.).
-///     Registered as a singleton — only one provider active per application.
+///     Registered as a singleton - only one provider active per application.
 /// </summary>
 public interface ILlmProvider
 {

@@ -168,7 +168,7 @@ public class GeoChangeContributor : ConfiguredContributorBase
 
                     if (recentChangeCount >= RapidDriftThreshold)
                     {
-                        // Rapid country switching — strong bot signal (proxy rotation)
+                        // Rapid country switching - strong bot signal (proxy rotation)
                         contributions.Add(BotContribution(
                             "GeoDrift",
                             $"Rapid country switching: {recentChangeCount} changes in {RapidDriftWindowMinutes}min across {history.DistinctCountries.Count} countries",
@@ -178,7 +178,7 @@ public class GeoChangeContributor : ConfiguredContributorBase
                     }
                     else if (history.DistinctCountries.Count >= 2)
                     {
-                        // Regular drift — moderate signal
+                        // Regular drift - moderate signal
                         contributions.Add(BotContribution(
                             "GeoDrift",
                             $"Country changed from {history.DistinctCountries.First()} → {countryCode} ({history.CountryChanges} total changes)",

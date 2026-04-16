@@ -11,7 +11,7 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     Background service that periodically computes all dashboard aggregates
 ///     and broadcasts summary statistics to connected clients.
 ///     This is the SINGLE place where top bots, countries, and user agents are computed.
-///     API endpoints read from <see cref="DashboardAggregateCache" /> — no inline computation.
+///     API endpoints read from <see cref="DashboardAggregateCache" /> - no inline computation.
 /// </summary>
 public class DashboardSummaryBroadcaster : BackgroundService
 {
@@ -71,7 +71,7 @@ public class DashboardSummaryBroadcaster : BackgroundService
                     }
                 }
 
-                // Compute aggregates from DB in parallel (no TopBots — handled by write-through cache)
+                // Compute aggregates from DB in parallel (no TopBots - handled by write-through cache)
                 var summaryTask = _eventStore.GetSummaryAsync();
                 var countriesTask = _eventStore.GetCountryStatsAsync(50);
                 var endpointsTask = _eventStore.GetEndpointStatsAsync(50);
@@ -87,7 +87,7 @@ public class DashboardSummaryBroadcaster : BackgroundService
                     UserAgents = await userAgentsTask
                 });
 
-                // Send lightweight invalidation signals — the HTMX coordinator
+                // Send lightweight invalidation signals - the HTMX coordinator
                 // will fetch fresh server-rendered partials on demand.
                 // No need to serialize full data payloads over the wire.
                 await _hubContext.Clients.All.BroadcastInvalidation("summary");
@@ -115,7 +115,7 @@ public class DashboardSummaryBroadcaster : BackgroundService
 
     /// <summary>
     ///     Compute user agent aggregates from detections.
-    ///     This logic was previously inline in ServeUserAgentsApiAsync — now computed once per beacon tick.
+    ///     This logic was previously inline in ServeUserAgentsApiAsync - now computed once per beacon tick.
     /// </summary>
     private async Task<List<DashboardUserAgentSummary>> ComputeUserAgentsAsync()
     {

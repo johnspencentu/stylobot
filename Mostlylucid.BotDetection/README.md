@@ -13,7 +13,7 @@ learning**, auto-updated blocklists, YARP integration, and full observability.
 
 - **30 detectors in 4 waves**: User-Agent, headers, IP, behavioral, protocol fingerprinting, AI classification, intent classification, cluster detection, and more
 - **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent and assigns threat scores orthogonal to bot probability
-- **Protocol-deep fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 — catch bots even when they spoof everything
+- **Protocol-deep fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 - catch bots even when they spoof everything
 - **Stream-aware detection**: WebSocket, SSE, SignalR, gRPC traffic classified early; downstream false positives suppressed; dedicated stream abuse detection
 - **AI-powered classification**: Heuristic model (<1ms, ~50 features) with optional LLM escalation for complex cases
 - **Continuous learning**: Heuristic weights adapt over time based on detection feedback
@@ -23,7 +23,7 @@ learning**, auto-updated blocklists, YARP integration, and full observability.
 - **Stealth responses**: Throttle, challenge, or honeypot bots without revealing detection
 - **Response PII masking (opt-in)**: `mask-pii`/`strip-pii` stream-mask response payloads for risky traffic
 - **Real-time dashboard**: World map, country stats, cluster visualization, user agent breakdown, live signature feed
-- **Zero PII**: All persistence uses HMAC-SHA256 hashed signatures — no raw IPs or user agents stored
+- **Zero PII**: All persistence uses HMAC-SHA256 hashed signatures - no raw IPs or user agents stored
 - **Auto-updated threat intel**: Pulls isbot patterns and cloud IP ranges automatically
 - **First-class YARP support**: Bot-aware routing and header injection for any-language backends
 - **Full observability**: OpenTelemetry traces and metrics baked in
@@ -147,7 +147,7 @@ public IActionResult Index() => View();
 
 All detectors execute in a wave-based pipeline. Fast-path detectors run in parallel in <1ms. Advanced detectors fire only when triggered by upstream signals.
 
-### Wave 0 — Fast Path (<1ms)
+### Wave 0 - Fast Path (<1ms)
 
 | Detector | Description |
 |----------|-------------|
@@ -165,29 +165,29 @@ All detectors execute in a wave-based pipeline. Fast-path detectors run in paral
 | **Inconsistency** | UA/header mismatch and cross-signal inconsistency detection |
 | **VerifiedBot** | DNS-verified identification of Googlebot, Bingbot, and 30+ legitimate crawlers |
 
-### Wave 1 — Behavioral (1-5ms)
+### Wave 1 - Behavioral (1-5ms)
 
 | Detector | Description |
 |----------|-------------|
 | **Behavioral** | Rate limiting, request pattern analysis, timing anomalies |
-| **AdvancedBehavioral** | Deep statistical analysis — entropy, Markov chains, anomaly detection |
+| **AdvancedBehavioral** | Deep statistical analysis - entropy, Markov chains, anomaly detection |
 | **BehavioralWaveform** | FFT-based spectral fingerprinting of request timing patterns |
 | **ClientSide** | Headless browser detection via JavaScript fingerprinting signals |
 | **GeoChange** | Geographic drift detection, country reputation, origin verification |
 | **AccountTakeover** | Credential stuffing, brute force, and account takeover detection |
 | **ResponseBehavior** | Honeypot path detection, response-side behavioral patterns |
 
-### Wave 2 — Protocol Fingerprinting (<1ms)
+### Wave 2 - Protocol Fingerprinting (<1ms)
 
 | Detector | Description |
 |----------|-------------|
-| **TLS Fingerprint** | JA3/JA4 TLS fingerprint analysis — identifies client libraries |
+| **TLS Fingerprint** | JA3/JA4 TLS fingerprint analysis - identifies client libraries |
 | **TCP/IP Fingerprint** | p0f-style passive OS fingerprinting via TCP stack behavior |
 | **HTTP/2 Fingerprint** | AKAMAI-style HTTP/2 frame analysis (settings, priorities, pseudo-headers) |
 | **HTTP/3 Fingerprint** | QUIC transport parameter fingerprinting and version negotiation analysis |
 | **MultiLayerCorrelation** | Cross-layer consistency analysis (does TLS match TCP match HTTP match UA?) |
 
-### Wave 3 — AI + Learning (1-500ms)
+### Wave 3 - AI + Learning (1-500ms)
 
 | Detector | Description |
 |----------|-------------|
@@ -454,4 +454,3 @@ builder.Services.AddSimpleBotDetection();
 - [GitHub](https://github.com/scottgal/mostlylucid.stylobot/tree/main/Mostlylucid.BotDetection)
 - [NuGet](https://www.nuget.org/packages/mostlylucid.botdetection/)
 - [Full Documentation](docs/)
-

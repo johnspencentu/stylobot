@@ -3,34 +3,34 @@
 }
 
 <div class="section">
-    <h2>&lt;sb-human&gt; — Human-only content</h2>
+    <h2>&lt;sb-human&gt; - Human-only content</h2>
     <div class="info">
-        <strong>Default fallback: show</strong> — content is visible even when detection hasn't run (fail-open).
+        <strong>Default fallback: show</strong> - content is visible even when detection hasn't run (fail-open).
     </div>
     <div class="gated ok">
         <sb-human>You are a human visitor. This content is hidden from bots.</sb-human>
     </div>
     <div class="gated">
-        <sb-human fallback="hide">Same gate with <code class="hl">fallback="hide"</code> — hidden when detection hasn't run.</sb-human>
+        <sb-human fallback="hide">Same gate with <code class="hl">fallback="hide"</code> - hidden when detection hasn't run.</sb-human>
     </div>
 </div>
 
 <div class="section">
-    <h2>&lt;sb-bot&gt; — Bot-only content</h2>
+    <h2>&lt;sb-bot&gt; - Bot-only content</h2>
     <div class="info">
-        <strong>Default fallback: hide</strong> — content is hidden when detection hasn't run (fail-closed).
+        <strong>Default fallback: hide</strong> - content is hidden when detection hasn't run (fail-closed).
     </div>
     <div class="gated">
         <sb-bot>You are a bot. Here is structured data for you.</sb-bot>
         <span class="muted">(Empty? You're human.)</span>
     </div>
     <div class="gated">
-        <sb-bot fallback="show">Same gate with <code class="hl">fallback="show"</code> — visible when detection hasn't run.</sb-bot>
+        <sb-bot fallback="show">Same gate with <code class="hl">fallback="show"</code> - visible when detection hasn't run.</sb-bot>
     </div>
 </div>
 
 <div class="section">
-    <h2>&lt;sb-gate&gt; — Universal gate</h2>
+    <h2>&lt;sb-gate&gt; - Universal gate</h2>
     <div class="info">
         <strong>All conditions AND together.</strong> Combine human-only, bot-only, risk ranges, bot types, and negate.
     </div>
@@ -51,7 +51,7 @@
 </div>
 
 <div class="section">
-    <h2>&lt;sb-risk&gt; — Risk band gate</h2>
+    <h2>&lt;sb-risk&gt; - Risk band gate</h2>
     <div class="info">
         Gate content by exact risk band or range.
     </div>

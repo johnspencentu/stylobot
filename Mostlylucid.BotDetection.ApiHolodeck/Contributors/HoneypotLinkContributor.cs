@@ -28,7 +28,7 @@ namespace Mostlylucid.BotDetection.ApiHolodeck.Contributors;
 /// </remarks>
 public class HoneypotLinkContributor : ContributingDetectorBase
 {
-    // Common scanner paths — curated from OWASP CRS restricted-files.data, CrowdSec sensitive_data.txt,
+    // Common scanner paths - curated from OWASP CRS restricted-files.data, CrowdSec sensitive_data.txt,
     // SecLists quickhits.txt, and ayoubfathi/leaky-paths. Grouped by category for maintainability.
     private static readonly HashSet<string> DefaultHoneypotPaths = new(StringComparer.OrdinalIgnoreCase)
     {

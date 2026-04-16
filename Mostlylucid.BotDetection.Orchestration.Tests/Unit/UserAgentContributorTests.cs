@@ -73,7 +73,7 @@ public class UserAgentContributorTests
     [InlineData("curl/7.88.1", "curl")]
     public async Task ContributeAsync_KnownBotPattern_ReturnsBotContribution(string userAgent, string expectedBotName)
     {
-        // No pattern cache — test the built-in IsCommonBotPattern
+        // No pattern cache - test the built-in IsCommonBotPattern
         var contributor = CreateContributor(patternCache: null);
         var state = CreateState(userAgent);
 

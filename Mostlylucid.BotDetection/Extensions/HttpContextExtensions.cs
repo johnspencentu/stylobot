@@ -87,7 +87,7 @@ public static partial class HttpContextExtensions
     }
 
     /// <summary>
-    ///     Gets the bot probability score (0.0 to 1.0) — how likely this request is from a bot.
+    ///     Gets the bot probability score (0.0 to 1.0) - how likely this request is from a bot.
     ///     Returns 0.0 if detection hasn't run.
     /// </summary>
     public static double GetBotProbability(this HttpContext context)
@@ -99,7 +99,7 @@ public static partial class HttpContextExtensions
     }
 
     /// <summary>
-    ///     Gets the detection confidence (0.0 to 1.0) — how certain the system is in its verdict,
+    ///     Gets the detection confidence (0.0 to 1.0) - how certain the system is in its verdict,
     ///     independent of the bot probability. High confidence with low probability means
     ///     "we're very sure this is human". Based on detector coverage, agreement, and evidence weight.
     ///     Returns 0.0 if detection hasn't run.
@@ -514,7 +514,7 @@ public static partial class HttpContextExtensions
 
     /// <summary>
     ///     Gets the unified threat score (0.0 = benign, 1.0 = malicious).
-    ///     Orthogonal to bot probability — measures malicious intent, not bot identity.
+    ///     Orthogonal to bot probability - measures malicious intent, not bot identity.
     /// </summary>
     public static double GetThreatScore(this HttpContext context)
     {

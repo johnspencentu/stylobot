@@ -198,7 +198,7 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
         }
 
         // WebSocket-specific burst detection with a higher threshold
-        // SignalR reconnects a few times on disconnect — that's normal.
+        // SignalR reconnects a few times on disconnect - that's normal.
         // But 20+ WebSocket upgrades in 10 seconds is abuse (connection flooding).
         if (recentWs >= 20)
         {
@@ -214,7 +214,7 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
                 botType: BotType.MaliciousBot.ToString()));
         }
 
-        // SSE burst detection — reconnect storms from broken EventSource implementations
+        // SSE burst detection - reconnect storms from broken EventSource implementations
         // Normal SSE: 1-3 reconnects on disconnect. 30+ in 10s = reconnect loop.
         if (recentSse >= 30)
         {
@@ -230,7 +230,7 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
                 botType: BotType.MaliciousBot.ToString()));
         }
 
-        // SignalR burst detection — long-polling is inherently high-frequency,
+        // SignalR burst detection - long-polling is inherently high-frequency,
         // but 40+ in 10s still indicates abuse or a broken reconnect loop.
         if (recentSignalR >= 40)
         {
@@ -319,7 +319,7 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
     {
         if (history.Count < 2) return;
 
-        // Exclude streaming requests — they don't represent page navigations or API calls
+        // Exclude streaming requests - they don't represent page navigations or API calls
         var nonStreamingHistory = history.Where(r => r.ContentClass is not (ContentClass.WebSocket or ContentClass.SSE or ContentClass.SignalR)).ToList();
         if (nonStreamingHistory.Count < 2) return;
 

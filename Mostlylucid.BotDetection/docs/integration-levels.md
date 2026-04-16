@@ -304,7 +304,7 @@ builder.Services.AddStyloBotDashboard(
 
 ### Dashboard Features
 
-- **Server-side rendered** — all data embedded in initial HTML (no loading spinners)
+- **Server-side rendered** - all data embedded in initial HTML (no loading spinners)
 - Live visitor feed with inline SVG sparklines (bot probability, processing time, confidence)
 - Two-column layout: detection detail (left) + live visitor feed (right)
 - Narrative-driven visitor rows with "How we know" explanations
@@ -312,7 +312,7 @@ builder.Services.AddStyloBotDashboard(
 - Leiden bot cluster detection and visualization
 - Hot endpoint tracking with bot percentage
 - Detection export (JSON/CSV)
-- SignalR live updates (patches only — initial render is server-side)
+- SignalR live updates (patches only - initial render is server-side)
 - Self-contained: Alpine.js + DaisyUI + Tailwind, no build step required
 
 ### Dashboard Architecture
@@ -321,7 +321,7 @@ The dashboard follows a **server-rendered first** model:
 
 1. `ServeDashboardPageAsync` gathers all data server-side (summary, detections, signatures, countries, clusters, your detection)
 2. Data is embedded as `<script type="application/json">` tags in the HTML
-3. Alpine.js reads embedded JSON synchronously on page load — instant render
+3. Alpine.js reads embedded JSON synchronously on page load - instant render
 4. SignalR connects after render and delivers live updates only
 5. Zero XHR calls on initial page load
 

@@ -579,7 +579,7 @@ public class MarkovSystemTests
     {
         var tracker = CreateTracker();
 
-        // First request for a signature — no previous path, so no transition recorded
+        // First request for a signature - no previous path, so no transition recorded
         var drift = tracker.RecordTransition("sig1", "/home", DateTime.UtcNow, false, false, false);
         Assert.Equal(DriftSignals.Empty, drift);
     }

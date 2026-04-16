@@ -114,7 +114,7 @@ public partial class DetectionBroadcastMiddleware
             if (context.Items.TryGetValue(BotDetectionMiddleware.AggregatedEvidenceKey, out var evidenceObj) &&
                 evidenceObj is AggregatedEvidence evidence)
             {
-                // Skip static assets with zero confidence — these are served by static file
+                // Skip static assets with zero confidence - these are served by static file
                 // middleware with no meaningful detection and pollute reputation history
                 if (evidence.Confidence == 0 && evidence.TotalProcessingTimeMs < 0.5)
                 {
@@ -172,7 +172,7 @@ public partial class DetectionBroadcastMiddleware
 
     /// <summary>
     ///     Single method that stores both detection and signature to the event store.
-    ///     Every code path calls this — no duplication.
+    ///     Every code path calls this - no duplication.
     /// </summary>
     private async Task<DashboardSignatureEvent> StoreDetectionAndSignatureAsync(
         HttpContext context,
@@ -374,7 +374,7 @@ public partial class DetectionBroadcastMiddleware
     // ─── Shared helpers (used by all paths) ──────────────────────────────
 
     /// <summary>
-    ///     Parse signature factors from HttpContext.Items — ONE place, not three.
+    ///     Parse signature factors from HttpContext.Items - ONE place, not three.
     /// </summary>
     private record SignatureFactors(string? IpSig, string? UaSig, string? ClientSig, int FactorCount);
 

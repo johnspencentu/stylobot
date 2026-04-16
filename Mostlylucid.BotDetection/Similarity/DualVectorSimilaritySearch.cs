@@ -318,7 +318,7 @@ public sealed class DualVectorSimilaritySearch : ISignatureSimilaritySearch
 
     /// <summary>
     ///     Convert a signatureId string to a deterministic GUID for Qdrant point ID.
-    ///     Uses XxHash128 (~10x faster than SHA256) — we need deterministic mapping, not crypto.
+    ///     Uses XxHash128 (~10x faster than SHA256) - we need deterministic mapping, not crypto.
     /// </summary>
     private static Guid ToGuid(string signatureId)
     {

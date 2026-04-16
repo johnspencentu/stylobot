@@ -2,7 +2,7 @@ namespace Mostlylucid.BotDetection.Similarity;
 
 /// <summary>
 ///     Interface for intent-based similarity search using approximate nearest neighbor algorithms.
-///     Separate from ISignatureSimilaritySearch — this indexes WHAT sessions do (intent),
+///     Separate from ISignatureSimilaritySearch - this indexes WHAT sessions do (intent),
 ///     not WHO they are (identity). Enables the learning loop: LLM classifies novel patterns,
 ///     embeddings get stored, future similar sessions match without LLM.
 /// </summary>

@@ -178,7 +178,7 @@ public class DetectionPolicyConfig : BaseComponentConfig
     ///     Minimum confidence required before any blocking decision takes effect.
     ///     Even if bot probability exceeds <see cref="ImmediateBlockThreshold" />,
     ///     blocking only occurs when confidence meets this gate.
-    ///     Default: 0.0 (no confidence gate — backwards compatible).
+    ///     Default: 0.0 (no confidence gate - backwards compatible).
     /// </summary>
     /// <example>
     ///     "strict": { "ImmediateBlockThreshold": 0.7, "MinConfidence": 0.9 }

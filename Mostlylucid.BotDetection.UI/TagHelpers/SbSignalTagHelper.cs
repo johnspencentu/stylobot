@@ -35,19 +35,19 @@ public class SbSignalTagHelper : TagHelper
     /// <summary>
     ///     Condition to evaluate:
     ///     <list type="bullet">
-    ///         <item><c>exists</c> — signal key exists (default)</item>
-    ///         <item><c>not-exists</c> — signal key does not exist</item>
-    ///         <item><c>equals</c> — signal value equals <see cref="Value" /> (case-insensitive)</item>
-    ///         <item><c>not-equals</c> — signal value does not equal <see cref="Value" /></item>
-    ///         <item><c>true</c> — signal value is boolean true</item>
-    ///         <item><c>false</c> — signal value is boolean false</item>
-    ///         <item><c>any-true</c> — any of the comma-separated signals is boolean true</item>
-    ///         <item><c>all-true</c> — all of the comma-separated signals are boolean true</item>
-    ///         <item><c>gt</c> — signal numeric value &gt; <see cref="Value" /></item>
-    ///         <item><c>lt</c> — signal numeric value &lt; <see cref="Value" /></item>
-    ///         <item><c>gte</c> — signal numeric value &gt;= <see cref="Value" /></item>
-    ///         <item><c>lte</c> — signal numeric value &lt;= <see cref="Value" /></item>
-    ///         <item><c>contains</c> — signal value contains <see cref="Value" /> substring</item>
+    ///         <item><c>exists</c> - signal key exists (default)</item>
+    ///         <item><c>not-exists</c> - signal key does not exist</item>
+    ///         <item><c>equals</c> - signal value equals <see cref="Value" /> (case-insensitive)</item>
+    ///         <item><c>not-equals</c> - signal value does not equal <see cref="Value" /></item>
+    ///         <item><c>true</c> - signal value is boolean true</item>
+    ///         <item><c>false</c> - signal value is boolean false</item>
+    ///         <item><c>any-true</c> - any of the comma-separated signals is boolean true</item>
+    ///         <item><c>all-true</c> - all of the comma-separated signals are boolean true</item>
+    ///         <item><c>gt</c> - signal numeric value &gt; <see cref="Value" /></item>
+    ///         <item><c>lt</c> - signal numeric value &lt; <see cref="Value" /></item>
+    ///         <item><c>gte</c> - signal numeric value &gt;= <see cref="Value" /></item>
+    ///         <item><c>lte</c> - signal numeric value &lt;= <see cref="Value" /></item>
+    ///         <item><c>contains</c> - signal value contains <see cref="Value" /> substring</item>
     ///     </list>
     /// </summary>
     [HtmlAttributeName("condition")]

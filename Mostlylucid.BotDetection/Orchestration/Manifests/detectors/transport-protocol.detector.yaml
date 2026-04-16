@@ -1,6 +1,6 @@
 # Transport Protocol Detector - WebSocket, gRPC, GraphQL, SSE protocol analysis
 name: TransportProtocolContributor
-priority: 5  # Run early — protocol type informs other detectors
+priority: 5  # Run early - protocol type informs other detectors
 enabled: true
 description: Detects transport protocol (WebSocket, gRPC, GraphQL, SSE) and validates protocol-specific headers
 

@@ -4,9 +4,9 @@ Real-time bot detection monitoring dashboard with SignalR live updates, interact
 
 ## Features
 
-- **Real-time Updates**: SignalR-powered live feed — detections, signatures, clusters, and summary stats update instantly
+- **Real-time Updates**: SignalR-powered live feed - detections, signatures, clusters, and summary stats update instantly
 - **Interactive World Map**: jsvectormap with countries colored by bot rate (green to red) and markers sized by request volume
-- **Top Bots Panel**: Ranked bot list from `VisitorListCache` — shared data source with the home page, updated in real-time via SignalR
+- **Top Bots Panel**: Ranked bot list from `VisitorListCache` - shared data source with the home page, updated in real-time via SignalR
 - **Countries Tab**: Country-level bot rates, reputation scores, request volumes, geographic threat intelligence
 - **Clusters Tab**: Leiden-detected bot networks with similarity scores, campaign analysis, and cluster membership
 - **User Agents Tab**: UA family aggregation with category badges (Browser/Search/AI/Tool), version distribution, country per UA
@@ -286,13 +286,13 @@ The `X-Frame-Options: SAMEORIGIN` header is set automatically.
 Run detection on a gateway but serve the dashboard elsewhere:
 
 ```csharp
-// Gateway — saves detections, no UI
+// Gateway - saves detections, no UI
 builder.Services.AddBotDetection();
 builder.Services.AddBotDetectionPersistence();
 app.UseBotDetection();
 app.UseBotDetectionPersistence();
 
-// Dashboard host — serves UI, reads shared database
+// Dashboard host - serves UI, reads shared database
 builder.Services.AddStyloBotDashboard();
 builder.Services.AddStyloBotPostgreSQL(connectionString);
 ```
@@ -301,12 +301,12 @@ builder.Services.AddStyloBotPostgreSQL(connectionString);
 
 ### Components
 
-1. **SignalR Hub** (`StyloBotDashboardHub`) — Broadcasts real-time events to all connected clients
-2. **Event Store** (`InMemoryDashboardEventStore`) — Circular buffer for recent events, thread-safe, replaceable
-3. **Visitor List Cache** (`VisitorListCache`) — In-memory cache of all visitor signatures with ranking, filtering, sparklines
-4. **Summary Broadcaster** (`DashboardSummaryBroadcaster`) — Background service broadcasting periodic stats
-5. **Detection Broadcast Middleware** (`DetectionBroadcastMiddleware`) — Captures detections and pushes to SignalR + event store
-6. **Dashboard Middleware** (`StyloBotDashboardMiddleware`) — Routes requests, serves HTML/API, handles auth + rate limiting
+1. **SignalR Hub** (`StyloBotDashboardHub`) - Broadcasts real-time events to all connected clients
+2. **Event Store** (`InMemoryDashboardEventStore`) - Circular buffer for recent events, thread-safe, replaceable
+3. **Visitor List Cache** (`VisitorListCache`) - In-memory cache of all visitor signatures with ranking, filtering, sparklines
+4. **Summary Broadcaster** (`DashboardSummaryBroadcaster`) - Background service broadcasting periodic stats
+5. **Detection Broadcast Middleware** (`DetectionBroadcastMiddleware`) - Captures detections and pushes to SignalR + event store
+6. **Dashboard Middleware** (`StyloBotDashboardMiddleware`) - Routes requests, serves HTML/API, handles auth + rate limiting
 
 ### Data Flow
 
@@ -398,9 +398,9 @@ builder.Services.AddStyloBotPostgreSQL(connectionString, options =>
 
 ### Countries Tab Empty
 
-1. In Docker, internal IPs can't be geo-located — ensure upstream headers (`X-Country`, `CF-IPCountry`) are forwarded
+1. In Docker, internal IPs can't be geo-located - ensure upstream headers (`X-Country`, `CF-IPCountry`) are forwarded
 2. Add GeoDetection contributor for local IP resolution
-3. Country data requires actual traffic — won't show with simulator alone
+3. Country data requires actual traffic - won't show with simulator alone
 
 ### Clusters Tab Empty
 
@@ -410,7 +410,7 @@ Cluster detection requires minimum traffic volume before Leiden clustering trigg
 
 1. Check browser console for JavaScript errors
 2. Verify jsvectormap is included in the Vite build (`npm run build`)
-3. The map requires country data from `/api/countries` — check that endpoint returns data
+3. The map requires country data from `/api/countries` - check that endpoint returns data
 
 ## License
 

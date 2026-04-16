@@ -43,7 +43,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
     // No triggers - runs in first wave
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
-    // Config-driven thresholds — no magic numbers
+    // Config-driven thresholds - no magic numbers
     private int ScanHeavyCount404 => GetParam("scan_heavy_count_404", 8);
     private int ScanHeavyUniquePaths => GetParam("scan_heavy_unique_paths", 5);
     private int ScanModerateCount404 => GetParam("scan_moderate_count_404", 4);
@@ -101,7 +101,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
     private double CleanHistoryConfidence => GetParam("clean_history_confidence", -0.15);
     private double CleanHistoryWeight => GetParam("clean_history_weight", 1.3);
 
-    // Exclusive 404 pattern — catches single-path hammering that existing scan tiers miss
+    // Exclusive 404 pattern - catches single-path hammering that existing scan tiers miss
     private int Exclusive404MinCount => GetParam("exclusive_404_min_count", 3);
     private double Exclusive404Ratio => GetParam("exclusive_404_ratio", 0.8);
     private double Exclusive404Confidence => GetParam("exclusive_404_confidence", 0.75);
@@ -164,7 +164,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
                 new(SignalKeys.ResponseHistoricalScore, behavior.ResponseScore)
             ]);
 
-            // Check for programmatic request attestation — if present, downweight
+            // Check for programmatic request attestation - if present, downweight
             // response history signals since auth failures and rate limits may have
             // been caused by bot detection itself (feedback loop), not the server.
             // Also check transport protocol class: API/gRPC/SignalR clients legitimately
@@ -179,7 +179,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
             }
 
             // Analyze historical behavior patterns
-            // Honeypot hits are ALWAYS significant — no attestation can excuse accessing /.env
+            // Honeypot hits are ALWAYS significant - no attestation can excuse accessing /.env
             AnalyzeHoneypotHits(state, behavior, contributions);
             AnalyzeScanPatterns(state, behavior, contributions);
 
@@ -207,7 +207,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
                         behavior.AuthFailures, rateLimitCount);
                     contributions.Add(DetectionContribution.Info(
                         Name, "Response",
-                        $"Auth/rate-limit history skipped — programmatic request attestation present (auth={behavior.AuthFailures}, rateLimit={rateLimitCount})"));
+                        $"Auth/rate-limit history skipped - programmatic request attestation present (auth={behavior.AuthFailures}, rateLimit={rateLimitCount})"));
                 }
             }
 
@@ -217,7 +217,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error analyzing response behavior");
-            state.WriteSignal("response.analysis_error", ex.Message); // Not in SignalKeys — transient error info only
+            state.WriteSignal("response.analysis_error", ex.Message); // Not in SignalKeys - transient error info only
         }
 
         // Always add at least one contribution
@@ -270,7 +270,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
             new(SignalKeys.ResponseUnique404Paths, behavior.UniqueNotFoundPaths)
         ]);
 
-        // EXCLUSIVE 404: ALL (or nearly all) responses are 404 — never legitimate.
+        // EXCLUSIVE 404: ALL (or nearly all) responses are 404 - never legitimate.
         // Catches single-path hammering that existing multi-path tiers miss.
         var fourOhFourRatio = behavior.TotalResponses > 0
             ? (double)behavior.Count404 / behavior.TotalResponses : 0;
@@ -292,7 +292,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
         // Real humans almost never hit multiple unique 404 paths.
         // A single 404 from a stale bookmark is normal; 3+ unique 404 paths is scanning.
 
-        // HEAVY: Systematic vulnerability scanning — many unique 404 paths
+        // HEAVY: Systematic vulnerability scanning - many unique 404 paths
         if (behavior.Count404 > ScanHeavyCount404 && behavior.UniqueNotFoundPaths > ScanHeavyUniquePaths)
         {
             state.WriteSignal(SignalKeys.ResponseScanPatternDetected, true);
@@ -306,7 +306,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
                 weight: ScanHeavyWeight,
                 botType: BotType.Scraper.ToString()));
         }
-        // MODERATE: Probable scanning — several unique 404 paths
+        // MODERATE: Probable scanning - several unique 404 paths
         else if (behavior.Count404 >= ScanModerateCount404 && behavior.UniqueNotFoundPaths >= ScanModerateUniquePaths)
         {
             state.WriteSignal(SignalKeys.ResponseScanPatternDetected, true);
@@ -320,7 +320,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
                 Reason = $"Probable scanning: {behavior.Count404} page-not-found errors across {behavior.UniqueNotFoundPaths} different URLs"
             });
         }
-        // LIGHT: Early signal — a couple of 404s on unique paths (not stale bookmarks)
+        // LIGHT: Early signal - a couple of 404s on unique paths (not stale bookmarks)
         else if (behavior.UniqueNotFoundPaths >= ScanLightUniquePaths)
         {
             contributions.Add(new DetectionContribution
@@ -486,7 +486,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
                 Weight = LowScoreWeight,
                 Reason = "Response patterns show some signs of automated access"
             });
-        // Low score = likely human — but only if the client has genuinely clean traffic.
+        // Low score = likely human - but only if the client has genuinely clean traffic.
         // A 404-only scanner gets a low ResponseScore due to limited feature activation,
         // NOT because it's actually clean. Guard: 4xx ratio must be below 50%.
         else if (behavior.ResponseScore < CleanHistoryThreshold

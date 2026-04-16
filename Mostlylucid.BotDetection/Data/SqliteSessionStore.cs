@@ -8,7 +8,7 @@ using Mostlylucid.BotDetection.Models;
 namespace Mostlylucid.BotDetection.Data;
 
 /// <summary>
-///     SQLite-backed session store. Zero external dependencies — just a file on disk.
+///     SQLite-backed session store. Zero external dependencies - just a file on disk.
 ///     Sessions are the unit of storage, not individual requests.
 ///     Vector search uses brute-force cosine similarity (fast enough for <100K sessions).
 ///     For larger deployments, the commercial PostgreSQL + pgvector implementation
@@ -442,7 +442,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     public async Task<List<(PersistedSession Session, float Similarity)>> FindSimilarSessionsAsync(
         float[] queryVector, int topK = 10, float minSimilarity = 0.7f, CancellationToken ct = default)
     {
-        // Brute-force cosine similarity — adequate for <100K sessions.
+        // Brute-force cosine similarity - adequate for <100K sessions.
         // Commercial PostgreSQL + pgvector provides native HNSW for larger deployments.
         await EnsureInitializedAsync(ct);
         await using var conn = new SqliteConnection(_connectionString);

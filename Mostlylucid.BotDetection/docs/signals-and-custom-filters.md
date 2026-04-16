@@ -1,6 +1,6 @@
 # Signals and Custom Filters
 
-StyloBot's detection pipeline produces 100+ signals — typed key-value pairs representing everything the detectors discovered about a request. This document covers how to read signals, filter by them, and build custom protection logic.
+StyloBot's detection pipeline produces 100+ signals - typed key-value pairs representing everything the detectors discovered about a request. This document covers how to read signals, filter by them, and build custom protection logic.
 
 ## Signal Architecture
 
@@ -102,7 +102,7 @@ public class PaymentController : ControllerBase
     [BlockIfSignal(SignalKeys.GeoCountryCode, SignalOperator.Equals, "CN")]
     public IActionResult Restricted() => Ok(new { data = "restricted" });
 
-    // Combine multiple conditions (AND logic — all must match to block)
+    // Combine multiple conditions (AND logic - all must match to block)
     [HttpPost("wire-transfer")]
     [BlockIfSignal(SignalKeys.GeoIsVpn, SignalOperator.Equals, "True")]
     [BlockIfSignal(SignalKeys.IpIsDatacenter, SignalOperator.Equals, "True")]
@@ -140,7 +140,7 @@ app.MapPost("/api/submit", () => Results.Ok())
 app.MapGet("/api/domestic", () => Results.Ok())
    .RequireSignal(SignalKeys.GeoCountryCode, SignalOperator.Equals, "US");
 
-// Combine with bot blocking — block bots AND VPNs
+// Combine with bot blocking - block bots AND VPNs
 app.MapPost("/api/checkout", () => Results.Ok())
    .BlockBots()
    .BlockIfSignal(SignalKeys.GeoIsVpn, SignalOperator.Equals, "True");
@@ -197,7 +197,7 @@ app.MapPost("/api/transfer", (HttpContext ctx) =>
 | `header.suspicious_count` | `int` | Header | Number of suspicious header patterns |
 | `behavioral.request_rate` | `double` | Behavioral | Requests per second from this client |
 
-### Geographic (`SignalKeys` — requires GeoDetection contributor)
+### Geographic (`SignalKeys` - requires GeoDetection contributor)
 
 | Key | Type | Source | Description |
 |-----|------|--------|-------------|
@@ -367,7 +367,7 @@ app.MapPost("/api/payment", () => Results.Ok())
 
 ## Further Reading
 
-- [blocking-and-filters.md](blocking-and-filters.md) — Bot type filtering, geo blocking via attributes
-- [quickstart.md](quickstart.md) — Getting started with zero dependencies
-- [action-policies.md](action-policies.md) — Config-driven response policies
-- [configuration.md](configuration.md) — Full `BotDetectionOptions` reference
+- [blocking-and-filters.md](blocking-and-filters.md) - Bot type filtering, geo blocking via attributes
+- [quickstart.md](quickstart.md) - Getting started with zero dependencies
+- [action-policies.md](action-policies.md) - Config-driven response policies
+- [configuration.md](configuration.md) - Full `BotDetectionOptions` reference

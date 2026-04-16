@@ -2,7 +2,7 @@ namespace Mostlylucid.BotDetection.Models;
 
 /// <summary>
 ///     Configuration for a named API key with fine-grained detection policy overlay.
-///     Keys act as detection policy overlays — detection still runs but with per-key
+///     Keys act as detection policy overlays - detection still runs but with per-key
 ///     detector enable/disable, weight overrides, and action policy overrides.
 /// </summary>
 public class ApiKeyConfig

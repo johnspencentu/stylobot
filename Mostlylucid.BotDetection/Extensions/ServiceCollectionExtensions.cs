@@ -10,7 +10,7 @@ using Mostlylucid.BotDetection.ClientSide;
 using Mostlylucid.BotDetection.Dashboard;
 using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Detectors;
-// LlmDetector removed — now in Mostlylucid.BotDetection.Llm.Ollama/LlamaSharp packages
+// LlmDetector removed - now in Mostlylucid.BotDetection.Llm.Ollama/LlamaSharp packages
 using Mostlylucid.BotDetection.Events;
 using Mostlylucid.BotDetection.Events.Listeners;
 using Mostlylucid.BotDetection.Metrics;
@@ -247,7 +247,7 @@ public static class ServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd("StyloBot/1.0 (+https://stylobot.net; stylobot@mostlylucid.net)");
         });
 
-        // VerifiedBotRegistry options — configurable via appsettings.json: BotDetection:VerifiedBotRegistry
+        // VerifiedBotRegistry options - configurable via appsettings.json: BotDetection:VerifiedBotRegistry
         services.AddOptions<VerifiedBotRegistryOptions>()
             .BindConfiguration("BotDetection:VerifiedBotRegistry");
 
@@ -470,7 +470,7 @@ public static class ServiceCollectionExtensions
         // Project Honeypot lookup service (shared between contributor and background enrichment)
         services.TryAddSingleton<ProjectHoneypotLookupService>();
         // Project Honeypot IP reputation (triggered by IP signal)
-        // Excluded from default policy — runs via BackgroundEnrichmentService for async DNS lookups.
+        // Excluded from default policy - runs via BackgroundEnrichmentService for async DNS lookups.
         // Still runs synchronously in Learning/Demo policies.
         services.AddSingleton<IContributingDetector, ProjectHoneypotContributor>();
         // Reputation bias - runs AFTER basic detectors extract signals, BEFORE heuristic scoring
@@ -509,7 +509,7 @@ public static class ServiceCollectionExtensions
         // ==========================================
         // Bot Name Synthesizer (provided by LLM plugin packages)
         // ==========================================
-        // Default no-op synthesizer — replaced by Mostlylucid.BotDetection.Llm.* packages
+        // Default no-op synthesizer - replaced by Mostlylucid.BotDetection.Llm.* packages
         services.TryAddSingleton<IBotNameSynthesizer, NoOpBotNameSynthesizer>();
 
         // ==========================================

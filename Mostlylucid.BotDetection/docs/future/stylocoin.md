@@ -7,7 +7,7 @@ It positions Stylocoin as the world’s first **privacy-preserving behavioural t
 
 # **STYLOCOIN: A FOVEATED MARKET FOR PRIVACY-PRESERVING BEHAVIOURAL INTELLIGENCE**
 
-### *Whitepaper Draft v0.9 — Mostlylucid Research*
+### *Whitepaper Draft v0.9 - Mostlylucid Research*
 
 ---
 
@@ -178,7 +178,7 @@ How much the signal sharpens future classification.
 
 ### **4.5 Rarity**
 
-Frequency-adjusted reward — rare events are more valuable.
+Frequency-adjusted reward - rare events are more valuable.
 
 ### **4.6 Cost-to-Evaluate**
 

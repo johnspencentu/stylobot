@@ -35,7 +35,7 @@ public class CacheBehaviorContributor : ContributingDetectorBase
     public override string Name => "CacheBehavior";
     public override int Priority => 15; // Run early, lightweight
 
-    // Triggered by TransportProtocol signal — moves to Wave 1 so we can read streaming classification
+    // Triggered by TransportProtocol signal - moves to Wave 1 so we can read streaming classification
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
     {
         new SignalExistsTrigger(SignalKeys.TransportProtocol)
@@ -49,7 +49,7 @@ public class CacheBehaviorContributor : ContributingDetectorBase
         var context = state.HttpContext;
         var request = context.Request;
 
-        // Skip cache analysis for streaming transports — they are non-cacheable by design.
+        // Skip cache analysis for streaming transports - they are non-cacheable by design.
         // SSE, WebSocket, and SignalR requests never send cache validation headers,
         // and rapid repeat requests are normal (reconnects, long-polling).
         var isStreaming = state.GetSignal<bool?>(SignalKeys.TransportIsStreaming) ?? false;
@@ -121,7 +121,7 @@ public class CacheBehaviorContributor : ContributingDetectorBase
         }
 
         // 3. Rapid repeated requests for the same resource
-        // Only flag static resources and HTML pages — API endpoints (no file extension,
+        // Only flag static resources and HTML pages - API endpoints (no file extension,
         // or Accept: application/json) are designed for repeated calls without cache.
         // Browsers never send If-None-Match/If-Modified-Since on API calls because
         // servers don't send ETag/Last-Modified on JSON responses.
@@ -136,7 +136,7 @@ public class CacheBehaviorContributor : ContributingDetectorBase
             var timeSinceLastRequest = (currentTime - lastRequestTime.Value).TotalSeconds;
 
             // Same resource requested within 5 seconds (without cache validation)
-            // Skip for API requests — these are inherently non-cacheable
+            // Skip for API requests - these are inherently non-cacheable
             if (timeSinceLastRequest < 5 && !hasCacheValidation && !isApiRequest)
             {
                 var impact = timeSinceLastRequest < 1 ? 0.4 : 0.3;
@@ -229,14 +229,14 @@ public class CacheBehaviorContributor : ContributingDetectorBase
     ///     API endpoints return dynamic JSON and don't send ETag/Last-Modified,
     ///     so browsers never send cache validation headers on repeat calls.
     ///     Only exempts requests that also carry browser-origin markers (Sec-Fetch-*,
-    ///     HX-Request, X-Requested-With) — a raw bot hitting /api/* won't have these.
+    ///     HX-Request, X-Requested-With) - a raw bot hitting /api/* won't have these.
     /// </summary>
     private static bool IsApiRequest(HttpRequest request)
     {
         // Gate: require at least one browser-origin marker.
         // Sec-Fetch-* headers are set by the browser Fetch API and cannot be spoofed
         // from simple HTTP libraries. HX-Request and X-Requested-With are set by
-        // HTMX/jQuery respectively — not proof of a browser, but combined with /api/
+        // HTMX/jQuery respectively - not proof of a browser, but combined with /api/
         // path they indicate legitimate AJAX.
         var hasBrowserOrigin = request.Headers.ContainsKey("Sec-Fetch-Mode")
                                || request.Headers.ContainsKey("HX-Request")

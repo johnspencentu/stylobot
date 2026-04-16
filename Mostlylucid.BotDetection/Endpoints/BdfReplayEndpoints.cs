@@ -304,7 +304,7 @@ public static class BdfReplayEndpoints
 #region Request/Response Models
 
 /// <summary>
-///     BDF replay request — subset of BDF v2 fields needed for replay.
+///     BDF replay request - subset of BDF v2 fields needed for replay.
 /// </summary>
 public sealed class BdfReplayRequest
 {

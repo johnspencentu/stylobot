@@ -57,7 +57,7 @@ public class DatabaseInitializationService : IHostedService
 
             _logger.LogInformation("PostgreSQL database schema initialized successfully");
 
-            // Apply TimescaleDB enhancements if enabled (non-fatal — app works without them)
+            // Apply TimescaleDB enhancements if enabled (non-fatal - app works without them)
             if (_options.EnableTimescaleDB)
             {
                 await ApplyTimescaleDBEnhancementsAsync(connection, cancellationToken);
@@ -66,7 +66,7 @@ public class DatabaseInitializationService : IHostedService
         catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
         {
             _logger.LogWarning(ex,
-                "Failed to connect to PostgreSQL — dashboard persistence disabled. " +
+                "Failed to connect to PostgreSQL - dashboard persistence disabled. " +
                 "The app will continue with in-memory storage. " +
                 "Set a valid connection string or start PostgreSQL to enable persistence.");
         }
@@ -120,7 +120,7 @@ public class DatabaseInitializationService : IHostedService
                 }
                 catch (Exception ex)
                 {
-                    // Log and continue — individual batch failures shouldn't block remaining batches
+                    // Log and continue - individual batch failures shouldn't block remaining batches
                     _logger.LogWarning(ex, "TimescaleDB batch failed (non-fatal): {Message}", ex.Message);
                 }
             }

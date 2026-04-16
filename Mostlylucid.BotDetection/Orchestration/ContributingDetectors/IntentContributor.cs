@@ -7,7 +7,7 @@ using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 
 /// <summary>
-///     Intent / threat scoring contributor — produces a unified threat score (0-1)
+///     Intent / threat scoring contributor - produces a unified threat score (0-1)
 ///     orthogonal to the bot probability score. A human probing .env files has low
 ///     bot score but high threat score. A verified Googlebot has high bot score but
 ///     zero threat score.
@@ -107,7 +107,7 @@ public class IntentContributor : ConfiguredContributorBase
             }
             else
             {
-                // No HNSW match — use fallback heuristic from attack signals
+                // No HNSW match - use fallback heuristic from attack signals
                 (threatScore, intentCategory) = ComputeHeuristicThreat(state);
 
                 _logger.LogDebug(
@@ -115,7 +115,7 @@ public class IntentContributor : ConfiguredContributorBase
                     threatScore, intentCategory);
             }
 
-            // Check ambiguity — queue for LLM if unclear
+            // Check ambiguity - queue for LLM if unclear
             var isAmbiguous = threatScore >= AmbiguousLow && threatScore <= AmbiguousHigh;
             if (isAmbiguous || matches.Count == 0)
             {
@@ -132,7 +132,7 @@ public class IntentContributor : ConfiguredContributorBase
             state.WriteSignal(SignalKeys.IntentThreatBand, band.ToString());
             state.WriteSignal(SignalKeys.IntentCategory, intentCategory);
 
-            // Always return NeutralContribution — threat is orthogonal to bot probability
+            // Always return NeutralContribution - threat is orthogonal to bot probability
             contributions.Add(NeutralContribution("Intent",
                 $"Session intent: {intentCategory} (threat={threatScore:F2}, band={band})"));
         }
@@ -237,7 +237,7 @@ public class IntentContributor : ConfiguredContributorBase
     {
         var lowerPath = path.ToLowerInvariant();
 
-        // Simple path classification — probe paths get special treatment
+        // Simple path classification - probe paths get special treatment
         var isProbe = lowerPath.Contains(".env") || lowerPath.Contains("wp-admin") ||
                       lowerPath.Contains("phpmyadmin") || lowerPath.Contains(".git") ||
                       lowerPath.Contains("/.") || lowerPath.Contains("actuator") ||

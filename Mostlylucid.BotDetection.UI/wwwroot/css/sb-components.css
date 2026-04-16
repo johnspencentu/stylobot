@@ -1,4 +1,4 @@
-/* StyloBot Component Styles — BEM + CSS Custom Properties
+/* StyloBot Component Styles - BEM + CSS Custom Properties
    Theme-aware: adapts to light/dark via prefers-color-scheme.
    Override with .sb-dark or .sb-light on any ancestor. */
 
@@ -25,7 +25,7 @@
     --sb-border-radius: 4px;
     --sb-pill-border-radius: 9999px;
 
-    /* Surface / text tokens — light theme */
+    /* Surface / text tokens - light theme */
     --sb-surface: #f8fafc;
     --sb-surface-alt: #fff;
     --sb-border: #e2e8f0;
@@ -36,7 +36,7 @@
     --sb-badge-mix-base: white;
 }
 
-/* Dark theme — auto via media query */
+/* Dark theme - auto via media query */
 @media (prefers-color-scheme: dark) {
     :root {
         --sb-surface: #1e293b;

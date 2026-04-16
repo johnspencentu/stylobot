@@ -162,7 +162,7 @@ public static class YarpExtensions
             if (topReasons.Any())
                 addHeader("X-Bot-Detection-Reasons", JsonSerializer.Serialize(topReasons));
 
-            // Detector contributions (JSON array — internal only, not client-facing)
+            // Detector contributions (JSON array - internal only, not client-facing)
             var contributionsData = evidence.Contributions
                 .GroupBy(c => c.DetectorName)
                 .Select(g => new

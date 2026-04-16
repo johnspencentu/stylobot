@@ -118,7 +118,7 @@ public class StyloBotDashboardMiddleware
         // High-value dashboard data APIs are hard-blocked for detected bots,
         // UNLESS the request carries a valid API key (trusted tooling / monitoring).
         // Block detected bots from data APIs. If a human is being blocked here,
-        // that's a detection bug — fix the detection, not the block.
+        // that's a detection bug - fix the detection, not the block.
         var isDataApi = DataApiPaths.Contains(relativePath)
                         || relativePath.StartsWith(CountryDetailPrefix, StringComparison.OrdinalIgnoreCase);
         isDataApi = isDataApi || relativePath.StartsWith(EndpointDetailPrefix, StringComparison.OrdinalIgnoreCase);
@@ -321,7 +321,7 @@ public class StyloBotDashboardMiddleware
             }
         }
 
-        // No auth configured — log warning on first request so operators notice
+        // No auth configured - log warning on first request so operators notice
         if (!_authWarningLogged)
         {
             _authWarningLogged = true;
@@ -362,7 +362,7 @@ public class StyloBotDashboardMiddleware
         var basePath = _options.BasePath.TrimEnd('/');
         var tab = context.Request.Query["tab"].FirstOrDefault() ?? "overview";
 
-        // Build all partial models server-side — fully rendered, no JSON serialization needed
+        // Build all partial models server-side - fully rendered, no JSON serialization needed
         var visitorCache = context.RequestServices.GetRequiredService<VisitorListCache>();
         var (visitors, visitorTotal, _, _) = visitorCache.GetFiltered("all", "lastSeen", "desc", 1, 24);
 
@@ -858,7 +858,7 @@ public class StyloBotDashboardMiddleware
 
     /// <summary>
     ///     Serves recent sessions from the session store.
-    ///     Sessions are the unit of storage — each contains a compressed behavioral vector,
+    ///     Sessions are the unit of storage - each contains a compressed behavioral vector,
     ///     Markov transition counts, and summary stats.
     /// </summary>
     private async Task ServeSessionsApiAsync(HttpContext context)
@@ -1143,7 +1143,7 @@ public class StyloBotDashboardMiddleware
             if (detections.Count == 0)
             {
                 // Return 200 with empty arrays instead of 404.
-                // 404s feed the responseBehavior detector — the dashboard calls sparkline
+                // 404s feed the responseBehavior detector - the dashboard calls sparkline
                 // for every signature in the top-bots list, so unknown signatures would
                 // generate hundreds of 404s that poison the user's own detection score.
                 context.Response.ContentType = "application/json";
@@ -1572,7 +1572,7 @@ public class StyloBotDashboardMiddleware
     }
 
     /// <summary>
-    ///     HTMX OOB update endpoint — renders multiple partials in a single response.
+    ///     HTMX OOB update endpoint - renders multiple partials in a single response.
     ///     Called by the SignalR coordinator when widgets need refreshing.
     ///     Query param: widgets=summary,visitors,countries (comma-separated widget IDs)
     /// </summary>
@@ -1888,7 +1888,7 @@ public class StyloBotDashboardMiddleware
         }
         else
         {
-            // Cache miss — reconstruct from persistent event store.
+            // Cache miss - reconstruct from persistent event store.
             // This handles signatures that have been evicted from SignatureAggregateCache
             // but still exist in the database (common when recent activity shows old signatures).
             try

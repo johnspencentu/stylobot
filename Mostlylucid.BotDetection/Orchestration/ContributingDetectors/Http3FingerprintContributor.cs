@@ -122,15 +122,15 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
 
             if (!isHttp3)
             {
-                // Not HTTP/3 — nothing for this contributor to do
+                // Not HTTP/3 - nothing for this contributor to do
                 contributions.Add(DetectionContribution.Info(Name, "HTTP/3",
                     $"Connection uses {protocol} (not HTTP/3)"));
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
             }
 
-            // HTTP/3 itself is a mildly positive (human) signal — most bot frameworks don't support QUIC yet
+            // HTTP/3 itself is a mildly positive (human) signal - most bot frameworks don't support QUIC yet
             contributions.Add(HumanContribution("HTTP/3",
-                "Using HTTP/3 (QUIC) — most bot frameworks don't support this protocol",
+                "Using HTTP/3 (QUIC) - most bot frameworks don't support this protocol",
                 weightMultiplier: 0.8));
 
             // 1. QUIC Transport Parameter fingerprinting
@@ -182,7 +182,7 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
                     // Draft versions = old tooling, suspicious
                     contributions.Add(BotContribution(
                         "HTTP/3",
-                        $"Using QUIC draft version ({version}) — indicates old or custom tooling",
+                        $"Using QUIC draft version ({version}) - indicates old or custom tooling",
                         confidenceOverride: DraftVersionPenalty,
                         weightMultiplier: 1.2));
                 }
@@ -192,7 +192,7 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
                     // QUIC v2 (RFC 9369) = very modern browser
                     state.WriteSignal("h3.quic_v2", true);
                     contributions.Add(HumanContribution("HTTP/3",
-                        "Using QUIC v2 (RFC 9369) — very modern browser"));
+                        "Using QUIC v2 (RFC 9369) - very modern browser"));
                 }
                 // v1 (RFC 9000) is standard, no additional signal needed
             }
@@ -208,7 +208,7 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
                 {
                     // 0-RTT = returning visitor with session cache, strong human signal
                     contributions.Add(HumanContribution("HTTP/3",
-                        "QUIC 0-RTT resumption used — returning visitor with session cache")
+                        "QUIC 0-RTT resumption used - returning visitor with session cache")
                         with
                         {
                             ConfidenceDelta = ZeroRttHumanBonus,
@@ -228,7 +228,7 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
                 {
                     // Connection migration = mobile user switching networks (WiFi -> cellular)
                     contributions.Add(HumanContribution("HTTP/3",
-                        "QUIC connection migration detected — mobile user switching networks")
+                        "QUIC connection migration detected - mobile user switching networks")
                         with
                         {
                             ConfidenceDelta = ConnectionMigrationHumanBonus,
@@ -249,7 +249,7 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
                     // Disabled spin bit = some bots don't cooperate with RTT measurement
                     contributions.Add(BotContribution(
                         "HTTP/3",
-                        "QUIC spin bit disabled — some bots don't cooperate with RTT measurement",
+                        "QUIC spin bit disabled - some bots don't cooperate with RTT measurement",
                         confidenceOverride: 0.15,
                         weightMultiplier: 0.6));
                 }
@@ -267,7 +267,7 @@ public class Http3FingerprintContributor : ConfiguredContributorBase
                     // Arrived via Alt-Svc upgrade from HTTP/2 = strong human signal
                     // Bots rarely negotiate this upgrade path
                     contributions.Add(HumanContribution("HTTP/3",
-                        "Arrived via Alt-Svc HTTP/2 to HTTP/3 upgrade — bots rarely negotiate this")
+                        "Arrived via Alt-Svc HTTP/2 to HTTP/3 upgrade - bots rarely negotiate this")
                         with
                         {
                             ConfidenceDelta = AltSvcUpgradeBonus,

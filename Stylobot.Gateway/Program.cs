@@ -125,7 +125,7 @@ try
     // Add OpenTelemetry instrumentation for bot detection signals
     builder.Services.AddBotDetectionTelemetry();
 
-    // Wire up OTel SDK — Prometheus exporter for /metrics scraping
+    // Wire up OTel SDK - Prometheus exporter for /metrics scraping
     builder.Services.AddOpenTelemetry()
         .WithMetrics(metrics => metrics
             .AddAspNetCoreInstrumentation()
@@ -152,7 +152,7 @@ try
 
     // NOTE: GeoDetectionContributor removed from detection pipeline to eliminate ~50ms
     // external API call latency. Country code is still available from GeoRouting middleware
-    // context (HttpContext.Items["GeoLocation"]) — the broadcast middleware reads it as fallback.
+    // context (HttpContext.Items["GeoLocation"]) - the broadcast middleware reads it as fallback.
 
     // Add detection persistence: saves detections to shared DB + broadcasts via SignalR.
     // This is the lightweight path (no dashboard UI served from the gateway).

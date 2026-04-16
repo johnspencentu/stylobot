@@ -142,7 +142,7 @@ public class BotDetectionMiddleware(
                     return;
                 }
 
-                // Key disables all detectors — equivalent to legacy bypass
+                // Key disables all detectors - equivalent to legacy bypass
                 context.Items[IsBotKey] = false;
                 context.Items[BotProbabilityKey] = 0.0;
                 context.Items["BotDetection.ApiKeyBypass"] = true;
@@ -153,7 +153,7 @@ public class BotDetectionMiddleware(
                 return;
             }
 
-            // Store context for downstream use — detection will run with overlay
+            // Store context for downstream use - detection will run with overlay
             context.Items["BotDetection.ApiKeyContext"] = apiKeyContext;
             _logger.LogDebug("Using API key '{KeyName}' overlay for {Path} (disabled: {Disabled})",
                 apiKeyContext.KeyName, context.Request.Path,
@@ -165,11 +165,11 @@ public class BotDetectionMiddleware(
 
             // In proxy (YARP) flows with TrustUpstreamDetection, the gateway already validated
             // the API key. The downstream website won't have the same key registry, so "NotFound"
-            // rejections are expected — don't block, let the upstream trust path handle it.
+            // rejections are expected - don't block, let the upstream trust path handle it.
             if (rejection.Reason == ApiKeyRejectionReason.NotFound && _options.TrustUpstreamDetection)
             {
                 _logger.LogDebug(
-                    "API key not in local registry but TrustUpstreamDetection is enabled — deferring to upstream for {Path}",
+                    "API key not in local registry but TrustUpstreamDetection is enabled - deferring to upstream for {Path}",
                     context.Request.Path);
                 // Clear the rejection so downstream middleware doesn't see a stale rejection
                 context.Items.Remove("BotDetection.ApiKeyRejection");
@@ -233,7 +233,7 @@ public class BotDetectionMiddleware(
                 });
             }
 
-            // Only add the trust marker — the gateway already emits full X-Bot-* response headers
+            // Only add the trust marker - the gateway already emits full X-Bot-* response headers
             if (_options.ResponseHeaders.Enabled)
             {
                 var prefix = _options.ResponseHeaders.HeaderPrefix;
@@ -302,7 +302,7 @@ public class BotDetectionMiddleware(
         if (_options.ResponseHeaders.Enabled) AddResponseHeaders(context, aggregatedResult, policy.Name);
 
         // API key action policy override (e.g., "logonly" for monitoring keys)
-        // Respect the policy's ActionPolicyOverridable flag — locked policies cannot be overridden by API keys
+        // Respect the policy's ActionPolicyOverridable flag - locked policies cannot be overridden by API keys
         if (apiKeyContext != null && !string.IsNullOrEmpty(apiKeyContext.ActionPolicyName)
             && policy.ActionPolicyOverridable)
         {
@@ -330,7 +330,7 @@ public class BotDetectionMiddleware(
                     return;
 
                 // Action policy allows continuation (e.g., logonly, throttle-stealth).
-                // The action policy IS the response strategy — skip ShouldBlockRequest
+                // The action policy IS the response strategy - skip ShouldBlockRequest
                 // so we don't hard-block after the policy explicitly allowed continuation.
                 EnsureMaliciousFallbackMaskPii(context);
                 await InvokeNextWithResponseMutationAsync(context);
@@ -348,7 +348,7 @@ public class BotDetectionMiddleware(
         // Fallback: if no action policy was triggered by transitions, but a bot was detected
         // and DefaultActionPolicyName is configured, execute that as a fallback.
         // This enables "tarpit all detected bots" without needing per-policy transitions.
-        // When DefaultActionPolicyName fires, it REPLACES the hard block/403 — the tarpit
+        // When DefaultActionPolicyName fires, it REPLACES the hard block/403 - the tarpit
         // IS the response. We skip ShouldBlockRequest so bots see a normal (delayed) response.
         if (string.IsNullOrEmpty(aggregatedResult.TriggeredActionPolicyName)
             && !string.IsNullOrEmpty(_options.DefaultActionPolicyName)
@@ -371,7 +371,7 @@ public class BotDetectionMiddleware(
 
                 await fallbackPolicy.ExecuteAsync(context, aggregatedResult, context.RequestAborted);
 
-                // DefaultActionPolicyName replaces ShouldBlockRequest — continue pipeline
+                // DefaultActionPolicyName replaces ShouldBlockRequest - continue pipeline
                 // after the action (e.g., throttle-stealth adds delay then lets the
                 // request through, appearing normal to the bot).
                 EnsureMaliciousFallbackMaskPii(context);
@@ -823,7 +823,7 @@ public class BotDetectionMiddleware(
         if (rejection != null &&
             (_options.RejectUnknownApiKeys || rejection.Reason != ApiKeyRejectionReason.NotFound))
         {
-            // Key was rejected (or unknown keys are configured to reject) — store rejection for the caller
+            // Key was rejected (or unknown keys are configured to reject) - store rejection for the caller
             context.Items["BotDetection.ApiKeyRejection"] = rejection;
         }
 
@@ -941,7 +941,7 @@ public class BotDetectionMiddleware(
         if (aggregated.PolicyAction == PolicyAction.Challenge)
             return (true, BotBlockAction.Challenge);
 
-        // Check for verified bad bot (bypasses confidence gate — verified bots are always high confidence)
+        // Check for verified bad bot (bypasses confidence gate - verified bots are always high confidence)
         if (aggregated.EarlyExit && aggregated.EarlyExitVerdict == EarlyExitVerdict.VerifiedBadBot)
             return (true, defaultAction == BotBlockAction.Default ? BotBlockAction.StatusCode : defaultAction);
 
@@ -1248,7 +1248,7 @@ public class BotDetectionMiddleware(
                 if (!actionResult.Continue)
                     return true;
 
-                // Action policy allows continuation (e.g., logonly) — the policy IS the
+                // Action policy allows continuation (e.g., logonly) - the policy IS the
                 // response strategy, so skip ShouldBlockRequest below.
                 return false;
             }
@@ -1261,7 +1261,7 @@ public class BotDetectionMiddleware(
         }
 
         // Fallback: per-bot-type action policy, then DefaultActionPolicyName.
-        // When this fires, it replaces the hard block — the policy IS the response.
+        // When this fires, it replaces the hard block - the policy IS the response.
         if (string.IsNullOrEmpty(aggregatedResult.TriggeredActionPolicyName)
             && aggregatedResult.BotProbability >= _options.BotThreshold
             && aggregatedResult.EarlyExitVerdict is not (EarlyExitVerdict.VerifiedGoodBot or EarlyExitVerdict.Whitelisted))
@@ -1356,7 +1356,7 @@ public class BotDetectionMiddleware(
             if (!context.Request.Headers.TryGetValue(_options.UpstreamSignatureHeader, out var signatureHeader) ||
                 string.IsNullOrEmpty(signatureHeader.ToString()))
             {
-                _logger.LogWarning("Upstream detection headers present but missing signature header '{Header}' — rejecting",
+                _logger.LogWarning("Upstream detection headers present but missing signature header '{Header}' - rejecting",
                     _options.UpstreamSignatureHeader);
                 return false;
             }
@@ -1364,10 +1364,10 @@ public class BotDetectionMiddleware(
             // Signature = HMACSHA256(X-Bot-Detected + ":" + X-Bot-Confidence + ":" + timestamp, secret)
             var timestamp = context.Request.Headers["X-Bot-Detection-Timestamp"].FirstOrDefault() ?? "";
 
-            // Reject missing or invalid timestamps — replay protection requires a valid timestamp
+            // Reject missing or invalid timestamps - replay protection requires a valid timestamp
             if (!long.TryParse(timestamp, out var epochSeconds))
             {
-                _logger.LogWarning("Upstream detection missing or invalid timestamp — rejecting (replay protection)");
+                _logger.LogWarning("Upstream detection missing or invalid timestamp - rejecting (replay protection)");
                 return false;
             }
 
@@ -1375,7 +1375,7 @@ public class BotDetectionMiddleware(
             var age = DateTimeOffset.UtcNow - signedAt;
             if (age.Duration() > TimeSpan.FromSeconds(_options.UpstreamSignatureMaxAgeSeconds))
             {
-                _logger.LogWarning("Upstream detection signature expired (age: {Age}) — rejecting", age);
+                _logger.LogWarning("Upstream detection signature expired (age: {Age}) - rejecting", age);
                 return false;
             }
 
@@ -1394,7 +1394,7 @@ public class BotDetectionMiddleware(
                 // Constant-time comparison to prevent timing attacks
                 if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
                 {
-                    _logger.LogWarning("Upstream detection signature mismatch — possible spoofing attempt");
+                    _logger.LogWarning("Upstream detection signature mismatch - possible spoofing attempt");
                     return false;
                 }
             }
@@ -1954,13 +1954,13 @@ public class BotDetectionMiddleware(
             404 => (boostOpts.NotFoundDelta,
                 $"Response 404 Not Found on {context.Request.Path}"),
             401 when !isAuthenticated => (boostOpts.UnauthorizedDelta,
-                "Response 401 Unauthorized — unauthenticated probe"),
+                "Response 401 Unauthorized - unauthenticated probe"),
             403 when !isAuthenticated => (boostOpts.ForbiddenDelta,
-                "Response 403 Forbidden — access denied"),
+                "Response 403 Forbidden - access denied"),
             >= 500 and < 600 => (boostOpts.ServerErrorDelta,
                 $"Response {statusCode} Server Error triggered"),
             410 => (boostOpts.GoneDelta,
-                "Response 410 Gone — probing removed resource"),
+                "Response 410 Gone - probing removed resource"),
             405 => (boostOpts.MethodNotAllowedDelta,
                 $"Response 405 Method Not Allowed on {context.Request.Path}"),
             // Authenticated successful response: clear suspicion for MARGINAL cases only.
@@ -1970,7 +1970,7 @@ public class BotDetectionMiddleware(
                 && evidence.BotProbability > boostOpts.AuthenticatedClearThreshold
                 && evidence.BotProbability <= boostOpts.AuthenticatedClearMaxProbability
                 => (boostOpts.AuthenticatedClearDelta,
-                    "Authenticated user — successful response clears suspicion"),
+                    "Authenticated user - successful response clears suspicion"),
             _ => (0.0, (string?)null)
         };
 
@@ -2059,7 +2059,7 @@ public class BotDetectionMiddleware(
         try
         {
             // Skip recording when bot detection itself modified the response.
-            // Our own 403s/429s are synthetic — they tell us nothing about the client's
+            // Our own 403s/429s are synthetic - they tell us nothing about the client's
             // actual behavior with the server, and counting them creates a positive
             // feedback loop (403 → auth failure → higher bot score → more 403s).
             var action = evidence.PolicyAction;
@@ -2068,7 +2068,7 @@ public class BotDetectionMiddleware(
                 or Policies.PolicyAction.Throttle)
             {
                 _logger.LogDebug(
-                    "Skipping response recording for {Path} — status {Status} was set by bot detection action '{Action}', not the server",
+                    "Skipping response recording for {Path} - status {Status} was set by bot detection action '{Action}', not the server",
                     context.Request.Path, context.Response.StatusCode, action);
                 return;
             }
@@ -2083,7 +2083,7 @@ public class BotDetectionMiddleware(
                 string.IsNullOrEmpty(evidence.TriggeredActionPolicyName))
             {
                 _logger.LogDebug(
-                    "Skipping response recording for {Path} — 403 likely set by middleware bot-block, not the server",
+                    "Skipping response recording for {Path} - 403 likely set by middleware bot-block, not the server",
                     context.Request.Path);
                 return;
             }

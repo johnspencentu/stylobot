@@ -3,7 +3,7 @@ offline analysis. They share the same sink (request scoped) but the request coor
 one's type is queued by signals in the request. Shoudl I make the coordinators keyed by signature? I think that's an
 interesting approach like (keep 100 signals of the most recent for example to gather a whole web request shape?)
 
-Yeah, you’ve basically got the right instinct here — you’re just mixing two layers in your head:
+Yeah, you’ve basically got the right instinct here - you’re just mixing two layers in your head:
 
 Operation-level: “this single HTTP request + response”
 
@@ -125,7 +125,7 @@ For behavioural waveform: yes, conceptually → keep a per-signature window, exa
 
 In practice:
 
-You probably don’t want a heavyweight coordinator object per signature — you already have BehavioralPatternAnalyzer
+You probably don’t want a heavyweight coordinator object per signature - you already have BehavioralPatternAnalyzer
 doing this cheaply via caches.
 
 You can describe that analyzer + its per-client window as a “virtual coordinator keyed by signature”, and that’s a good

@@ -23,14 +23,14 @@ public class StyloBotDashboardHub : Hub<IStyloBotDashboardHub>
     }
 
     /// <summary>
-    ///     Client connects — enforces same auth as dashboard middleware.
+    ///     Client connects - enforces same auth as dashboard middleware.
     /// </summary>
     public override async Task OnConnectedAsync()
     {
         var httpContext = Context.GetHttpContext();
         if (httpContext != null && !await IsAuthorizedAsync(httpContext))
         {
-            _logger.LogWarning("SignalR connection rejected for {IP} — dashboard auth failed",
+            _logger.LogWarning("SignalR connection rejected for {IP} - dashboard auth failed",
                 httpContext.Connection.RemoteIpAddress);
             Context.Abort();
             return;
@@ -61,7 +61,7 @@ public class StyloBotDashboardHub : Hub<IStyloBotDashboardHub>
             }
         }
 
-        // No auth configured — allow (same as dashboard middleware default)
+        // No auth configured - allow (same as dashboard middleware default)
         return true;
     }
 

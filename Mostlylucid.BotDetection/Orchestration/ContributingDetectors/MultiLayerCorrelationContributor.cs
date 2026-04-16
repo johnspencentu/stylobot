@@ -135,7 +135,7 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
             }
 
             // 5. Datacenter + Browser Claims = Suspicious
-            // Skip for API/gRPC/SignalR traffic — server-side clients in datacenters with
+            // Skip for API/gRPC/SignalR traffic - server-side clients in datacenters with
             // browser-like UAs are expected for API consumers, monitoring, and service meshes.
             var protocolClass = GetSignal<string>(state, SignalKeys.TransportProtocolClass);
             var isNonDocumentTraffic = protocolClass is "api" or "grpc" or "signalr";

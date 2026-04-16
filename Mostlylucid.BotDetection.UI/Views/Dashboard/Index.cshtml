@@ -124,10 +124,10 @@
     <!-- Main content -->
     <main class="max-w-7xl mx-auto px-2 py-4">
 
-        <!-- Summary stats — always visible -->
+        <!-- Summary stats - always visible -->
         @await Html.PartialAsync("~/Views/Dashboard/_SummaryStats.cshtml", Model.Summary)
 
-        <!-- Your Detection — full width, above tabs -->
+        <!-- Your Detection - full width, above tabs -->
         <div class="my-4">
             @await Html.PartialAsync("~/Views/Dashboard/_YourDetection.cshtml", Model.YourDetection)
         </div>
@@ -283,7 +283,7 @@
                     var params = new URLSearchParams();
                     // Read current state from the last HTMX request or from filter buttons
                     var activeFilter = vl.querySelector('.bg-error\\/20, .bg-success\\/20, .shadow-sm');
-                    // Just use defaults — server will return the default view
+                    // Just use defaults - server will return the default view
                 }
             }
 

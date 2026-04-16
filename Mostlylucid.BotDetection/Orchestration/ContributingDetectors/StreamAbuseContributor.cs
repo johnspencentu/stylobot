@@ -7,7 +7,7 @@ using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 
 /// <summary>
-///     Stream abuse detection contributor — catches attackers hiding behind streaming traffic.
+///     Stream abuse detection contributor - catches attackers hiding behind streaming traffic.
 ///     Tracks per-signature streaming activity via IMemoryCache to detect:
 ///     - Handshake storms (excessive WS upgrades)
 ///     - Cross-endpoint mixing (streaming + page-scraping from same signature)
@@ -42,7 +42,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
         new SignalExistsTrigger(SignalKeys.WaveformSignature)
     };
 
-    // Config-driven parameters from YAML — no magic numbers
+    // Config-driven parameters from YAML - no magic numbers
     private int HandshakeStormThreshold => GetParam("handshake_storm_threshold", 10);
     private int HandshakeStormWindowSeconds => GetParam("handshake_storm_window_seconds", 60);
     private double HandshakeStormConfidence => GetParam("handshake_storm_confidence", 0.65);
@@ -78,7 +78,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
 
             if (!isStreaming)
             {
-                // Not a streaming request — still check cross-endpoint mixing
+                // Not a streaming request - still check cross-endpoint mixing
                 // (attacker doing page scraping alongside their streaming)
                 var signature = state.GetSignal<string>(SignalKeys.WaveformSignature);
                 if (!string.IsNullOrEmpty(signature))
@@ -89,7 +89,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
                 }
 
                 if (contributions.Count == 0)
-                    contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check — non-streaming request"));
+                    contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check - non-streaming request"));
 
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
             }
@@ -97,7 +97,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
             var sig = state.GetSignal<string>(SignalKeys.WaveformSignature);
             if (string.IsNullOrEmpty(sig))
             {
-                contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check — no signature available"));
+                contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check - no signature available"));
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
             }
 
@@ -129,7 +129,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
             CheckCrossEndpointMixing(state, activityWindow, contributions);
 
             if (contributions.Count == 0)
-                contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check — normal streaming activity"));
+                contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check - normal streaming activity"));
         }
         catch (Exception ex)
         {
@@ -195,12 +195,12 @@ public class StreamAbuseContributor : ConfiguredContributorBase
 
         var assetRatio = (double)window.AssetRequests / total;
         if (assetRatio >= CrossEndpointMaxAssetRatio)
-            return; // Has enough assets — looks like normal browsing
+            return; // Has enough assets - looks like normal browsing
 
         state.WriteSignal(SignalKeys.StreamCrossEndpointMixing, true);
         contributions.Add(BotContribution(
             "StreamAbuse",
-            $"Cross-endpoint mixing: {window.StreamRequests} stream + {window.PageRequests} page requests with low asset ratio ({assetRatio:P0}) — scraping behind streaming cover",
+            $"Cross-endpoint mixing: {window.StreamRequests} stream + {window.PageRequests} page requests with low asset ratio ({assetRatio:P0}) - scraping behind streaming cover",
             confidenceOverride: CrossEndpointConfidence,
             weightMultiplier: CrossEndpointWeight,
             botType: BotType.Scraper.ToString()));
@@ -237,7 +237,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
 
     private static string GetPathHash(string path)
     {
-        // Use a simple hash for path deduplication — we only need uniqueness, not reversibility
+        // Use a simple hash for path deduplication - we only need uniqueness, not reversibility
         var bytes = System.Text.Encoding.UTF8.GetBytes(path);
         return System.IO.Hashing.XxHash32.HashToUInt32(bytes).ToString("X8");
     }

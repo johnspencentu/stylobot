@@ -8,8 +8,8 @@ using Mostlylucid.BotDetection.Models;
 namespace Mostlylucid.BotDetection.Benchmarks;
 
 /// <summary>
-///     Benchmarks for pattern normalization (hot path — called per request in Wave 0)
-///     and reputation updater (background path — called per learning event).
+///     Benchmarks for pattern normalization (hot path - called per request in Wave 0)
+///     and reputation updater (background path - called per learning event).
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob(RunStrategy.Throughput, warmupCount: 3, iterationCount: 10)]

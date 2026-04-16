@@ -14,10 +14,10 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     Runs early (priority 4) after FastPathReputation but before UserAgent.
 ///
 ///     Three verification tiers:
-///     1. **Known bots** (Googlebot, Bingbot, etc.) — verified via published CIDR ranges or FCrDNS
-///     2. **Honest bots** — UA contains a URL/domain AND client IP reverse-DNS matches that domain
+///     1. **Known bots** (Googlebot, Bingbot, etc.) - verified via published CIDR ranges or FCrDNS
+///     2. **Honest bots** - UA contains a URL/domain AND client IP reverse-DNS matches that domain
 ///        These are bots that truthfully identify themselves (e.g., MostlylucidBot with matching rDNS)
-///     3. **Spoofed bots** — UA claims to be a known bot but IP doesn't verify
+///     3. **Spoofed bots** - UA claims to be a known bot but IP doesn't verify
 ///
 ///     Configuration loaded from: verifiedbot.detector.yaml
 ///     Override via: appsettings.json → BotDetection:Detectors:VerifiedBotContributor:*
@@ -70,7 +70,7 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
         var botName = _registry.MatchBotUserAgent(userAgent);
         if (botName == null)
         {
-            // Not a known bot — but check for "honest bot" pattern:
+            // Not a known bot - but check for "honest bot" pattern:
             // UA has a URL, and reverse DNS of client IP matches that domain
             var honestResult = await CheckHonestBot(state, userAgent, clientIp, cancellationToken);
             if (honestResult != null)
@@ -166,7 +166,7 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
 
         if (!domainMatch2)
         {
-            // rDNS resolved to a DIFFERENT domain — weak mismatch signal
+            // rDNS resolved to a DIFFERENT domain - weak mismatch signal
             // (rDNS can legitimately differ due to CDNs, shared hosting, etc.)
             _logger.LogDebug(
                 "rDNS mismatch: UA claims {Domain} but rDNS is {Hostname}",
@@ -200,7 +200,7 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
                 botName: honestBotName ?? uaDomain)
             with
             {
-                // Honest bots get moderate weight — they're still bots, just trustworthy ones
+                // Honest bots get moderate weight - they're still bots, just trustworthy ones
                 Weight = WeightBase * 0.8
             };
     }

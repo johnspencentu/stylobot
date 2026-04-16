@@ -1,6 +1,6 @@
 # SignalR Beacon Architecture
 
-The StyloBot dashboard uses a hybrid **SignalR + HTMX** architecture for real-time updates. SignalR acts as a lightweight beacon — it tells clients *what changed*, never *what the data is*. Clients then fetch authoritative data via HTMX partial endpoints.
+The StyloBot dashboard uses a hybrid **SignalR + HTMX** architecture for real-time updates. SignalR acts as a lightweight beacon - it tells clients *what changed*, never *what the data is*. Clients then fetch authoritative data via HTMX partial endpoints.
 
 ## The Problem with Data-Over-SignalR
 
@@ -14,11 +14,11 @@ Server → SignalR → BroadcastDetection({ isBot, probability, country, ... })
 
 This creates several problems:
 
-1. **Bandwidth waste** — Every connected client receives every detection event's full payload, even if they're on a tab that doesn't display it.
-2. **State synchronization bugs** — Client-side state diverges from server-side truth. Missed messages mean stale data.
-3. **Serialization coupling** — The hub interface becomes a de facto API contract. Changing a model property breaks all clients.
-4. **No pagination** — You can't paginate a push stream. The client either gets everything or nothing.
-5. **Duplicate rendering** — Server renders HTML for the initial page load, then clients re-render from JSON for updates. Two rendering paths to maintain.
+1. **Bandwidth waste** - Every connected client receives every detection event's full payload, even if they're on a tab that doesn't display it.
+2. **State synchronization bugs** - Client-side state diverges from server-side truth. Missed messages mean stale data.
+3. **Serialization coupling** - The hub interface becomes a de facto API contract. Changing a model property breaks all clients.
+4. **No pagination** - You can't paginate a push stream. The client either gets everything or nothing.
+5. **Duplicate rendering** - Server renders HTML for the initial page load, then clients re-render from JSON for updates. Two rendering paths to maintain.
 
 ## The Beacon-Only Solution
 
@@ -52,11 +52,11 @@ This mirrors Bluetooth Low Energy's advertising pattern:
 | **Scan interval** | Debounce timer (500ms) |
 | **Connection event** | HTMX partial fetch |
 
-The beacon carries no data — it's a "something changed" ping. The client decides *when* and *what* to fetch based on its current view.
+The beacon carries no data - it's a "something changed" ping. The client decides *when* and *what* to fetch based on its current view.
 
 ## Hub Interface
 
-The hub contract is minimal — two methods total:
+The hub contract is minimal - two methods total:
 
 ```csharp
 public interface IStyloBotDashboardHub
@@ -69,7 +69,7 @@ public interface IStyloBotDashboardHub
 }
 ```
 
-`BroadcastAttackArc` is the single exception — it carries two strings (country code + risk band) for the world map animation. This is acceptable because:
+`BroadcastAttackArc` is the single exception - it carries two strings (country code + risk band) for the world map animation. This is acceptable because:
 - The data is tiny (two short strings)
 - Attack arcs are ephemeral animations, not persistent state
 - There's no server-rendered partial equivalent for a CSS animation
@@ -87,8 +87,8 @@ Dashboard widgets self-register via HTML `data-` attributes:
 </div>
 ```
 
-- `data-sb-widget="topbots"` — widget ID (used in `?widgets=topbots` query)
-- `data-sb-depends="signature,summary"` — which invalidation signals trigger a refresh
+- `data-sb-widget="topbots"` - widget ID (used in `?widgets=topbots` query)
+- `data-sb-depends="signature,summary"` - which invalidation signals trigger a refresh
 
 The HTMX coordinator script builds a reverse map at runtime:
 
@@ -160,9 +160,9 @@ The dashboard-viz module (world map + time series chart) connects separately and
 
 ## Benefits
 
-1. **Single rendering path** — Razor partials render both the initial page and all updates. No client-side template duplication.
-2. **Server-side pagination** — Widgets like Top Bots and Recent Activity support sort, filter, and pagination because updates come via HTTP, not push.
-3. **Bandwidth efficiency** — SignalR messages are a few bytes each. Data is fetched only when the client needs it and only for visible widgets.
-4. **Stale-proof** — Every HTMX fetch returns the current server state. There's no possibility of missed-message drift.
-5. **Simple client code** — The entire HTMX coordinator is ~40 lines of vanilla JavaScript. No framework, no state management, no JSON-to-DOM mapping.
-6. **CDN/cache friendly** — Partial endpoints are regular HTTP GETs that could be cached, rate-limited, or served from edge.
+1. **Single rendering path** - Razor partials render both the initial page and all updates. No client-side template duplication.
+2. **Server-side pagination** - Widgets like Top Bots and Recent Activity support sort, filter, and pagination because updates come via HTTP, not push.
+3. **Bandwidth efficiency** - SignalR messages are a few bytes each. Data is fetched only when the client needs it and only for visible widgets.
+4. **Stale-proof** - Every HTMX fetch returns the current server state. There's no possibility of missed-message drift.
+5. **Simple client code** - The entire HTMX coordinator is ~40 lines of vanilla JavaScript. No framework, no state management, no JSON-to-DOM mapping.
+6. **CDN/cache friendly** - Partial endpoints are regular HTTP GETs that could be cached, rate-limited, or served from edge.

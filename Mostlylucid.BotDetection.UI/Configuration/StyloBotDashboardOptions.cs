@@ -71,7 +71,7 @@ public sealed class StyloBotDashboardOptions
     ///     When true, extract basic browser, protocol, and country info from HTTP headers
     ///     for ALL detections (including human traffic). This enables browser/protocol/country
     ///     dashboard stats even when the detection pipeline doesn't write signals for humans.
-    ///     No PII is stored — only browser family, major version, HTTP protocol, and country code.
+    ///     No PII is stored - only browser family, major version, HTTP protocol, and country code.
     ///     Default: false (privacy-preserving). Enable for demo/marketing dashboards.
     /// </summary>
     public bool EnrichHumanSignals { get; set; } = false;
@@ -88,7 +88,7 @@ public sealed class StyloBotDashboardOptions
     ///     Action policy name to execute when a bot is detected on dashboard data API endpoints.
     ///     Maps to the <c>ActionPolicyName</c> on the registered detection policy.
     ///     Uses the bot detection system's own policy registry (e.g., "throttle-stealth",
-    ///     "block", "throttle-tools"). Only bots are affected — human traffic passes through freely.
+    ///     "block", "throttle-tools"). Only bots are affected - human traffic passes through freely.
     ///     Default: "throttle-stealth"
     /// </summary>
     public string DataApiActionPolicyName { get; set; } = "throttle-stealth";

@@ -52,7 +52,7 @@ policies:
 
   block-fake-success:
     type: Block
-    description: Return 200 with empty JSON data — bot thinks it succeeded
+    description: Return 200 with empty JSON data - bot thinks it succeeded
     tags: [production, stealth, anti-scraping]
     status_code: 200
     content_type: application/json
@@ -62,7 +62,7 @@ policies:
 
   block-fake-html:
     type: Block
-    description: Return 200 with empty HTML — bot thinks page loaded
+    description: Return 200 with empty HTML - bot thinks page loaded
     tags: [production, stealth, anti-scraping]
     status_code: 200
     content_type: text/html

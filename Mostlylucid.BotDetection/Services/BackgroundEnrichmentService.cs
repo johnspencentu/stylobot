@@ -134,7 +134,7 @@ public class BackgroundEnrichmentService : BackgroundService
 
             if (result is { IsListed: true })
             {
-                // Listed IP — determine bot evidence strength from threat score
+                // Listed IP - determine bot evidence strength from threat score
                 var label = result.ThreatScore switch
                 {
                     >= 100 => 0.95,
@@ -177,7 +177,7 @@ public class BackgroundEnrichmentService : BackgroundService
             }
             else
             {
-                // Clean IP — record slight human signal
+                // Clean IP - record slight human signal
                 var current = _reputationCache.Get(patternId);
                 if (current != null)
                 {

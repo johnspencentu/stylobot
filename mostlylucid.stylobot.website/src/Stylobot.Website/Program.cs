@@ -117,7 +117,7 @@ builder.Services.AddBotDetection(options =>
     // Trust upstream detection from YARP gateway (skip re-running the full pipeline)
     options.TrustUpstreamDetection = GetConfigBool("BotDetection:TrustUpstreamDetection", "BOTDETECTION_TRUST_UPSTREAM", false);
 
-    // Let bot detection run on dashboard paths (dogfooding) — confirmed bots
+    // Let bot detection run on dashboard paths (dogfooding) - confirmed bots
     // are blocked from data API endpoints by the dashboard middleware itself.
 
     // Detection thresholds
@@ -200,7 +200,7 @@ if (aiProviderForLlm.Equals("LlamaSharp", StringComparison.OrdinalIgnoreCase))
 // Add OpenTelemetry instrumentation for bot detection signals
 builder.Services.AddBotDetectionTelemetry();
 
-// Wire up OTel SDK — Prometheus exporter for /metrics scraping
+// Wire up OTel SDK - Prometheus exporter for /metrics scraping
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
@@ -329,7 +329,7 @@ if (app.Environment.IsDevelopment())
     }
 }
 
-// Must be first — rewrites RemoteIpAddress from X-Forwarded-For before
+// Must be first - rewrites RemoteIpAddress from X-Forwarded-For before
 // any middleware (GeoRouting, BotDetection) reads the client IP.
 app.UseForwardedHeaders();
 
@@ -347,7 +347,7 @@ app.UseHttpsRedirection();
 
 app.Use(async (context, next) =>
 {
-    // Skip strict CSP for dashboard paths — the dashboard middleware sets its own headers
+    // Skip strict CSP for dashboard paths - the dashboard middleware sets its own headers
     // and needs frame-ancestors 'self' for the LiveDemo iframe embed
     var dashboardBasePath = GetConfig("StyloBotDashboard:BasePath", "STYLOBOT_DASHBOARD_PATH", "/_stylobot");
     if (context.Request.Path.StartsWithSegments(dashboardBasePath))

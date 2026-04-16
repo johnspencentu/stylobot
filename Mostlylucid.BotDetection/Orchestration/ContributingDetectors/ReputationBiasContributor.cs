@@ -176,7 +176,7 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
         // When a request carries same-origin attestation, the browser is declaring this
         // is a programmatic fetch from the same site. Bots can set the header, but they
         // can't maintain consistency across TLS/TCP/H2 fingerprints. Downgrade reputation
-        // weight so other detectors can confirm or override — prevents reputation from
+        // weight so other detectors can confirm or override - prevents reputation from
         // single-handedly blocking legitimate dashboard/API traffic.
         // (Same pattern as FastPathReputationContributor.)
         var secFetchSite = state.HttpContext?.Request.Headers["Sec-Fetch-Site"].FirstOrDefault();
@@ -192,7 +192,7 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
             if (hasBrowserAttestation)
             {
                 _logger.LogInformation(
-                    "Reputation bias downgraded: {PatternId} ({Category}) has Sec-Fetch-Site: same-origin — using mild bias instead of verified abort",
+                    "Reputation bias downgraded: {PatternId} ({Category}) has Sec-Fetch-Site: same-origin - using mild bias instead of verified abort",
                     reputation.PatternId, category);
 
                 return new DetectionContribution
@@ -201,7 +201,7 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
                     Category = $"Reputation:{category}",
                     ConfidenceDelta = Math.Min(reputation.BotScore, GetParam("browser_attestation_max_confidence", 0.35)),
                     Weight = GetParam("browser_attestation_weight", 0.7),
-                    Reason = $"{reason} (downgraded — browser attestation present)"
+                    Reason = $"{reason} (downgraded - browser attestation present)"
                 };
             }
 
@@ -227,7 +227,7 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
         if (hasBrowserAttestation && weight > 0)
         {
             effectiveWeight = Math.Min(effectiveWeight, GetParam("browser_attestation_weight", 0.7));
-            reason += " (downgraded — browser attestation present)";
+            reason += " (downgraded - browser attestation present)";
         }
 
         string? botType = reputation.State switch

@@ -11,12 +11,12 @@ namespace Mostlylucid.BotDetection.Demo.Controllers;
 public class ComponentsController : Controller
 {
     /// <summary>
-    ///     Main page — all data-display and gating TagHelpers rendered live.
+    ///     Main page - all data-display and gating TagHelpers rendered live.
     /// </summary>
     public IActionResult Index()
     {
         ViewData["Title"] = "sb-* Component TagHelpers";
-        ViewData["Subtitle"] = "ASP.NET Core MVC demo — content gating, data display, and form protection";
+        ViewData["Subtitle"] = "ASP.NET Core MVC demo - content gating, data display, and form protection";
         return View();
     }
 

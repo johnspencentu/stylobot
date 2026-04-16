@@ -11,7 +11,7 @@ public sealed class DashboardAggregateCache
 {
     private volatile AggregateSnapshot _snapshot = AggregateSnapshot.Empty;
 
-    /// <summary>Current cached snapshot. Never null — returns empty defaults before first refresh.</summary>
+    /// <summary>Current cached snapshot. Never null - returns empty defaults before first refresh.</summary>
     public AggregateSnapshot Current => _snapshot;
 
     /// <summary>Replace the entire snapshot atomically.</summary>

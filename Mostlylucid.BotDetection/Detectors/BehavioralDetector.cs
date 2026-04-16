@@ -64,7 +64,7 @@ public class BehavioralDetector : IDetector
         var isWarmingUp = sessionAge.TotalMinutes < 2; // First 2 minutes is warmup
 
         // ===== Content-Aware Rate Limiting (per-IP) =====
-        // HTTP/2+ multiplexes many asset requests per page load — counting all requests
+        // HTTP/2+ multiplexes many asset requests per page load - counting all requests
         // produces false positives. Only page navigations matter for rate limiting.
         var isPageRequest = IsPageRequest(context);
         var totalRequestCount = IncrementRequestCount(ipAddress);
@@ -242,7 +242,7 @@ public class BehavioralDetector : IDetector
 
         // ===== Session Consistency Checks =====
 
-        // HTMX/fetch sub-requests prove JavaScript execution — strong human signal.
+        // HTMX/fetch sub-requests prove JavaScript execution - strong human signal.
         // These are AJAX partials triggered by the parent page's JS framework.
         var isHtmxRequest = context.Request.Headers.ContainsKey("HX-Request");
 
@@ -269,7 +269,7 @@ public class BehavioralDetector : IDetector
 
         // Check for no referrer on non-initial requests
         // Skip during warmup as initial page load doesn't have referrer
-        // Skip for HTMX/fetch sub-requests — they may legitimately omit Referer
+        // Skip for HTMX/fetch sub-requests - they may legitimately omit Referer
         if (!isWarmingUp &&
             !isHtmxRequest && !isFetchRequest &&
             !context.Request.Headers.ContainsKey("Referer") &&
@@ -287,7 +287,7 @@ public class BehavioralDetector : IDetector
 
         // Check for missing cookies (bots often don't maintain sessions)
         // Skip during warmup - cookies are set after first response
-        // Skip for HTMX/fetch sub-requests — many sites don't set cookies at all,
+        // Skip for HTMX/fetch sub-requests - many sites don't set cookies at all,
         // and penalizing cookie-less AJAX from real browsers is a false positive.
         if (!isWarmingUp && !isHtmxRequest && !isFetchRequest &&
             !context.Request.Cookies.Any() && totalRequestCount > 2)
@@ -476,7 +476,7 @@ public class BehavioralDetector : IDetector
             return fetchDest.Equals("document", StringComparison.OrdinalIgnoreCase)
                    || fetchDest.Equals("iframe", StringComparison.OrdinalIgnoreCase);
 
-        // File extension check — known asset extensions are NOT page requests
+        // File extension check - known asset extensions are NOT page requests
         var path = context.Request.Path.Value ?? "/";
         var ext = Path.GetExtension(path).ToLowerInvariant();
         if (ext is ".js" or ".css" or ".png" or ".jpg" or ".jpeg" or ".gif" or ".svg" or ".ico"

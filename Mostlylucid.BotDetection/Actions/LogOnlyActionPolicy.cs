@@ -336,7 +336,7 @@ public class LogOnlyActionOptions
     };
 
     /// <summary>
-    ///     Creates options for "degrade" mode — marks request for content degradation.
+    ///     Creates options for "degrade" mode - marks request for content degradation.
     ///     Downstream middleware reads BotDetection.Action = "degrade" from HttpContext.Items.
     /// </summary>
     public static LogOnlyActionOptions Degrade => new()
@@ -349,7 +349,7 @@ public class LogOnlyActionOptions
     };
 
     /// <summary>
-    ///     Creates options for "rate-limit-headers" mode — adds RateLimit-* response headers
+    ///     Creates options for "rate-limit-headers" mode - adds RateLimit-* response headers
     ///     without blocking. Signals to well-behaved bots.
     /// </summary>
     public static LogOnlyActionOptions RateLimitHeaders => new()
@@ -362,7 +362,7 @@ public class LogOnlyActionOptions
     };
 
     /// <summary>
-    ///     Creates options for "quarantine" mode — allows request through but tags
+    ///     Creates options for "quarantine" mode - allows request through but tags
     ///     it for manual review downstream.
     /// </summary>
     public static LogOnlyActionOptions Quarantine => new()
@@ -376,14 +376,14 @@ public class LogOnlyActionOptions
     };
 
     /// <summary>
-    ///     Creates options for "sandbox" (probation) mode — forces the full learning
+    ///     Creates options for "sandbox" (probation) mode - forces the full learning
     ///     detection policy on uncertain traffic to build confidence before taking action.
-    ///     The gateway still handles everything — no separate backend needed.
+    ///     The gateway still handles everything - no separate backend needed.
     ///     Sets HttpContext.Items:
     ///     <list type="bullet">
     ///         <item><c>BotDetection.Action = "sandbox"</c></item>
-    ///         <item><c>BotDetection.SandboxPolicy = "learning"</c> — forces full pipeline</item>
-    ///         <item><c>BotDetection.SandboxUseLlm</c> — true/false based on SandboxSampleRate</item>
+    ///         <item><c>BotDetection.SandboxPolicy = "learning"</c> - forces full pipeline</item>
+    ///         <item><c>BotDetection.SandboxUseLlm</c> - true/false based on SandboxSampleRate</item>
     ///     </list>
     ///     Use SandboxSampleRate (default 0.05 = 5%) to control what fraction of
     ///     sandboxed requests get the expensive LLM call. The rest run all detectors

@@ -466,7 +466,7 @@ public class TransportProtocolContributorTests
         var botContrib = contributions.FirstOrDefault(c =>
             c.Reason != null && c.Reason.Contains("batch"));
         Assert.NotNull(botContrib);
-        // Batch is mild — legitimate but high-abuse
+        // Batch is mild - legitimate but high-abuse
         Assert.True(botContrib!.ConfidenceDelta > 0);
         Assert.True(botContrib.ConfidenceDelta < 0.3, "Batch signal should be mild");
     }

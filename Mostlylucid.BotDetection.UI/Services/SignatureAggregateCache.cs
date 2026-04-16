@@ -13,7 +13,7 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     </para>
 ///     <para>
 ///     MaxEntries is capped at 200 by default. Eviction scans are O(n) but batched
-///     to amortize cost — eviction only triggers when 10% over capacity.
+///     to amortize cost - eviction only triggers when 10% over capacity.
 ///     </para>
 /// </summary>
 public sealed class SignatureAggregateCache
@@ -119,7 +119,7 @@ public sealed class SignatureAggregateCache
             "hits" => asc
                 ? query.OrderBy(b => b.HitCount)
                 : query.OrderByDescending(b => b.HitCount),
-            // Default: composite sort — threat score * hits for a blended ranking
+            // Default: composite sort - threat score * hits for a blended ranking
             _ => query.OrderByDescending(b => (b.ThreatScore ?? 0) * 0.4 + Math.Log10(Math.Max(b.HitCount, 1)) * 0.6)
         };
 
@@ -214,7 +214,7 @@ public sealed class SignatureAggregateCache
             ThreatBand = detection.ThreatBand,
         };
 
-        // No lock needed — object is not yet visible to other threads
+        // No lock needed - object is not yet visible to other threads
         agg.ScoreHistory.AddLast(detection.BotProbability);
 
         return agg;
@@ -256,7 +256,7 @@ public sealed class SignatureAggregateCache
 
     private IReadOnlyList<DashboardTopBotEntry> GetOrRebuildSortedList()
     {
-        // Fast path — double-checked locking. Benign staleness is acceptable for a dashboard.
+        // Fast path - double-checked locking. Benign staleness is acceptable for a dashboard.
         if (!_sortDirty && _sortedCache != null)
             return _sortedCache;
 
@@ -342,7 +342,7 @@ public sealed class SignatureAggregateCache
     {
         foreach (var kvp in _entries)
         {
-            // Atomic read-then-halve (approximate — good enough for LFU heuristic)
+            // Atomic read-then-halve (approximate - good enough for LFU heuristic)
             var current = Interlocked.Read(ref kvp.Value.AccessCount);
             Interlocked.Exchange(ref kvp.Value.AccessCount, current / 2);
         }
@@ -372,7 +372,7 @@ public sealed class SignatureAggregate
     public double? ThreatScore;
     public string? ThreatBand;
 
-    /// <summary>LFU access counter — incremented on read, periodically aged.</summary>
+    /// <summary>LFU access counter - incremented on read, periodically aged.</summary>
     public long AccessCount;
 
     /// <summary>Ring buffer of recent bot probability scores for sparkline.</summary>

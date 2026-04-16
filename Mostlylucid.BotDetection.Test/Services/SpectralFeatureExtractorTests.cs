@@ -71,7 +71,7 @@ public class SpectralFeatureExtractorTests
 
     #endregion
 
-    #region Extract — Insufficient Data
+    #region Extract - Insufficient Data
 
     [Fact]
     public void Extract_NullInput_ReturnsInsufficientData()
@@ -113,10 +113,10 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_InsufficientDataDefaults_HaveExpectedValues()
     {
-        // Act — use null to trigger the InsufficientData return
+        // Act - use null to trigger the InsufficientData return
         var result = SpectralFeatureExtractor.Extract(null!);
 
-        // Assert — verify each default precisely
+        // Assert - verify each default precisely
         Assert.Equal(0.0, result.DominantFrequency);
         Assert.Equal(1.0, result.SpectralEntropy);
         Assert.Equal(0.0, result.HarmonicRatio);
@@ -127,12 +127,12 @@ public class SpectralFeatureExtractorTests
 
     #endregion
 
-    #region Extract — Sufficient Data
+    #region Extract - Sufficient Data
 
     [Fact]
     public void Extract_ExactlyEightIntervals_HasSufficientData()
     {
-        // Arrange — exactly MinIntervals = 8
+        // Arrange - exactly MinIntervals = 8
         var intervals = RandomIntervals(8);
 
         // Act
@@ -146,7 +146,7 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_ConstantIntervals_HighSpectralEntropy()
     {
-        // Arrange — all identical values; DC is the only energy source
+        // Arrange - all identical values; DC is the only energy source
         var intervals = ConstantIntervals(16);
 
         // Act
@@ -164,7 +164,7 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_RandomIntervals_HighSpectralEntropy()
     {
-        // Arrange — varied intervals simulate a human visitor
+        // Arrange - varied intervals simulate a human visitor
         var intervals = RandomIntervals(32);
 
         // Act
@@ -198,7 +198,7 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_LargeInput_CompletesWithoutError()
     {
-        // Arrange — 100 intervals
+        // Arrange - 100 intervals
         var intervals = RandomIntervals(100);
 
         // Act
@@ -211,12 +211,12 @@ public class SpectralFeatureExtractorTests
 
     #endregion
 
-    #region Extract — Edge Cases
+    #region Extract - Edge Cases
 
     [Fact]
     public void Extract_NegativeIntervals_DoesNotCrash()
     {
-        // Arrange — negative values are unusual but should not throw
+        // Arrange - negative values are unusual but should not throw
         var intervals = new double[] { -1.0, -2.0, -0.5, -3.0, -1.5, -2.5, -0.8, -1.2 };
 
         // Act
@@ -230,13 +230,13 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_AllZeroIntervals_DoesNotCrash()
     {
-        // Arrange — all zeros (degenerate input)
+        // Arrange - all zeros (degenerate input)
         var intervals = new double[16];
 
         // Act
         var result = SpectralFeatureExtractor.Extract(intervals);
 
-        // Assert — zero input has zero energy everywhere
+        // Assert - zero input has zero energy everywhere
         Assert.True(result.HasSufficientData);
         // All outputs should still be valid numbers in [0,1]
         AssertAllOutputsBounded(result);
@@ -261,13 +261,13 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_SingleValueRepeated_EntropyDefaultsToOne()
     {
-        // Arrange — same value repeated many times
+        // Arrange - same value repeated many times
         var intervals = ConstantIntervals(32, 2.5);
 
         // Act
         var result = SpectralFeatureExtractor.Extract(intervals);
 
-        // Assert — constant signal has all energy at DC (excluded from spectrum),
+        // Assert - constant signal has all energy at DC (excluded from spectrum),
         // so non-DC totalEnergy is near zero and entropy defaults to 1.0.
         Assert.True(result.HasSufficientData);
         Assert.Equal(1.0, result.SpectralEntropy);
@@ -276,7 +276,7 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_AlternatingValues_DetectsDominantFrequency()
     {
-        // Arrange — alternating pattern creates a clear frequency component
+        // Arrange - alternating pattern creates a clear frequency component
         var intervals = AlternatingIntervals(32, 1.0, 3.0);
 
         // Act
@@ -295,7 +295,7 @@ public class SpectralFeatureExtractorTests
 
     #endregion
 
-    #region ComputeTemporalCorrelation — Null / Short Input
+    #region ComputeTemporalCorrelation - Null / Short Input
 
     [Fact]
     public void ComputeTemporalCorrelation_NullFirstArray_ReturnsZero()
@@ -369,7 +369,7 @@ public class SpectralFeatureExtractorTests
 
     #endregion
 
-    #region ComputeTemporalCorrelation — Valid Input
+    #region ComputeTemporalCorrelation - Valid Input
 
     [Fact]
     public void ComputeTemporalCorrelation_IdenticalArrays_HighCorrelation()
@@ -380,28 +380,28 @@ public class SpectralFeatureExtractorTests
         // Act
         var result = SpectralFeatureExtractor.ComputeTemporalCorrelation(intervals, intervals);
 
-        // Assert — auto-correlation should be very high
+        // Assert - auto-correlation should be very high
         Assert.InRange(result, 0.8, 1.0);
     }
 
     [Fact]
     public void ComputeTemporalCorrelation_DifferentArrays_StillBounded()
     {
-        // Arrange — two different random sequences
+        // Arrange - two different random sequences
         var a = RandomIntervals(16, seed: 1);
         var b = RandomIntervals(16, seed: 999);
 
         // Act
         var correlationDiff = SpectralFeatureExtractor.ComputeTemporalCorrelation(a, b);
 
-        // Assert — output is always bounded to [0,1] regardless of input
+        // Assert - output is always bounded to [0,1] regardless of input
         Assert.InRange(correlationDiff, 0.0, 1.0);
     }
 
     [Fact]
     public void ComputeTemporalCorrelation_StructurallyDifferent_StillBounded()
     {
-        // Arrange — use arrays with deliberately different structure
+        // Arrange - use arrays with deliberately different structure
         var ascending = new double[64];
         for (var i = 0; i < ascending.Length; i++)
             ascending[i] = 0.1 + i * 0.1;
@@ -411,14 +411,14 @@ public class SpectralFeatureExtractorTests
         // Act
         var correlationDiff = SpectralFeatureExtractor.ComputeTemporalCorrelation(ascending, alternating);
 
-        // Assert — regardless of structure, output is always bounded [0,1]
+        // Assert - regardless of structure, output is always bounded [0,1]
         Assert.InRange(correlationDiff, 0.0, 1.0);
     }
 
     [Fact]
     public void ComputeTemporalCorrelation_ZeroMeanSignals_IdenticalCorrelatesHigherThanDifferent()
     {
-        // Arrange — zero-mean signals avoid DC dominance that can mask structural
+        // Arrange - zero-mean signals avoid DC dominance that can mask structural
         // differences in the cross-correlation normalization.
         var a = new double[64];
         var b = new double[64];
@@ -434,7 +434,7 @@ public class SpectralFeatureExtractorTests
         var correlationSame = SpectralFeatureExtractor.ComputeTemporalCorrelation(a, a);
         var correlationDiff = SpectralFeatureExtractor.ComputeTemporalCorrelation(a, b);
 
-        // Assert — identical should correlate higher than different with zero-mean data
+        // Assert - identical should correlate higher than different with zero-mean data
         Assert.True(correlationDiff <= correlationSame,
             $"Different zero-mean arrays ({correlationDiff:F4}) should not exceed identical ({correlationSame:F4}).");
     }
@@ -460,14 +460,14 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void ComputeTemporalCorrelation_LongArrays_CompletesWithinCap()
     {
-        // Arrange — 200 elements, exceeding the internal 128-element cap
+        // Arrange - 200 elements, exceeding the internal 128-element cap
         var a = RandomIntervals(200, seed: 10);
         var b = RandomIntervals(200, seed: 20);
 
         // Act
         var result = SpectralFeatureExtractor.ComputeTemporalCorrelation(a, b);
 
-        // Assert — should complete without error, output bounded
+        // Assert - should complete without error, output bounded
         Assert.InRange(result, 0.0, 1.0);
     }
 
@@ -482,14 +482,14 @@ public class SpectralFeatureExtractorTests
         var resultAB = SpectralFeatureExtractor.ComputeTemporalCorrelation(a, b);
         var resultBA = SpectralFeatureExtractor.ComputeTemporalCorrelation(b, a);
 
-        // Assert — cross-correlation magnitude should be symmetric
+        // Assert - cross-correlation magnitude should be symmetric
         Assert.Equal(resultAB, resultBA, precision: 10);
     }
 
     [Fact]
     public void ComputeTemporalCorrelation_DifferentLengthArrays_Works()
     {
-        // Arrange — arrays with different lengths (both >= 8)
+        // Arrange - arrays with different lengths (both >= 8)
         var a = RandomIntervals(10, seed: 50);
         var b = RandomIntervals(20, seed: 60);
 
@@ -502,12 +502,12 @@ public class SpectralFeatureExtractorTests
 
     #endregion
 
-    #region Extract — Periodic vs Random Comparison
+    #region Extract - Periodic vs Random Comparison
 
     [Fact]
     public void Extract_PeriodicVsRandom_PeriodicHasLowerEntropy()
     {
-        // Arrange — alternating pattern has energy concentrated at one frequency;
+        // Arrange - alternating pattern has energy concentrated at one frequency;
         // random intervals spread energy across many frequencies.
         var periodic = AlternatingIntervals(32, 1.0, 3.0);
         var random = RandomIntervals(32);
@@ -516,7 +516,7 @@ public class SpectralFeatureExtractorTests
         var periodicResult = SpectralFeatureExtractor.Extract(periodic);
         var randomResult = SpectralFeatureExtractor.Extract(random);
 
-        // Assert — periodic (bot-like) should have lower entropy than random (human-like)
+        // Assert - periodic (bot-like) should have lower entropy than random (human-like)
         Assert.True(periodicResult.SpectralEntropy < randomResult.SpectralEntropy,
             $"Periodic entropy ({periodicResult.SpectralEntropy:F4}) should be less than random ({randomResult.SpectralEntropy:F4}).");
     }
@@ -524,7 +524,7 @@ public class SpectralFeatureExtractorTests
     [Fact]
     public void Extract_ConstantIntervals_EntropyEqualsOne_BecauseDcIsExcluded()
     {
-        // Arrange — constant signal has all energy at DC which is excluded
+        // Arrange - constant signal has all energy at DC which is excluded
         var constant = ConstantIntervals(32);
         var random = RandomIntervals(32);
 
@@ -532,7 +532,7 @@ public class SpectralFeatureExtractorTests
         var constantResult = SpectralFeatureExtractor.Extract(constant);
         var randomResult = SpectralFeatureExtractor.Extract(random);
 
-        // Assert — counter-intuitive: constant actually has HIGHER entropy (1.0)
+        // Assert - counter-intuitive: constant actually has HIGHER entropy (1.0)
         // because after removing DC there is no meaningful frequency content,
         // causing the default entropy of 1.0 to be returned.
         Assert.Equal(1.0, constantResult.SpectralEntropy);

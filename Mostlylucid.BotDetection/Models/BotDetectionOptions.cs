@@ -651,7 +651,7 @@ public class BotDetectionOptions
     ///     Name of the header containing the HMAC signature from the upstream gateway.
     ///     When set alongside TrustUpstreamDetection, the middleware will verify
     ///     that upstream headers were signed by a trusted gateway using the shared secret.
-    ///     Default: null (no signature verification — only use when backend is network-isolated).
+    ///     Default: null (no signature verification - only use when backend is network-isolated).
     /// </summary>
     public string? UpstreamSignatureHeader { get; set; }
 
@@ -3026,7 +3026,7 @@ public class VersionAgeOptions
         ["Mac OS X 13"] = "current", // Ventura
         ["Mac OS X 12"] = "current", // Monterey (still supported)
         ["Mac OS X 11"] = "current", // Big Sur (frozen UA reports 10_15 anyway)
-        ["Mac OS X 10_15"] = "current", // Frozen UA value — all modern Macs report this
+        ["Mac OS X 10_15"] = "current", // Frozen UA value - all modern Macs report this
         ["Mac OS X 10_14"] = "very_old", // Mojave
         ["Mac OS X 10_13"] = "very_old", // High Sierra
         ["Mac OS X 10_12"] = "ancient", // Sierra and older
@@ -3261,7 +3261,7 @@ public class TrainingEndpointsOptions
 /// <summary>
 ///     Configuration for BDF (Bot Detection Format) replay endpoints.
 ///     Accepts BDF files and runs them through the real detection pipeline for offline debugging,
-///     training, and regression testing. Disabled by default — must opt-in.
+///     training, and regression testing. Disabled by default - must opt-in.
 /// </summary>
 public class BdfReplayOptions
 {
@@ -3349,7 +3349,7 @@ public class BotDetectionOptionsValidator : IValidateOptions<BotDetectionOptions
             warnings.Add(
                 $"MinConfidenceToBlock ({options.MinConfidenceToBlock}) is less than BotThreshold ({options.BotThreshold}), this may cause unexpected blocking");
 
-        // Upstream trust without HMAC allows header spoofing — warn but allow (network-isolated backends are a valid use case)
+        // Upstream trust without HMAC allows header spoofing - warn but allow (network-isolated backends are a valid use case)
         if (options.TrustUpstreamDetection &&
             (string.IsNullOrEmpty(options.UpstreamSignatureHeader) || string.IsNullOrEmpty(options.UpstreamSignatureSecret)))
             warnings.Add(
@@ -3606,7 +3606,7 @@ public class ResponseHeadersOptions
     /// <summary>
     ///     Include threat score and threat band in response headers.
     ///     Headers: {Prefix}Threat-Score, {Prefix}Threat-Band
-    ///     Default: true (orthogonal to bot probability — measures malicious intent)
+    ///     Default: true (orthogonal to bot probability - measures malicious intent)
     /// </summary>
     public bool IncludeThreatScore { get; set; } = true;
 

@@ -50,7 +50,7 @@ public sealed class MultiFactorSignatureService
     ///     Protocol-aware: when a request (WebSocket upgrade, SignalR negotiate) produces
     ///     fewer factors than a previous request from the same client, the richer factors
     ///     are carried forward. This ensures consistent signature identity across request
-    ///     types without weakening detection — the PrimarySignature (IP+UA) anchors the
+    ///     types without weakening detection - the PrimarySignature (IP+UA) anchors the
     ///     match, and secondary factors are only inherited, never fabricated.
     /// </summary>
     public MultiFactorSignatures GenerateSignatures(HttpContext httpContext)
@@ -77,7 +77,7 @@ public sealed class MultiFactorSignatureService
         // Carry-forward: non-document requests (WebSocket, fetch/XHR, SignalR negotiate)
         // produce different secondary factors (Accept-Encoding differs, Client Hints may be
         // absent). If we have a cached full-page-load set for this PrimarySignature, use those
-        // factors instead — this keeps the signature identity stable across request types.
+        // factors instead - this keeps the signature identity stable across request types.
         //
         // Detect non-document requests: WebSocket upgrade, Sec-Fetch-Dest != document/iframe,
         // or missing any factors that the cache has.
@@ -368,7 +368,7 @@ public sealed class MultiFactorSignatureService
             components.Add($"lang:{acceptLang}");
 
         // Accept-Encoding (stable per browser version for same request type,
-        // but differs across request types — e.g. page load vs WebSocket vs fetch.
+        // but differs across request types - e.g. page load vs WebSocket vs fetch.
         // The carry-forward logic in GenerateSignatures handles this divergence.)
         var acceptEnc = httpContext.Request.Headers.AcceptEncoding.ToString();
         if (!string.IsNullOrEmpty(acceptEnc))
@@ -387,7 +387,7 @@ public sealed class MultiFactorSignatureService
 
     /// <summary>
     ///     Extract country code from GeoLocation stored by GeoRoutingMiddleware.
-    ///     Country code (e.g. "US", "CN") is NOT PII — it's a coarse geographic signal
+    ///     Country code (e.g. "US", "CN") is NOT PII - it's a coarse geographic signal
     ///     more resistant to IP rotation than IP-based signatures.
     /// </summary>
     private static string? ExtractCountryCode(HttpContext httpContext)

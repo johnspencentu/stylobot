@@ -7,7 +7,7 @@ namespace Mostlylucid.BotDetection.Llm.Extensions;
 
 /// <summary>
 ///     Registers common LLM services (prompt builders, parser, service wrappers).
-///     Called by provider-specific extension methods — not directly by consumers.
+///     Called by provider-specific extension methods - not directly by consumers.
 /// </summary>
 public static class LlmServiceExtensions
 {
@@ -20,7 +20,7 @@ public static class LlmServiceExtensions
         // Classification service
         services.TryAddSingleton<LlmClassificationService>();
 
-        // Bot name synthesizer — replaces the old IBotNameSynthesizer registration
+        // Bot name synthesizer - replaces the old IBotNameSynthesizer registration
         services.RemoveAll<IBotNameSynthesizer>();
         services.AddSingleton<IBotNameSynthesizer, LlmBotNameSynthesizer>();
 

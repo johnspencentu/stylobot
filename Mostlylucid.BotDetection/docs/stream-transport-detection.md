@@ -8,15 +8,15 @@ StyloBot implements a **two-level transport classification** system that identif
 
 Two detectors work together:
 
-- **TransportProtocolContributor** (Wave 0, priority 5) — classifies every request into a transport class and protocol class, emitting `transport.is_streaming` for downstream consumption
-- **StreamAbuseContributor** (Wave 1+, priority 35) — uses per-signature sliding window tracking to detect abuse patterns unique to streaming
+- **TransportProtocolContributor** (Wave 0, priority 5) - classifies every request into a transport class and protocol class, emitting `transport.is_streaming` for downstream consumption
+- **StreamAbuseContributor** (Wave 1+, priority 35) - uses per-signature sliding window tracking to detect abuse patterns unique to streaming
 
 Five existing detectors consume the streaming signals to suppress false positives:
 
-- **CacheBehaviorContributor** — skips cache validation checks entirely for streaming requests
-- **BehavioralWaveformContributor** — excludes streaming requests from page rate/burst calculations, applies stream-specific burst thresholds
-- **AdvancedBehavioralContributor** — skips path entropy, navigation pattern, and burst analysis for streaming
-- **MultiFactorSignatureService** — prevents streaming requests from polluting full-page-load signature factors
+- **CacheBehaviorContributor** - skips cache validation checks entirely for streaming requests
+- **BehavioralWaveformContributor** - excludes streaming requests from page rate/burst calculations, applies stream-specific burst thresholds
+- **AdvancedBehavioralContributor** - skips path entropy, navigation pattern, and burst analysis for streaming
+- **MultiFactorSignatureService** - prevents streaming requests from polluting full-page-load signature factors
 
 ## Request Flow by Transport Type
 
@@ -123,7 +123,7 @@ When an SSE connection drops, the browser automatically reconnects with `Last-Ev
 | `transport.sse_reconnect` | boolean | `true` when `Last-Event-ID` header is present |
 | `transport.sse_last_event_id` | string | The Last-Event-ID value |
 
-A `Last-Event-ID` of `0` or `-1` triggers a bot signal (history replay attempt — requesting all events from the beginning).
+A `Last-Event-ID` of `0` or `-1` triggers a bot signal (history replay attempt - requesting all events from the beginning).
 
 ## Stream Abuse Detection
 
@@ -193,7 +193,7 @@ A signature connecting to many distinct streaming endpoints (probing for open st
 
 ### CacheBehaviorContributor
 
-**Before**: Wave 0, no streaming awareness. Penalized missing `If-None-Match`/`If-Modified-Since` and rapid repeat requests — both normal for SSE and SignalR.
+**Before**: Wave 0, no streaming awareness. Penalized missing `If-None-Match`/`If-Modified-Since` and rapid repeat requests - both normal for SSE and SignalR.
 
 **After**: Moved to Wave 1 (triggered by `transport.protocol`). Reads `transport.is_streaming` and returns a neutral contribution immediately for streaming requests, emitting `cache.skipped_streaming = true`.
 
@@ -215,13 +215,13 @@ A signature connecting to many distinct streaming endpoints (probing for open st
 
 **Before**: Only skipped path entropy, navigation pattern, and burst detection for WebSocket.
 
-**After**: Inline detection expanded to cover SSE (`Accept: text/event-stream`) and SignalR (path/query patterns). All skip guards use the composite `isStreaming` flag. Timing analysis (entropy, regularity, anomaly) still applies — machine-gun reconnects at exact intervals are still suspicious regardless of transport.
+**After**: Inline detection expanded to cover SSE (`Accept: text/event-stream`) and SignalR (path/query patterns). All skip guards use the composite `isStreaming` flag. Timing analysis (entropy, regularity, anomaly) still applies - machine-gun reconnects at exact intervals are still suspicious regardless of transport.
 
 ### MultiFactorSignatureService
 
 **Before**: `IsNonDocumentRequest()` detected WebSocket and had SSE in a fallback Accept header check.
 
-**After**: Explicit early checks for SSE (`Accept: text/event-stream`), SignalR negotiate (`/negotiate` + `negotiateVersion`), and SignalR connect (`id=` query param) — all before the `Sec-Fetch-Dest` check. Prevents streaming requests from generating new signature factors.
+**After**: Explicit early checks for SSE (`Accept: text/event-stream`), SignalR negotiate (`/negotiate` + `negotiateVersion`), and SignalR connect (`id=` query param) - all before the `Sec-Fetch-Dest` check. Prevents streaming requests from generating new signature factors.
 
 ## Configuration
 

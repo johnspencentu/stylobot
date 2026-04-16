@@ -334,7 +334,7 @@ public class ThrottleActionOptions
     };
 
     /// <summary>
-    ///     Creates options for "escalating" throttle — progressive delay that increases
+    ///     Creates options for "escalating" throttle - progressive delay that increases
     ///     rapidly with repeat detections. First hit ~200ms, escalates to 30s via backoff factor 3.
     /// </summary>
     public static ThrottleActionOptions Escalating => new()
@@ -349,7 +349,7 @@ public class ThrottleActionOptions
     };
 
     /// <summary>
-    ///     Creates options for "tools" throttle — 429 with Retry-After for developer tools (curl, wget, python-requests).
+    ///     Creates options for "tools" throttle - 429 with Retry-After for developer tools (curl, wget, python-requests).
     ///     Uses exponential backoff so well-behaved tools auto-slow. Visible headers encourage proper rate limiting.
     /// </summary>
     public static ThrottleActionOptions Tools => new()

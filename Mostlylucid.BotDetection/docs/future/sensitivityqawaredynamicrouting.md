@@ -206,7 +206,7 @@ You can optionally also require blocking if:
 * There is an **ongoing incident flag** for the tenant.
 * The request is to a **known PII endpoint** (e.g., `/api/upload-id`, `/api/payment`).
 
-These extra rules are still deterministic — no magic.
+These extra rules are still deterministic - no magic.
 
 ---
 
@@ -346,7 +346,7 @@ Enterprise can override these per-tenant through its admin plane; free users edi
 
 ## 10. Example Scenarios
 
-### Scenario 1 — HR Portal (known PII-heavy)
+### Scenario 1 - HR Portal (known PII-heavy)
 
 * Signature “hr-portal” has `SensitivityLevel.High`.
 * Any request from that signature automatically:
@@ -354,14 +354,14 @@ Enterprise can override these per-tenant through its admin plane; free users edi
     * `RequireBlockingContentCheck = true`.
 * Response sub-coordinator always runs blocking content detectors on its responses.
 
-### Scenario 2 — Generic blog tenant
+### Scenario 2 - Generic blog tenant
 
 * Signature “blog” starts at `Low`.
 * Async content detectors rarely see PII.
 * `RequireBlockingContentCheck = false` except on globally sensitive endpoints (if configured).
 * No extra latency for blog traffic.
 
-### Scenario 3 — Chat-like endpoint starts leaking PII
+### Scenario 3 - Chat-like endpoint starts leaking PII
 
 * Signature “chat-tenant” initially `Medium`.
 * Async detection sees recurring PII-like patterns.
@@ -384,7 +384,7 @@ If you like, I can next:
 * sketch the actual C# interface for the `SensitivityProfileStore` and `SensitivityRoutingAtom`, or
 * draw a little mermaid diagram of the whole request→signal→response flow.
 
-Nice, yes, this slots really naturally into pure ASP.NET too — you just move the “response sub-coordinator” into
+Nice, yes, this slots really naturally into pure ASP.NET too - you just move the “response sub-coordinator” into
 middleware.
 
 Here’s an **add-on spec section** you can paste under the existing “SensitivityAwareContentRouting / ContentContributor”
@@ -746,4 +746,4 @@ So you can deploy Stylobot in front of:
 * APIs & microservices,
 * YARP reverse proxies,
 
-without changing your detector logic — only where you plug in the middleware.
+without changing your detector logic - only where you plug in the middleware.

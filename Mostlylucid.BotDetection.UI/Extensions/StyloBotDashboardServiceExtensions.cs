@@ -81,13 +81,13 @@ public static class StyloBotDashboardServiceExtensions
         // Event store for in-memory history
         services.AddSingleton<IDashboardEventStore, InMemoryDashboardEventStore>();
 
-        // Aggregate cache — populated by beacon, read by API endpoints
+        // Aggregate cache - populated by beacon, read by API endpoints
         services.AddSingleton<DashboardAggregateCache>();
 
-        // Write-through signature cache — single source of truth for top bots
+        // Write-through signature cache - single source of truth for top bots
         services.AddSingleton<SignatureAggregateCache>();
 
-        // Background beacon — computes all dashboard aggregates periodically
+        // Background beacon - computes all dashboard aggregates periodically
         services.AddHostedService<DashboardSummaryBroadcaster>();
 
         // Server-side visitor cache for HTMX rendering
@@ -106,7 +106,7 @@ public static class StyloBotDashboardServiceExtensions
         services.TryAddSingleton<IClusterDescriptionCallback, ClusterDescriptionSignalRCallback>();
 
         // Register dashboard data API paths with the bot detection policy system.
-        // Detection runs on ALL paths including dashboard API — no exclusions.
+        // Detection runs on ALL paths including dashboard API - no exclusions.
         // BotDetectionMiddleware resolves the detection policy for these paths
         // and applies the configured action policy automatically.
         services.PostConfigure<BotDetectionOptions>(opts =>
@@ -141,7 +141,7 @@ public static class StyloBotDashboardServiceExtensions
 
         if (!options.Enabled) return app;
 
-        // Detection runs on ALL paths including dashboard API — no exclusions.
+        // Detection runs on ALL paths including dashboard API - no exclusions.
         // FastPathReputation fix (UA patterns don't trigger early exit) prevents feedback loops.
 
         // Broadcast REAL detections to SignalR - must be BEFORE UseEndpoints
@@ -210,10 +210,10 @@ public static class StyloBotDashboardServiceExtensions
         // Event store (in-memory by default, replaced by PostgreSQL when configured)
         services.TryAddSingleton<IDashboardEventStore, InMemoryDashboardEventStore>();
 
-        // Aggregate cache — populated by beacon, read by API endpoints
+        // Aggregate cache - populated by beacon, read by API endpoints
         services.TryAddSingleton<DashboardAggregateCache>();
 
-        // Write-through signature cache — single source of truth for top bots
+        // Write-through signature cache - single source of truth for top bots
         services.TryAddSingleton<SignatureAggregateCache>();
 
         // Server-side visitor cache (needed by broadcast middleware)

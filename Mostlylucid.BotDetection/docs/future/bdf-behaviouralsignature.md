@@ -939,4 +939,4 @@ And if you want a “Replay this behaviour” button:
     * “Re-run as synthetic test” in one click.
 
 So yeah: the explanation formatter is just a **human-readable front-end** to the same mapping logic you’re already
-designing for BDF — which is exactly what you noticed.
+designing for BDF - which is exactly what you noticed.

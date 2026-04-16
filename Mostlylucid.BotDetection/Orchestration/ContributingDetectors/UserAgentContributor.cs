@@ -65,7 +65,7 @@ public partial class UserAgentContributor : ConfiguredContributorBase
         var contributions = new List<DetectionContribution>();
 
         // Check for known bot UA patterns (previously whitelisted for early exit).
-        // Now emits a regular bot contribution — actual IP/DNS verification is
+        // Now emits a regular bot contribution - actual IP/DNS verification is
         // handled by VerifiedBotContributor. UA alone is trivially spoofable.
         // Extract browser family and version for all UAs (bots and humans alike)
         var (family, familyVersion) = ExtractBrowserFamily(userAgent);
@@ -242,13 +242,13 @@ public partial class UserAgentContributor : ConfiguredContributorBase
     }
 
     // Browser-only headers that real HTTP tools never send.
-    // Used to verify tool UA claims — if these are present, the UA is likely spoofed.
+    // Used to verify tool UA claims - if these are present, the UA is likely spoofed.
     private static readonly string[] BrowserOnlyHeaders =
         ["Sec-Fetch-Mode", "Sec-Fetch-Site", "Sec-Fetch-Dest"];
 
     private static readonly (string pattern, BotType type, string name)[] CommonBotPatterns =
     [
-        // Developer HTTP tools (libraries/CLIs — not automation frameworks)
+        // Developer HTTP tools (libraries/CLIs - not automation frameworks)
         ("curl/", BotType.Tool, "curl"),
         ("wget/", BotType.Tool, "wget"),
         ("python-requests", BotType.Tool, "python-requests"),
@@ -417,13 +417,13 @@ public partial class UserAgentContributor : ConfiguredContributorBase
     {
         var headers = state.HttpContext.Request.Headers;
 
-        // Count browser-only headers present — real tools send 0 of these
+        // Count browser-only headers present - real tools send 0 of these
         var browserHeaderCount = 0;
         foreach (var header in BrowserOnlyHeaders)
             if (headers.ContainsKey(header))
                 browserHeaderCount++;
 
-        // Also check Accept-Language with locale (e.g., "en-US,en;q=0.9") — tools don't send this
+        // Also check Accept-Language with locale (e.g., "en-US,en;q=0.9") - tools don't send this
         var acceptLang = headers["Accept-Language"].FirstOrDefault();
         if (!string.IsNullOrEmpty(acceptLang) && acceptLang.Contains(','))
             browserHeaderCount++;
@@ -431,7 +431,7 @@ public partial class UserAgentContributor : ConfiguredContributorBase
         if (browserHeaderCount > 0)
         {
             // Browser headers present with tool UA → likely spoofed
-            reason = $"Tool UA ({toolName}) with {browserHeaderCount} browser-only header(s) — likely spoofed";
+            reason = $"Tool UA ({toolName}) with {browserHeaderCount} browser-only header(s) - likely spoofed";
             return ToolHeaderMismatchConfidence + (browserHeaderCount * 0.05);
         }
 
@@ -512,13 +512,13 @@ public partial class InconsistencyContributor : ConfiguredContributorBase
                 botType: BotType.Unknown.ToString()));
 
         // WebSocket upgrade requests (RFC 6455) legitimately omit Accept-Language
-        // and Client Hints — browsers don't send these on WS upgrades.
+        // and Client Hints - browsers don't send these on WS upgrades.
         // Read the signal written by HeaderContributor (Wave 0, Priority 10) rather
-        // than re-parsing the Upgrade header — single source of truth.
+        // than re-parsing the Upgrade header - single source of truth.
         var isWebSocketUpgrade = state.GetSignal<bool>("header.is_websocket_upgrade");
 
         // Same-origin fetch (Sec-Fetch-Site: same-origin) legitimately omits Accept-Language
-        // and Client Hints — browser fetch() API doesn't always include them.
+        // and Client Hints - browser fetch() API doesn't always include them.
         var isSameOriginFetch = state.GetSignal<bool>(SignalKeys.HeaderSecFetchSameOrigin);
 
         // Check for missing Accept-Language with browser UA

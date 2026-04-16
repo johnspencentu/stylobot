@@ -38,7 +38,7 @@ public readonly record struct SessionRequest(
 /// </summary>
 public sealed record SessionSnapshot
 {
-    /// <summary>Client signature (hashed IP:UA — zero PII)</summary>
+    /// <summary>Client signature (hashed IP:UA - zero PII)</summary>
     public required string Signature { get; init; }
 
     /// <summary>When this session started (first request)</summary>
@@ -60,7 +60,7 @@ public sealed record SessionSnapshot
 
     /// <summary>
     ///     Confidence in this snapshot: f(request_count, state_diversity).
-    ///     Low request counts produce unreliable vectors — consumers should gate on this.
+    ///     Low request counts produce unreliable vectors - consumers should gate on this.
     /// </summary>
     public required float Maturity { get; init; }
 
@@ -267,7 +267,7 @@ public static class SessionVectorizer
             ? Math.Sqrt(intervals.Sum(x => Math.Pow(x - mean, 2)) / intervals.Count)
             : 0;
 
-        // [0] Timing regularity: CV (coefficient of variation) — low = bot-like
+        // [0] Timing regularity: CV (coefficient of variation) - low = bot-like
         vector[offset + 0] = mean > 0 ? Math.Min(1f, (float)(stdDev / mean)) : 0f;
 
         // [1] Timing entropy (Shannon entropy of 100ms-bucketed intervals)
@@ -424,7 +424,7 @@ public sealed class SessionStore
             }
             else
             {
-                // First request — start new session
+                // First request - start new session
                 currentSession = new List<SessionRequest> { request };
             }
 
@@ -490,7 +490,7 @@ public sealed class SessionStore
         history.Add(snapshot);
 
         // Compact old snapshots into a root when history grows too large.
-        // The root is a maturity-weighted average of old vectors — lossy compression
+        // The root is a maturity-weighted average of old vectors - lossy compression
         // that preserves the client's baseline behavioral profile while discarding
         // per-session detail beyond the useful threshold.
         if (history.Count > _maxSnapshotsPerSignature)

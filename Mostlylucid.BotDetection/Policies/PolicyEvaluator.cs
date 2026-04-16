@@ -264,7 +264,7 @@ public class PolicyEvaluator : IPolicyEvaluator
 
     private bool ShouldTransition(PolicyTransition transition, BlackboardState state)
     {
-        // Guard: transitions with no conditions are misconfigured — never fire them.
+        // Guard: transitions with no conditions are misconfigured - never fire them.
         // A transition must have at least one condition to prevent accidental unconditional triggers.
         var hasConditions = transition.WhenRiskExceeds.HasValue
                             || transition.WhenRiskBelow.HasValue

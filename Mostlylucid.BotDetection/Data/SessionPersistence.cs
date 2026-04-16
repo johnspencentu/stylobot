@@ -3,7 +3,7 @@ using Mostlylucid.BotDetection.Analysis;
 namespace Mostlylucid.BotDetection.Data;
 
 /// <summary>
-///     Persisted session record. Sessions are the unit of storage — not individual requests.
+///     Persisted session record. Sessions are the unit of storage - not individual requests.
 ///     Each session captures a compressed behavioral snapshot (Markov vector + fingerprint),
 ///     summary stats, and the dominant detection outcome.
 ///     This replaces per-request event storage (TimescaleDB) with session-level compression,
@@ -14,7 +14,7 @@ public sealed record PersistedSession
     /// <summary>Auto-increment row ID</summary>
     public long Id { get; init; }
 
-    /// <summary>Client signature (hashed IP:UA — zero PII)</summary>
+    /// <summary>Client signature (hashed IP:UA - zero PII)</summary>
     public required string Signature { get; init; }
 
     /// <summary>When this session started</summary>
@@ -86,7 +86,7 @@ public sealed record PersistedSession
 
 /// <summary>
 ///     Persisted signature reputation. Accumulated across all sessions.
-///     This is the long-lived identity — sessions come and go, signatures persist.
+///     This is the long-lived identity - sessions come and go, signatures persist.
 /// </summary>
 public sealed record PersistedSignature
 {

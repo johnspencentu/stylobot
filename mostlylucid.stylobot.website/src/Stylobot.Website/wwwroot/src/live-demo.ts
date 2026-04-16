@@ -28,7 +28,7 @@ async function loadSignalR(): Promise<void> {
     });
 }
 
-// liveDetection() removed — LiveDemo page now uses an iframe to the /_stylobot dashboard.
+// liveDetection() removed - LiveDemo page now uses an iframe to the /_stylobot dashboard.
 // The dashboard is fully self-contained with its own Alpine.js component.
 
 // ===== Homepage Detection Bar Alpine Component =====

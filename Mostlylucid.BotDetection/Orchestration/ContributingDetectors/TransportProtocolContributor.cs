@@ -8,7 +8,7 @@ using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 
 /// <summary>
-///     Transport protocol contributor — detects WebSocket, gRPC, GraphQL, and SSE
+///     Transport protocol contributor - detects WebSocket, gRPC, GraphQL, and SSE
 ///     from HTTP request headers and validates protocol-specific compliance.
 ///
 ///     <para><b>Why this matters for bot detection:</b></para>
@@ -20,17 +20,17 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///
 ///     <para><b>What we CAN see (at the gateway/middleware level):</b></para>
 ///     <list type="bullet">
-///         <item><b>WebSocket</b> — <c>Upgrade: websocket</c> + <c>Sec-WebSocket-*</c> headers in the HTTP upgrade request</item>
-///         <item><b>gRPC</b> — <c>content-type: application/grpc</c> + <c>te: trailers</c> over HTTP/2</item>
-///         <item><b>GraphQL</b> — <c>POST /graphql</c> with <c>content-type: application/json</c></item>
-///         <item><b>SSE</b> — <c>Accept: text/event-stream</c></item>
+///         <item><b>WebSocket</b> - <c>Upgrade: websocket</c> + <c>Sec-WebSocket-*</c> headers in the HTTP upgrade request</item>
+///         <item><b>gRPC</b> - <c>content-type: application/grpc</c> + <c>te: trailers</c> over HTTP/2</item>
+///         <item><b>GraphQL</b> - <c>POST /graphql</c> with <c>content-type: application/json</c></item>
+///         <item><b>SSE</b> - <c>Accept: text/event-stream</c></item>
 ///     </list>
 ///
 ///     <para><b>What we CANNOT see (post-upgrade or payload-level):</b></para>
 ///     <list type="bullet">
 ///         <item>Individual WebSocket frames after upgrade</item>
 ///         <item>gRPC stream messages after initial request</item>
-///         <item>GraphQL query body content (we don't read the body — we flag path + content-type)</item>
+///         <item>GraphQL query body content (we don't read the body - we flag path + content-type)</item>
 ///         <item>SSE is server→client only, so no further client messages to inspect</item>
 ///     </list>
 ///
@@ -62,7 +62,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     public override int Priority => Manifest?.Priority ?? 5;
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
-    // Config-driven parameters from YAML — no magic numbers
+    // Config-driven parameters from YAML - no magic numbers
     private double MissingWsHeadersConfidence => GetParam("missing_ws_headers_confidence", 0.6);
     private double InvalidWsVersionConfidence => GetParam("invalid_ws_version_confidence", 0.5);
     private double MissingWsOriginConfidence => GetParam("missing_ws_origin_confidence", 0.3);
@@ -164,7 +164,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     // ==========================================
     // WebSocket Analysis
     // ==========================================
-    // RFC 6455 §4.1 — Client opening handshake MUST include:
+    // RFC 6455 §4.1 - Client opening handshake MUST include:
     //   - Connection: Upgrade
     //   - Upgrade: websocket
     //   - Sec-WebSocket-Key (16-byte base64-encoded nonce)
@@ -179,7 +179,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     //
     // Attack vectors visible at HTTP layer:
     //   - WebSocket hijacking probes (upgrade without proper headers)
-    //   - Cross-Site WebSocket Hijacking (CSWSH) — missing/wrong Origin
+    //   - Cross-Site WebSocket Hijacking (CSWSH) - missing/wrong Origin
     //   - DoS via upgrade flooding (handled by behavioral, but we flag the protocol)
     // ==========================================
 
@@ -217,7 +217,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
         }
         else if (hasKey)
         {
-            // Has key but no version — partially implemented, likely a bot
+            // Has key but no version - partially implemented, likely a bot
             contributions.Add(BotContribution(
                 "Protocol",
                 "WebSocket upgrade missing Sec-WebSocket-Version",
@@ -225,7 +225,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
                 weightMultiplier: 1.2));
         }
 
-        // Origin header — browsers ALWAYS send this on WebSocket upgrades
+        // Origin header - browsers ALWAYS send this on WebSocket upgrades
         // Missing Origin is a strong signal for non-browser clients (scripts, bots, CLI tools)
         // Also relevant for CSWSH (Cross-Site WebSocket Hijacking) detection
         state.WriteSignal(SignalKeys.TransportWebSocketOrigin, hasOrigin);
@@ -248,7 +248,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
                     weightMultiplier: 1.3));
         }
 
-        // Host vs Origin mismatch — CSWSH (Cross-Site WebSocket Hijacking) detection
+        // Host vs Origin mismatch - CSWSH (Cross-Site WebSocket Hijacking) detection
         // A browser always sends Origin matching the page that initiated the connection.
         // An Origin from a different domain attempting to upgrade is a CSRF probe.
         var originMatches = false;
@@ -316,10 +316,10 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     private void AnalyzeGrpc(BlackboardState state, HttpRequest request, string protocol,
         List<DetectionContribution> contributions)
     {
-        // grpc-web is legitimate from browsers — only flag raw gRPC from browser UAs
+        // grpc-web is legitimate from browsers - only flag raw gRPC from browser UAs
         if (protocol == "grpc")
         {
-            // Check for te: trailers — required by gRPC spec
+            // Check for te: trailers - required by gRPC spec
             // Browsers never send this header; its absence with gRPC content-type
             // indicates a malformed or incomplete gRPC client
             var hasTe = request.Headers.TryGetValue("te", out var teValue)
@@ -345,14 +345,14 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
                     botType: BotType.Scraper.ToString()));
         }
 
-        // gRPC reflection probing — bots use grpc_cli/grpcurl to enumerate services
+        // gRPC reflection probing - bots use grpc_cli/grpcurl to enumerate services
         // Path pattern: /grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo
         //           or: /grpc.reflection.v1.ServerReflection/ServerReflectionInfo
         var path = request.Path.Value ?? "";
         if (path.Contains("grpc.reflection", StringComparison.OrdinalIgnoreCase))
             contributions.Add(BotContribution(
                 "Protocol",
-                "gRPC reflection endpoint probed — service discovery reconnaissance",
+                "gRPC reflection endpoint probed - service discovery reconnaissance",
                 confidenceOverride: GrpcReflectionConfidence,
                 weightMultiplier: 1.2,
                 botType: BotType.Scraper.ToString()));
@@ -366,7 +366,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     //
     // What we CAN detect from headers/URL:
     //   - Path matching (/graphql, /gql, /api/graphql)
-    //   - Query string introspection (?query={__schema{...}}) — GET requests
+    //   - Query string introspection (?query={__schema{...}}) - GET requests
     //   - Content-Type: application/graphql (less common but valid)
     //
     // Bot patterns we catch:
@@ -378,7 +378,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     //   - Batch query abuse (send many operations in one request for DoS)
     //   - GraphQL endpoint discovery (probing common paths)
     //   - Note: Query depth attacks, alias abuse, and field duplication
-    //     require body parsing — out of scope for header-level detection
+    //     require body parsing - out of scope for header-level detection
     // ==========================================
 
     private void AnalyzeGraphql(BlackboardState state, HttpRequest request,
@@ -393,11 +393,11 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
         if (hasIntrospection)
             contributions.Add(BotContribution(
                 "Protocol",
-                "GraphQL introspection query detected (__schema/__type) — common bot reconnaissance",
+                "GraphQL introspection query detected (__schema/__type) - common bot reconnaissance",
                 confidenceOverride: GraphqlIntrospectionConfidence,
                 weightMultiplier: 1.1));
 
-        // Check for batch indicator — array content-type or batch query param
+        // Check for batch indicator - array content-type or batch query param
         // Legitimate apps can batch, but it's a high-abuse pattern for DoS
         var hasBatchHint = request.Headers.TryGetValue("X-GraphQL-Batch", out _)
                            || queryString.Contains("batch", StringComparison.OrdinalIgnoreCase);
@@ -407,18 +407,18 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
         if (hasBatchHint)
             contributions.Add(BotContribution(
                 "Protocol",
-                "GraphQL batch query indicator detected — legitimate but high-abuse pattern",
+                "GraphQL batch query indicator detected - legitimate but high-abuse pattern",
                 confidenceOverride: GraphqlBatchConfidence,
                 weightMultiplier: 0.8));
 
-        // GET request with mutation/subscription in query string — spec violation
+        // GET request with mutation/subscription in query string - spec violation
         // GraphQL over HTTP spec: GET requests may only be used for query operations
         // Bots that use GET for mutations are nonconformant or scanning
         if (HttpMethods.IsGet(request.Method) &&
             MutationSubscriptionPattern().IsMatch(queryString))
             contributions.Add(BotContribution(
                 "Protocol",
-                "GraphQL mutation/subscription via GET request (spec violation — GET is read-only)",
+                "GraphQL mutation/subscription via GET request (spec violation - GET is read-only)",
                 confidenceOverride: GraphqlGetMutationConfidence,
                 weightMultiplier: 1.2));
     }
@@ -447,10 +447,10 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
     private void AnalyzeSse(BlackboardState state, HttpRequest request,
         List<DetectionContribution> contributions)
     {
-        // SSE itself is neutral — we just emit the signal for downstream detectors
+        // SSE itself is neutral - we just emit the signal for downstream detectors
         // The behavioral detector can use this to flag multiple concurrent SSE connections
 
-        // Missing Cache-Control: no-cache — WHATWG EventSource spec says the client MUST include this
+        // Missing Cache-Control: no-cache - WHATWG EventSource spec says the client MUST include this
         // All browsers send it; custom SSE client libraries often omit it
         var hasCacheControl = request.Headers.TryGetValue("Cache-Control", out var cacheControl)
                               && cacheControl.ToString().Contains("no-cache", StringComparison.OrdinalIgnoreCase);
@@ -462,7 +462,7 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
                 confidenceOverride: SseMissingCacheControlConfidence,
                 weightMultiplier: 0.8));
 
-        // Last-Event-ID presence — SSE reconnect detection
+        // Last-Event-ID presence - SSE reconnect detection
         if (request.Headers.TryGetValue("Last-Event-ID", out var lastEventId))
         {
             var eventIdValue = lastEventId.ToString().Trim();
@@ -471,12 +471,12 @@ public partial class TransportProtocolContributor : ConfiguredContributorBase
                 new(SignalKeys.TransportSseLastEventId, eventIdValue)
             ]);
 
-            // Last-Event-ID: 0 or -1 — history replay attempt
+            // Last-Event-ID: 0 or -1 - history replay attempt
             // This is a data extraction technique: requesting all historical events from the beginning
             if (eventIdValue is "0" or "-1")
                 contributions.Add(BotContribution(
                     "Protocol",
-                    $"SSE Last-Event-ID: {eventIdValue} — potential history replay attempt",
+                    $"SSE Last-Event-ID: {eventIdValue} - potential history replay attempt",
                     confidenceOverride: SseHistoryReplayConfidence,
                     weightMultiplier: 1.1));
         }

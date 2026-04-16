@@ -176,7 +176,7 @@ public class BlockActionOptions
     };
 
     /// <summary>
-    ///     Creates options for a "fake success" block — returns 200 with empty JSON data.
+    ///     Creates options for a "fake success" block - returns 200 with empty JSON data.
     ///     Bots think they succeeded but receive no useful content.
     /// </summary>
     public static BlockActionOptions FakeSuccess => new()
@@ -189,7 +189,7 @@ public class BlockActionOptions
     };
 
     /// <summary>
-    ///     Creates options for a "fake HTML" block — returns 200 with empty HTML.
+    ///     Creates options for a "fake HTML" block - returns 200 with empty HTML.
     ///     Bots think the page loaded but receive no useful content.
     /// </summary>
     public static BlockActionOptions FakeHtml => new()

@@ -31,19 +31,19 @@ public class BdfExportService
     /// <summary>Signal keys that are ALWAYS stripped (raw PII).</summary>
     private static readonly HashSet<string> PiiSignalKeys =
     [
-        SignalKeys.UserAgent,   // ua.raw — raw User-Agent string
-        SignalKeys.ClientIp,    // ip.address — raw IP
+        SignalKeys.UserAgent,   // ua.raw - raw User-Agent string
+        SignalKeys.ClientIp,    // ip.address - raw IP
     ];
 
     /// <summary>IP-derived signals stripped for all signatures (could fingerprint networks).</summary>
     private static readonly HashSet<string> IpDerivedSignalKeys =
     [
-        SignalKeys.IpProvider,  // ip.provider — ISP/hosting name
-        SignalKeys.IpAsn,       // ip.asn — ASN number
-        SignalKeys.IpAsnOrg,    // ip.asn_org — ASN organization name
+        SignalKeys.IpProvider,  // ip.provider - ISP/hosting name
+        SignalKeys.IpAsn,       // ip.asn - ASN number
+        SignalKeys.IpAsnOrg,    // ip.asn_org - ASN organization name
     ];
 
-    /// <summary>UA classification keys — only included for bot-detected signatures.</summary>
+    /// <summary>UA classification keys - only included for bot-detected signatures.</summary>
     private static readonly HashSet<string> UaClassificationKeys =
     [
         SignalKeys.UserAgentIsBot,
@@ -117,7 +117,7 @@ public class BdfExportService
 
         // 3. Build narrative/scenario string
         var scenario = latest.Narrative
-            ?? $"{(latest.IsBot ? "Bot" : "Human")} — {latest.RiskBand} risk";
+            ?? $"{(latest.IsBot ? "Bot" : "Human")} - {latest.RiskBand} risk";
 
         // 4. Build request sequence with inter-request delays
         var requests = new List<BdfRequest>();
@@ -238,7 +238,7 @@ public class BdfExportService
     {
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // UA: ONLY for bot-classified signatures — never for humans
+        // UA: ONLY for bot-classified signatures - never for humans
         if (isBotDetected && !string.IsNullOrEmpty(detection.UserAgent))
             headers["User-Agent"] = detection.UserAgent;
 
@@ -293,9 +293,9 @@ public class BdfExportService
 
     /// <summary>
     ///     Full zero-PII signal filter. Strips:
-    ///     - Raw PII (ua.raw, ip.address) — always
-    ///     - IP-derived (ip.provider, ip.asn, ip.asn_org) — always
-    ///     - UA classification (ua.is_bot, ua.bot_type, etc.) — only for humans
+    ///     - Raw PII (ua.raw, ip.address) - always
+    ///     - IP-derived (ip.provider, ip.asn, ip.asn_org) - always
+    ///     - UA classification (ua.is_bot, ua.bot_type, etc.) - only for humans
     /// </summary>
     private static Dictionary<string, object>? FilterPiiSignals(
         Dictionary<string, object>? signals, bool isBotDetected)

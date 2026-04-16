@@ -363,7 +363,7 @@ Free gets only the final detector score and a generic explanation.
 
 # 12. **Test Cases**
 
-### Case A — Debug-leak from backend
+### Case A - Debug-leak from backend
 
 Bodies containing stack-trace text.
 
@@ -373,7 +373,7 @@ Expected:
 * riskBand bumps at least +1
 * blocking mode masks body if configured
 
-### Case B — 404 exploration bot
+### Case B - 404 exploration bot
 
 Bodies match common CMS error pages repeatedly.
 
@@ -381,7 +381,7 @@ Expected:
 
 * Low-weight positive score (ties into ResponseContributor)
 
-### Case C — Honeypot content hit
+### Case C - Honeypot content hit
 
 Bot lands on fake admin.
 
@@ -390,7 +390,7 @@ Expected:
 * Score strongly positive
 * recommendedAction = Block
 
-### Case D — Normal user
+### Case D - Normal user
 
 Nearly all content clean patterns.
 

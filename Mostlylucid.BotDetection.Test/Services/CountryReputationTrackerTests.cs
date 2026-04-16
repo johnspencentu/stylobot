@@ -31,7 +31,7 @@ public class CountryReputationTrackerTests
         _tracker = new CountryReputationTracker(logger, options);
     }
 
-    #region GetCountryBotRate — Unknown / Empty
+    #region GetCountryBotRate - Unknown / Empty
 
     [Fact]
     public void GetCountryBotRate_UnknownCountry_ReturnsZero()
@@ -45,7 +45,7 @@ public class CountryReputationTrackerTests
 
     #endregion
 
-    #region RecordDetection — Null / Empty Guard
+    #region RecordDetection - Null / Empty Guard
 
     [Fact]
     public void RecordDetection_NullCountryCode_NoOp()
@@ -53,7 +53,7 @@ public class CountryReputationTrackerTests
         // Act
         _tracker.RecordDetection(null!, "Nowhere", true, 0.9);
 
-        // Assert — nothing tracked
+        // Assert - nothing tracked
         var countries = _tracker.GetAllCountries();
         Assert.Empty(countries);
     }
@@ -64,14 +64,14 @@ public class CountryReputationTrackerTests
         // Act
         _tracker.RecordDetection("", "Nowhere", true, 0.9);
 
-        // Assert — nothing tracked
+        // Assert - nothing tracked
         var countries = _tracker.GetAllCountries();
         Assert.Empty(countries);
     }
 
     #endregion
 
-    #region RecordDetection — Single Record
+    #region RecordDetection - Single Record
 
     [Fact]
     public void RecordDetection_SingleBot_TracksCorrectly()
@@ -92,12 +92,12 @@ public class CountryReputationTrackerTests
 
     #endregion
 
-    #region RecordDetection — Mixed Traffic
+    #region RecordDetection - Mixed Traffic
 
     [Fact]
     public void RecordDetection_MixedBotHuman_CalculatesRate()
     {
-        // Arrange — 3 bots, 7 humans = 10 total (meets MinSampleSize of 5)
+        // Arrange - 3 bots, 7 humans = 10 total (meets MinSampleSize of 5)
         for (var i = 0; i < 3; i++)
             _tracker.RecordDetection("DE", "Germany", true, 0.9);
         for (var i = 0; i < 7; i++)
@@ -106,32 +106,32 @@ public class CountryReputationTrackerTests
         // Act
         var rate = _tracker.GetCountryBotRate("DE");
 
-        // Assert — 3/10 = 0.3 (approximately, due to minor decay within test execution)
+        // Assert - 3/10 = 0.3 (approximately, due to minor decay within test execution)
         Assert.InRange(rate, 0.28, 0.32);
     }
 
     #endregion
 
-    #region GetCountryBotRate — MinSampleSize
+    #region GetCountryBotRate - MinSampleSize
 
     [Fact]
     public void GetCountryBotRate_BelowMinSampleSize_ReturnsZero()
     {
-        // Arrange — record fewer than MinSampleSize (5)
+        // Arrange - record fewer than MinSampleSize (5)
         for (var i = 0; i < 4; i++)
             _tracker.RecordDetection("FR", "France", true, 0.9);
 
         // Act
         var rate = _tracker.GetCountryBotRate("FR");
 
-        // Assert — insufficient data, should return 0
+        // Assert - insufficient data, should return 0
         Assert.Equal(0.0, rate);
     }
 
     [Fact]
     public void GetCountryBotRate_AtMinSampleSize_ReturnsRate()
     {
-        // Arrange — slightly above MinSampleSize (5) to account for floating-point
+        // Arrange - slightly above MinSampleSize (5) to account for floating-point
         // decay effects. With 6 records the decayed total comfortably exceeds 5.
         for (var i = 0; i < 6; i++)
             _tracker.RecordDetection("JP", "Japan", true, 0.9);
@@ -139,18 +139,18 @@ public class CountryReputationTrackerTests
         // Act
         var rate = _tracker.GetCountryBotRate("JP");
 
-        // Assert — 6/6 = 1.0 (approximately, with negligible decay)
+        // Assert - 6/6 = 1.0 (approximately, with negligible decay)
         Assert.InRange(rate, 0.95, 1.0);
     }
 
     #endregion
 
-    #region GetTopBotCountries — Sorting and Limiting
+    #region GetTopBotCountries - Sorting and Limiting
 
     [Fact]
     public void GetTopBotCountries_MultipleCountries_SortedByBotRate()
     {
-        // Arrange — country A: 20% bot, country B: 80% bot, country C: 50% bot
+        // Arrange - country A: 20% bot, country B: 80% bot, country C: 50% bot
         // All need >= MinSampleSize (5) raw records to appear in top list
         RecordMultiple("AA", "Alpha", botCount: 2, humanCount: 8);
         RecordMultiple("BB", "Bravo", botCount: 8, humanCount: 2);
@@ -159,7 +159,7 @@ public class CountryReputationTrackerTests
         // Act
         var top = _tracker.GetTopBotCountries(10);
 
-        // Assert — sorted descending by bot rate
+        // Assert - sorted descending by bot rate
         Assert.Equal(3, top.Count);
         Assert.Equal("BB", top[0].CountryCode);
         Assert.Equal("CC", top[1].CountryCode);
@@ -169,7 +169,7 @@ public class CountryReputationTrackerTests
     [Fact]
     public void GetTopBotCountries_LimitsCount()
     {
-        // Arrange — 5 countries with sufficient data (10 records each to exceed MinSampleSize
+        // Arrange - 5 countries with sufficient data (10 records each to exceed MinSampleSize
         // comfortably even after floating-point decay)
         RecordMultiple("C1", "Country1", botCount: 10, humanCount: 0);
         RecordMultiple("C2", "Country2", botCount: 8, humanCount: 2);
@@ -177,7 +177,7 @@ public class CountryReputationTrackerTests
         RecordMultiple("C4", "Country4", botCount: 4, humanCount: 6);
         RecordMultiple("C5", "Country5", botCount: 2, humanCount: 8);
 
-        // Act — request only 2
+        // Act - request only 2
         var top = _tracker.GetTopBotCountries(2);
 
         // Assert
@@ -201,7 +201,7 @@ public class CountryReputationTrackerTests
         // Act
         var all = _tracker.GetAllCountries();
 
-        // Assert — all three tracked
+        // Assert - all three tracked
         Assert.Equal(3, all.Count);
         var codes = all.Select(c => c.CountryCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("US", codes);
@@ -216,14 +216,14 @@ public class CountryReputationTrackerTests
     [Fact]
     public void RecordDetection_CaseInsensitive_SameCountry()
     {
-        // Arrange — "US" and "us" should map to the same entry
+        // Arrange - "US" and "us" should map to the same entry
         _tracker.RecordDetection("US", "United States", true, 0.9);
         _tracker.RecordDetection("us", "United States", false, 0.1);
 
         // Act
         var all = _tracker.GetAllCountries();
 
-        // Assert — should be a single entry with 2 raw total
+        // Assert - should be a single entry with 2 raw total
         Assert.Single(all);
         Assert.Equal(2, all[0].RawTotalCount);
         Assert.Equal(1, all[0].RawBotCount);
@@ -236,14 +236,14 @@ public class CountryReputationTrackerTests
     [Fact]
     public void GetCountryBotRate_AllBots_ReturnsNearOne()
     {
-        // Arrange — 100% bot traffic, enough samples
+        // Arrange - 100% bot traffic, enough samples
         for (var i = 0; i < 10; i++)
             _tracker.RecordDetection("RU", "Russia", true, 0.99);
 
         // Act
         var rate = _tracker.GetCountryBotRate("RU");
 
-        // Assert — should be very close to 1.0
+        // Assert - should be very close to 1.0
         Assert.InRange(rate, 0.95, 1.0);
     }
 

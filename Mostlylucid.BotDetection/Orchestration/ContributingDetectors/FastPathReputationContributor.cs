@@ -139,7 +139,7 @@ public class FastPathReputationContributor : ConfiguredContributorBase
             new($"reputation.fastpath.{mtLower}.support", matchedPattern.Support)
         ]);
 
-        // Strong human contribution — NOT an early exit.
+        // Strong human contribution - NOT an early exit.
         // Reputation says this pattern is known-good (likely human), so contribute
         // a strong negative (human) signal that will pull probability down during
         // normal aggregation. Other detectors still run for full coverage.
@@ -159,11 +159,11 @@ public class FastPathReputationContributor : ConfiguredContributorBase
     ///     Creates a fast-path ABORT contribution for known bad patterns.
     ///     IP patterns use VerifiedBot (early exit) because IPs are specific identifiers.
     ///     UA patterns use a strong bot signal WITHOUT early exit because many legitimate
-    ///     users share the same Chrome/Firefox UA string — a UA hash alone is not a
+    ///     users share the same Chrome/Firefox UA string - a UA hash alone is not a
     ///     verified identity, so other detectors must still run to confirm or override.
     ///
     ///     When the request carries Sec-Fetch-Site: same-origin (browser attestation),
-    ///     the reputation signal is further downgraded to a mild bias — the browser is
+    ///     the reputation signal is further downgraded to a mild bias - the browser is
     ///     attesting that this is a same-origin programmatic fetch, which bots can't
     ///     easily forge while maintaining consistency across all other detection layers.
     ///     This prevents reputation from single-handedly blocking legitimate dashboard/API traffic.
@@ -195,7 +195,7 @@ public class FastPathReputationContributor : ConfiguredContributorBase
         ]);
 
         // IP patterns: specific identifiers → VerifiedBot early exit is appropriate
-        // BUT if browser attestation is present, downgrade — a real browser on a bad IP
+        // BUT if browser attestation is present, downgrade - a real browser on a bad IP
         // should still get full detection rather than instant abort.
         if (matchType == "IP" && !hasBrowserAttestation)
         {
@@ -213,16 +213,16 @@ public class FastPathReputationContributor : ConfiguredContributorBase
 
         // When browser attestation (Sec-Fetch-Site: same-origin) is present,
         // downgrade from strong bot signal to a mild bias. Let full detection
-        // run — if this is really a bot, other detectors will catch it.
+        // run - if this is really a bot, other detectors will catch it.
         if (hasBrowserAttestation)
         {
             _logger.LogInformation(
-                "Fast-path reputation downgraded: {PatternId} has Sec-Fetch-Site: same-origin — using mild bias instead of strong abort",
+                "Fast-path reputation downgraded: {PatternId} has Sec-Fetch-Site: same-origin - using mild bias instead of strong abort",
                 matchedPattern.PatternId);
 
             var mildContribution = BotContribution(
                     "FastPathReputation",
-                    $"Reputation bias ({matchType} seen {matchedPattern.Support:F0} times as bot, downgraded — browser attestation present)")
+                    $"Reputation bias ({matchType} seen {matchedPattern.Support:F0} times as bot, downgraded - browser attestation present)")
                 with
                 {
                     ConfidenceDelta = Math.Min(matchedPattern.BotScore, GetParam("browser_attestation_max_confidence", 0.4)),

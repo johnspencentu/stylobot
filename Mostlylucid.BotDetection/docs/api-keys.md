@@ -110,22 +110,22 @@ When a request arrives with an `X-SB-Api-Key` header:
 
 The `InMemoryApiKeyStore` validates keys in this order:
 
-1. **Key exists** — constant-time comparison (prevents timing attacks)
-2. **Enabled** — `config.Enabled == true`
-3. **Not expired** — `ExpiresAt == null || ExpiresAt > now`
-4. **Time window** — current UTC time within `AllowedTimeWindow`
-5. **Path allowed** — request path matches `AllowedPaths` globs
-6. **Path not denied** — request path does not match `DeniedPaths` globs
-7. **Rate limit** — sliding window counters for per-minute and per-hour limits
+1. **Key exists** - constant-time comparison (prevents timing attacks)
+2. **Enabled** - `config.Enabled == true`
+3. **Not expired** - `ExpiresAt == null || ExpiresAt > now`
+4. **Time window** - current UTC time within `AllowedTimeWindow`
+5. **Path allowed** - request path matches `AllowedPaths` globs
+6. **Path not denied** - request path does not match `DeniedPaths` globs
+7. **Rate limit** - sliding window counters for per-minute and per-hour limits
 
 Rejection reasons are stored in `HttpContext.Items["BotDetection.ApiKeyRejection"]` for diagnostics.
 
 ### Path Matching
 
-- `/**` or `**` — matches all paths
-- `/api/**` — matches any path starting with `/api/`
-- `/admin/*` — matches single segment under `/admin/`
-- Empty `AllowedPaths` — all paths allowed
+- `/**` or `**` - matches all paths
+- `/api/**` - matches any path starting with `/api/`
+- `/admin/*` - matches single segment under `/admin/`
+- Empty `AllowedPaths` - all paths allowed
 - `DeniedPaths` are evaluated first (deny takes priority)
 
 ## Configuration via Environment Variables
@@ -276,16 +276,16 @@ k6 run -e K6_VERBOSE=1 k6-soak.js
 
 ### Key Storage
 
-API keys are **bearer tokens** — anyone who knows a key value can send it via `X-SB-Api-Key` to bypass or alter detection. Treat them like passwords:
+API keys are **bearer tokens** - anyone who knows a key value can send it via `X-SB-Api-Key` to bypass or alter detection. Treat them like passwords:
 
 - **Never commit real key values to source control.** The `SB-*` defaults in `docker-compose.demo.yml` and `.env.example` are insecure placeholders for local development only. They are not used in production.
 - **Generate production keys with strong randomness**: `openssl rand -hex 32` or equivalent.
-- **Store keys in `.env` (gitignored), Docker Secrets, Vault, or your platform's secrets manager** — never in compose files, appsettings.json checked into git, or environment variable defaults.
+- **Store keys in `.env` (gitignored), Docker Secrets, Vault, or your platform's secrets manager** - never in compose files, appsettings.json checked into git, or environment variable defaults.
 - **Scope keys narrowly**: use `AllowedPaths`, `DeniedPaths`, `RateLimitPerMinute`, and `ExpiresAt` to limit blast radius if a key leaks.
 
 ### Intended Use
 
-API keys are designed for **your own automation tooling** — CI/CD pipelines, load testing (k6), monitoring dashboards, and dev scripts that need to interact with protected endpoints without triggering false positives. They are not used for production system-to-system communication within the StyloBot infrastructure itself.
+API keys are designed for **your own automation tooling** - CI/CD pipelines, load testing (k6), monitoring dashboards, and dev scripts that need to interact with protected endpoints without triggering false positives. They are not used for production system-to-system communication within the StyloBot infrastructure itself.
 
 ### Demo vs Production
 

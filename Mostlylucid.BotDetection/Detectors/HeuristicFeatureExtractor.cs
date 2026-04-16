@@ -127,7 +127,7 @@ public static class HeuristicFeatureExtractor
         var isSameOriginFetch = secFetchSite.Equals("same-origin", StringComparison.OrdinalIgnoreCase);
         if (isSameOriginFetch) features["hdr:sec_fetch_same_origin"] = 1f;
 
-        // Missing header penalties — absence of expected headers is a bot signal
+        // Missing header penalties - absence of expected headers is a bot signal
         // Suppress for same-origin fetch: browser fetch() legitimately omits Accept-Language
         if (!hasAcceptLanguage && !isSameOriginFetch) features["hdr:missing_accept_language"] = 1f;
         if (!hasReferer) features["hdr:missing_referer"] = 1f;
@@ -153,10 +153,10 @@ public static class HeuristicFeatureExtractor
         if (uaLower.Contains("httpx")) features["ua:httpx"] = 1f;
         if (uaLower.Contains("aiohttp")) features["ua:aiohttp"] = 1f;
 
-        // Empty/missing User-Agent — no real browser omits the UA header
+        // Empty/missing User-Agent - no real browser omits the UA header
         if (userAgent.Length == 0) features["ua:empty"] = 1f;
 
-        // Very short User-Agent (< 15 chars) is suspicious — real browsers have long UAs
+        // Very short User-Agent (< 15 chars) is suspicious - real browsers have long UAs
         if (userAgent.Length > 0 && userAgent.Length < 15) features["ua:very_short"] = 1f;
 
         // Detect browser-like UA (Chrome/Firefox/Safari/Edge in the string)
@@ -168,11 +168,11 @@ public static class HeuristicFeatureExtractor
         if (isBrowserUa && !hasAcceptLanguage && !isSameOriginFetch) features["combo:browser_no_accept_lang"] = 1f;
         if (isBrowserUa && context.Request.Cookies.Count == 0) features["combo:browser_no_cookies"] = 1f;
 
-        // HTTP method — HEAD is commonly used by scanners/probers
+        // HTTP method - HEAD is commonly used by scanners/probers
         if (string.Equals(context.Request.Method, "HEAD", StringComparison.OrdinalIgnoreCase))
             features["req:method_head"] = 1f;
 
-        // Path analysis — detect config/env file probing
+        // Path analysis - detect config/env file probing
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
         if (path.Contains("/.env")) features["path:env_file"] = 1f;
         if (path.StartsWith("/.") && path.Length > 2) features["path:dotfile"] = 1f;
@@ -201,19 +201,19 @@ public static class HeuristicFeatureExtractor
     {
         var signals = evidence.Signals;
 
-        // Core transport type — WebSocket upgrade, SSE, gRPC
+        // Core transport type - WebSocket upgrade, SSE, gRPC
         if (signals.TryGetValue(SignalKeys.TransportIsUpgrade, out var upgradeVal) && upgradeVal is true)
             features["transport:is_upgrade"] = 1f;
 
-        // Streaming transport — WebSocket, SSE, SignalR long-polling
+        // Streaming transport - WebSocket, SSE, SignalR long-polling
         if (signals.TryGetValue(SignalKeys.TransportIsStreaming, out var streamVal) && streamVal is true)
             features["transport:is_streaming"] = 1f;
 
-        // SignalR specifically — negotiate, WebSocket, SSE, long-polling
+        // SignalR specifically - negotiate, WebSocket, SSE, long-polling
         if (signals.TryGetValue(SignalKeys.TransportIsSignalR, out var signalrVal) && signalrVal is true)
             features["transport:is_signalr"] = 1f;
 
-        // Protocol class — one-hot encode the major categories
+        // Protocol class - one-hot encode the major categories
         if (signals.TryGetValue(SignalKeys.TransportProtocolClass, out var classVal) && classVal is string protocolClass)
         {
             var cls = protocolClass.ToLowerInvariant();

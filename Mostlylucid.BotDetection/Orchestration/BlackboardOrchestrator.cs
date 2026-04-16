@@ -385,7 +385,7 @@ public class BlackboardOrchestrator
                         aiRan,
                         _fullOptions);
 
-                    // Find detectors that can run in this wave — no LINQ allocation
+                    // Find detectors that can run in this wave - no LINQ allocation
                     var readyDetectorsList = new List<IContributingDetector>();
                     foreach (var d in availableDetectors)
                     {
@@ -438,7 +438,7 @@ public class BlackboardOrchestrator
                     signals[DetectorCountTrigger.CompletedDetectorsSignal] = completedDetectors.Count;
                     signals[RiskThresholdTrigger.CurrentRiskSignal] = aggregator.BotProbability;
 
-                    // Evaluate policy transitions — skip on Wave 0 so that Wave 1
+                    // Evaluate policy transitions - skip on Wave 0 so that Wave 1
                     // triggered detectors (VersionAge, Inconsistency, Heuristic, etc.)
                     // get a chance to contribute before the early-exit threshold fires.
                     // Detector-driven early exits (EarlyExit flag above) still apply on all waves.
@@ -619,7 +619,7 @@ public class BlackboardOrchestrator
             if (!isVerifiedEarlyExit)
             {
                 // Only publish learning events for non-reputation-driven detections.
-                // Reputation-driven results are just echoes of prior beliefs — not new evidence.
+                // Reputation-driven results are just echoes of prior beliefs - not new evidence.
                 if (!isReputationDriven)
                     PublishLearningEvent(result, httpContext, requestId, stopwatch.Elapsed);
 
@@ -738,7 +738,7 @@ public class BlackboardOrchestrator
         }
         else
         {
-            // Parallel execution with semaphore — allocated per-wave intentionally.
+            // Parallel execution with semaphore - allocated per-wave intentionally.
             // A class-level semaphore would throttle across concurrent requests, not per-request.
             // Use explicit array instead of LINQ .Select() to avoid closure allocations.
             using var semaphore = new SemaphoreSlim(_options.MaxParallelDetectors);
@@ -980,7 +980,7 @@ public class BlackboardOrchestrator
 
         // Extract features for similarity learning vector storage.
         // Without this, SimilarityLearningHandler gets null features and skips AddAsync.
-        // Also extract for uncertain detections — the learning pipeline needs features to improve.
+        // Also extract for uncertain detections - the learning pipeline needs features to improve.
         Dictionary<string, double>? features = null;
         if (isHighConfidenceBot || isHighConfidenceHuman || isUncertain)
         {
@@ -1093,29 +1093,29 @@ public class BlackboardOrchestrator
 
             if (isNew)
             {
-                // New unknown signature — always enqueue for learning
+                // New unknown signature - always enqueue for learning
                 enqueueReason = "new_signature";
             }
             else if (isConclusive && confidence >= 0.7)
             {
-                // Already well-classified by TimescaleDB AND confident — skip
+                // Already well-classified by TimescaleDB AND confident - skip
                 _logger.LogDebug("Skipping LLM enqueue: TimescaleDB reputation is conclusive and confidence is high ({Confidence:F2})", confidence);
                 return;
             }
             else if (confidence < 0.6 && prob >= 0.3)
             {
-                // Low confidence with meaningful probability — always enqueue for deeper analysis.
+                // Low confidence with meaningful probability - always enqueue for deeper analysis.
                 // This is the key trigger: "we're not sure" → get LLM opinion to boost confidence.
                 enqueueReason = "low_confidence";
             }
             else if (prob >= coordOptions.MinProbabilityToEnqueue && prob <= coordOptions.MaxProbabilityToEnqueue)
             {
-                // Ambiguous range — always enqueue
+                // Ambiguous range - always enqueue
                 enqueueReason = "ambiguous";
             }
             else if (prob > coordOptions.MaxProbabilityToEnqueue)
             {
-                // High-risk — sample at reduced rate for confirmation
+                // High-risk - sample at reduced rate for confirmation
                 var random = t_random ??= new Random();
                 if (random.NextDouble() < coordOptions.HighRiskConfirmationRate)
                 {
@@ -1129,7 +1129,7 @@ public class BlackboardOrchestrator
             }
             else if (prob < coordOptions.MinProbabilityToEnqueue)
             {
-                // Low-risk — adaptive sampling for drift detection
+                // Low-risk - adaptive sampling for drift detection
                 var random = t_random ??= new Random();
                 var sampleRate = _llmCoordinator!.GetAdaptiveSampleRate();
                 if (random.NextDouble() < sampleRate)

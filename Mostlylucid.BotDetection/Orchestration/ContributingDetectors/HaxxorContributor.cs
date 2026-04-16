@@ -13,7 +13,7 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// <summary>
 ///     Detects script kiddie probing, injection attempts, config file exposure scans,
 ///     webshell probes, and attack tool signatures from request metadata.
-///     Pure single-request analysis — no cross-request state needed.
+///     Pure single-request analysis - no cross-request state needed.
 ///
 ///     Categories detected:
 ///     - SQL injection (UNION SELECT, OR 1=1, SLEEP, WAITFOR DELAY)
@@ -41,10 +41,10 @@ public class HaxxorContributor : ConfiguredContributorBase
 {
     private readonly ILogger<HaxxorContributor> _logger;
 
-    // Lazily compiled regex patterns per category — built once, thread-safe via volatile
+    // Lazily compiled regex patterns per category - built once, thread-safe via volatile
     private volatile CompiledPatternSet? _compiledPatterns;
 
-    // Pre-lowered and frozen path pattern sets — built once alongside regex compilation
+    // Pre-lowered and frozen path pattern sets - built once alongside regex compilation
     private volatile CachedPathPatterns? _cachedPathPatterns;
 
     // Static empty result to avoid allocation on clean path (vast majority of requests)
@@ -62,10 +62,10 @@ public class HaxxorContributor : ConfiguredContributorBase
     public override string Name => "Haxxor";
     public override int Priority => Manifest?.Priority ?? 7;
 
-    // Wave 0 — no trigger conditions, runs on every request
+    // Wave 0 - no trigger conditions, runs on every request
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
-    // Config-driven parameters from YAML — cached after first access via GetParam
+    // Config-driven parameters from YAML - cached after first access via GetParam
     private int MaxInputLength => GetParam("max_input_length", 8192);
     private int RegexTimeoutMs => GetParam("regex_timeout_ms", 100);
     private double CompoundBonusPerCategory => GetParam("compound_bonus_per_category", 0.05);
@@ -80,7 +80,7 @@ public class HaxxorContributor : ConfiguredContributorBase
             .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    ///     Map category name to signal key — frozen for fast lookup.
+    ///     Map category name to signal key - frozen for fast lookup.
     /// </summary>
     private static readonly FrozenDictionary<string, string> CategorySignalKeys =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -101,7 +101,7 @@ public class HaxxorContributor : ConfiguredContributorBase
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    ///     Map category to confidence value — avoids switch expression allocation per call.
+    ///     Map category to confidence value - avoids switch expression allocation per call.
     /// </summary>
     private FrozenDictionary<string, double>? _categoryConfidenceMap;
 
@@ -126,7 +126,7 @@ public class HaxxorContributor : ConfiguredContributorBase
             ["encoding_evasion"] = GetParam("encoding_evasion_confidence", 0.85),
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
-    // Encoding evasion markers — searched via IndexOf (no regex needed)
+    // Encoding evasion markers - searched via IndexOf (no regex needed)
     private static readonly string[] EncodingEvasionMarkers =
     [
         "%25",   // Double encoding
@@ -158,7 +158,7 @@ public class HaxxorContributor : ConfiguredContributorBase
             if (string.IsNullOrEmpty(path) && string.IsNullOrEmpty(queryString))
                 return EmptyResult;
 
-            // === Phase 1: Path-only checks (zero allocation — span-based) ===
+            // === Phase 1: Path-only checks (zero allocation - span-based) ===
             // These run BEFORE we concatenate path+query, avoiding string alloc for clean paths
             var pathSpan = path.AsSpan();
             var pathPatterns = EnsureCachedPathPatterns();
@@ -185,7 +185,7 @@ public class HaxxorContributor : ConfiguredContributorBase
 
             if (needsRegexScan)
             {
-                // Build combined input for regex — only allocates when suspicious chars found
+                // Build combined input for regex - only allocates when suspicious chars found
                 var input = hasQueryString
                     ? string.Concat(path ?? "/", queryString)
                     : path ?? "/";
@@ -215,16 +215,16 @@ public class HaxxorContributor : ConfiguredContributorBase
                     }
                 }
 
-                // Encoding evasion — only when % is present (already covered by SuspiciousChars)
+                // Encoding evasion - only when % is present (already covered by SuspiciousChars)
                 if (HasEncodingEvasion(input))
                     matchedFlags |= CategoryFlag.EncodingEvasion;
             }
 
-            // Fast path: nothing detected — zero allocation return
+            // Fast path: nothing detected - zero allocation return
             if (matchedFlags == 0)
                 return EmptyResult;
 
-            // === Slow path: attack detected — allocations acceptable here ===
+            // === Slow path: attack detected - allocations acceptable here ===
             return Task.FromResult(BuildAttackContributions(state, path!, matchedFlags));
         }
         catch (Exception ex)
@@ -357,7 +357,7 @@ public class HaxxorContributor : ConfiguredContributorBase
     }
 
     /// <summary>
-    ///     Detect encoding evasion patterns using IndexOf — no regex needed.
+    ///     Detect encoding evasion patterns using IndexOf - no regex needed.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasEncodingEvasion(string input)
@@ -415,7 +415,7 @@ public class HaxxorContributor : ConfiguredContributorBase
             }
             catch (Exception)
             {
-                // NonBacktracking may not support all patterns — fall back to compiled only
+                // NonBacktracking may not support all patterns - fall back to compiled only
                 try
                 {
                     regexList.Add(new Regex(pattern,
@@ -470,10 +470,10 @@ public class HaxxorContributor : ConfiguredContributorBase
         return entries;
     }
 
-    // ===== Internal types — struct-based to avoid heap allocations =====
+    // ===== Internal types - struct-based to avoid heap allocations =====
 
     /// <summary>
-    ///     Bit flags for category matching — avoids List allocation and deduplication.
+    ///     Bit flags for category matching - avoids List allocation and deduplication.
     /// </summary>
     private static class CategoryFlag
     {
@@ -526,7 +526,7 @@ public class HaxxorContributor : ConfiguredContributorBase
     private readonly record struct CompiledCategory(string Name, uint Flag, Regex[] Patterns);
 
     /// <summary>
-    ///     Immutable compiled pattern set — all regex categories.
+    ///     Immutable compiled pattern set - all regex categories.
     /// </summary>
     private sealed class CompiledPatternSet(CompiledCategory[] categories)
     {
@@ -534,12 +534,12 @@ public class HaxxorContributor : ConfiguredContributorBase
     }
 
     /// <summary>
-    ///     Pre-lowered path pattern entry — avoids per-request ToLowerInvariant.
+    ///     Pre-lowered path pattern entry - avoids per-request ToLowerInvariant.
     /// </summary>
     private readonly record struct CachedPathEntry(string Pattern, bool IsPrefix);
 
     /// <summary>
-    ///     All cached path pattern arrays — built once from YAML config.
+    ///     All cached path pattern arrays - built once from YAML config.
     /// </summary>
     private sealed class CachedPathPatterns(
         CachedPathEntry[] pathProbes,

@@ -17,11 +17,11 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     moved to a new country, changed browser). Baseline confidence decays exponentially
 ///     over time, requiring fresh observations to rebuild trust.
 ///
-///     Runs in Wave 1 — needs signals from: UserAgent (ua.family), IP (ip.address hash),
+///     Runs in Wave 1 - needs signals from: UserAgent (ua.family), IP (ip.address hash),
 ///     Geo (geo.country_code), Behavioral (behavioral patterns), ResponseBehavior.
 ///
 ///     Cross-request state tracked per-signature via in-memory sliding window.
-///     No credential content is ever inspected — zero-PII design. Login attempts are
+///     No credential content is ever inspected - zero-PII design. Login attempts are
 ///     counted by tracking POST requests to configurable login path patterns.
 ///
 ///     Drift score is a weighted composite of geo, fingerprint, timing, path, and velocity
@@ -42,7 +42,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     private static long _requestCounter;
     private const int CleanupInterval = 1000;
 
-    // Cached path patterns — built once from YAML, avoids per-request GetStringListParam allocations
+    // Cached path patterns - built once from YAML, avoids per-request GetStringListParam allocations
     private volatile CachedPathPatterns? _cachedPaths;
 
     // Static empty result to avoid allocation on clean path
@@ -60,7 +60,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     public override string Name => "AccountTakeover";
     public override int Priority => Manifest?.Priority ?? 25;
 
-    // Wave 1 — needs signals from earlier detectors
+    // Wave 1 - needs signals from earlier detectors
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
         Triggers.AnyOf(
@@ -92,7 +92,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     private double DriftWeightPath => GetParam("drift_weight_path", 0.20);
     private double DriftWeightVelocity => GetParam("drift_weight_velocity", 0.10);
 
-    // Decay: half-life in days — after this many days of absence,
+    // Decay: half-life in days - after this many days of absence,
     // the baseline confidence halves, reducing false positives for returning users
     private double BaselineHalfLifeDays => GetParam("baseline_half_life_days", 14.0);
 
@@ -110,14 +110,14 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
             var method = state.HttpContext.Request.Method;
             var now = DateTimeOffset.UtcNow;
 
-            // Periodic cleanup of stale trackers — only every N requests
+            // Periodic cleanup of stale trackers - only every N requests
             if (Interlocked.Increment(ref _requestCounter) % CleanupInterval == 0)
                 CleanupStaleTrackers(now);
 
             // Get cached path patterns (built once from YAML config)
             var pathPatterns = EnsureCachedPaths();
 
-            // Use HttpMethods helpers — zero-allocation string comparison
+            // Use HttpMethods helpers - zero-allocation string comparison
             var isPost = HttpMethods.IsPost(method);
             var isGet = HttpMethods.IsGet(method);
 
@@ -152,7 +152,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
                 return EmptyResult;
             }
 
-            // === Login/sensitive path — full analysis ===
+            // === Login/sensitive path - full analysis ===
             var tracker = SignatureTrackers.GetOrAdd(signature, static _ => new LoginTracker());
 
             // Prune the tracker's expired entries
@@ -300,7 +300,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     }
 
     /// <summary>
-    ///     Build a geo velocity contribution — extracted to avoid allocation in common path.
+    ///     Build a geo velocity contribution - extracted to avoid allocation in common path.
     /// </summary>
     private IReadOnlyList<DetectionContribution> BuildGeoVelocityContribution(
         BlackboardState state, double driftScore)
@@ -466,7 +466,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
         var count = SignatureTrackers.Count;
         if (count > MaxTrackedSignatures)
         {
-            // Evict oldest entries — use a simple approach: remove entries that are oldest
+            // Evict oldest entries - use a simple approach: remove entries that are oldest
             var toEvict = count - MaxTrackedSignatures + 100;
             var oldest = DateTimeOffset.MaxValue;
             string? oldestKey = null;

@@ -81,7 +81,7 @@ public class HeuristicDetector : IDetector, IDisposable
         ["hdr:x-requested-with"] = -0.3f,
         ["hdr:connection-close"] = 0.3f,
 
-        // Sec-Fetch-* browser attestation — strong human signals (W3C Fetch Metadata)
+        // Sec-Fetch-* browser attestation - strong human signals (W3C Fetch Metadata)
         // Browsers set these automatically; bots can't easily forge them while maintaining
         // consistency across all detection layers (TLS, TCP, H2 fingerprints).
         ["hdr:sec-fetch-site"] = -0.3f, // Any Sec-Fetch-Site header = browser attestation present
@@ -114,7 +114,7 @@ public class HeuristicDetector : IDetector, IDisposable
         ["ua:safari"] = -0.2f,
         ["ua:edge"] = -0.2f,
 
-        // Empty/missing User-Agent — no real browser omits this
+        // Empty/missing User-Agent - no real browser omits this
         ["ua:empty"] = 0.7f,
 
         // Very short User-Agent (< 15 chars) is suspicious
@@ -139,7 +139,7 @@ public class HeuristicDetector : IDetector, IDisposable
         ["accept:html"] = -0.3f,
         ["accept:json"] = 0.0f,
 
-        // Transport protocol context — set by TransportProtocolContributor.
+        // Transport protocol context - set by TransportProtocolContributor.
         // These features tell the model what KIND of request this is so it stops penalizing
         // normal API/streaming behavior (missing Accept-Language, high velocity, no cookies).
         ["transport:is_upgrade"] = -0.7f, // WebSocket upgrades legitimately omit browser headers
@@ -149,8 +149,8 @@ public class HeuristicDetector : IDetector, IDisposable
         ["transport:class_api"] = -0.5f, // API endpoints have different header expectations
         ["transport:class_signalr"] = -0.8f, // SignalR protocol class
         ["transport:class_grpc"] = -0.6f, // gRPC is always programmatic, not suspicious
-        ["transport:class_document"] = 0.0f, // Document requests — neutral (default behavior)
-        ["transport:class_static"] = -0.1f, // Static assets — slightly human-like
+        ["transport:class_document"] = 0.0f, // Document requests - neutral (default behavior)
+        ["transport:class_static"] = -0.1f, // Static assets - slightly human-like
 
         // Client-side fingerprint - STRONG human indicator when present
         ["fp:received"] = -0.7f, // Fingerprint received = strong human signal
@@ -159,7 +159,7 @@ public class HeuristicDetector : IDetector, IDisposable
         ["fp:suspicious"] = 0.6f, // Suspicious fingerprint (headless, automation)
         ["fp:missing"] = 0.15f, // No fingerprint - slightly suspicious but not conclusive
 
-        // Response behavior signals — historical response patterns
+        // Response behavior signals - historical response patterns
         ["sig:response_honeypot_hits"] = 0.9f, // Honeypot hit = very strong bot signal
         ["sig:response_scan_pattern_detected"] = 0.8f, // Systematic 404 scanning
         ["sig:response_auth_struggle"] = 0.6f, // Auth brute-forcing

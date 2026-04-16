@@ -163,7 +163,7 @@ public class AiScraperContributor : ConfiguredContributorBase
                 }
             }
 
-            // 2. Accept: text/markdown — Cloudflare "Markdown for Agents" signal
+            // 2. Accept: text/markdown - Cloudflare "Markdown for Agents" signal
             var acceptHeader = request.Headers.Accept.ToString();
             if (acceptHeader.Contains("text/markdown", StringComparison.OrdinalIgnoreCase))
             {
@@ -173,7 +173,7 @@ public class AiScraperContributor : ConfiguredContributorBase
                 {
                     contributions.Add(BotContribution(
                         "AI Scraper",
-                        "Requests text/markdown content (Cloudflare Markdown for Agents signal) — real browsers never send this",
+                        "Requests text/markdown content (Cloudflare Markdown for Agents signal) - real browsers never send this",
                         confidenceOverride: AcceptMarkdownConfidence,
                         weightMultiplier: 1.8,
                         botType: BotType.AiBot.ToString()));
@@ -200,14 +200,14 @@ public class AiScraperContributor : ConfiguredContributorBase
                 {
                     contributions.Add(BotContribution(
                         "AI Scraper",
-                        "Cloudflare AI Gateway headers detected (cf-aig-*) — traffic routed through AI infrastructure",
+                        "Cloudflare AI Gateway headers detected (cf-aig-*) - traffic routed through AI infrastructure",
                         confidenceOverride: AiGatewayConfidence,
                         weightMultiplier: 1.6,
                         botType: BotType.AiBot.ToString()));
                 }
             }
 
-            // 4. Web Bot Auth — RFC 9421 cryptographic bot verification
+            // 4. Web Bot Auth - RFC 9421 cryptographic bot verification
             if (request.Headers.ContainsKey("Signature") &&
                 request.Headers.ContainsKey("Signature-Input") &&
                 request.Headers.ContainsKey("Signature-Agent"))
@@ -243,7 +243,7 @@ public class AiScraperContributor : ConfiguredContributorBase
                 {
                     contributions.Add(BotContribution(
                         "AI Scraper",
-                        "Cloudflare Browser Rendering infrastructure detected — AI agent using headless browser",
+                        "Cloudflare Browser Rendering infrastructure detected - AI agent using headless browser",
                         confidenceOverride: BrowserRenderingConfidence,
                         weightMultiplier: 1.8,
                         botType: BotType.AiBot.ToString()));

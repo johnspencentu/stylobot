@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**StyloBot** is an enterprise-grade bot detection framework for ASP.NET Core. It uses a blackboard architecture (via StyloFlow) with 31 detectors in 4 waves, AI-powered classification, intent classification with threat scoring, Leiden clustering for bot network discovery, and zero-PII design. The system combines fast-path detection (<1ms) with optional LLM escalation for complex cases. Sessions are the primary behavioral unit — compressed into 118-dimensional Markov chain vectors with unified fingerprint dimensions, enabling inter-session velocity analysis and behavioral anomaly detection. Persistence uses SQLite (zero-dependency) with PostgreSQL + pgvector as the commercial upgrade path. The real-time dashboard features session timeline visualization with Markov chain drill-in, radar charts for behavioral shape, country analytics, cluster visualization, threat scoring, user agent breakdown, and live signature feed.
+**StyloBot** is an enterprise-grade bot detection framework for ASP.NET Core. It uses a blackboard architecture (via StyloFlow) with 31 detectors in 4 waves, AI-powered classification, intent classification with threat scoring, Leiden clustering for bot network discovery, and zero-PII design. The system combines fast-path detection (<1ms) with optional LLM escalation for complex cases. Sessions are the primary behavioral unit - compressed into 118-dimensional Markov chain vectors with unified fingerprint dimensions, enabling inter-session velocity analysis and behavioral anomaly detection. Persistence uses SQLite (zero-dependency) with PostgreSQL + pgvector as the commercial upgrade path. The real-time dashboard features session timeline visualization with Markov chain drill-in, radar charts for behavioral shape, country analytics, cluster visualization, threat scoring, user agent breakdown, and live signature feed.
 
 ## Critical Rules
 
-- **NEVER add hard-coded site-specific exceptions, bypass keys, or allowlists.** StyloBot is a detection product — the fix is always to make detection *correct*, not to add workarounds. The live site (www.stylobot.net) runs the product as-is to test it.
+- **NEVER add hard-coded site-specific exceptions, bypass keys, or allowlists.** StyloBot is a detection product - the fix is always to make detection *correct*, not to add workarounds. The live site (www.stylobot.net) runs the product as-is to test it.
 - **The `X-SB-Api-Key` header** is part of the product's detection policy system (for customers to exempt their own monitoring/health-check traffic). It is NOT for operational use to bypass detection on the StyloBot site itself.
-- **All detection improvements must be generic** — based on protocol specs (W3C Fetch Metadata, RFC 6455, etc.), not site-specific paths or domains.
+- **All detection improvements must be generic** - based on protocol specs (W3C Fetch Metadata, RFC 6455, etc.), not site-specific paths or domains.
 
 ## Build Commands
 
@@ -53,7 +53,7 @@ dotnet pack Mostlylucid.BotDetection -c Release
 | Project | Purpose |
 |---------|---------|
 | `Mostlylucid.BotDetection` | Core detection library (NuGet package) |
-| `Mostlylucid.BotDetection.MinimalDemo` | Minimal demo — zero dependencies, shows all protection approaches |
+| `Mostlylucid.BotDetection.MinimalDemo` | Minimal demo - zero dependencies, shows all protection approaches |
 | `Mostlylucid.BotDetection.UI` | Dashboard, TagHelpers, SignalR hub |
 | `Mostlylucid.BotDetection.UI.PostgreSQL` | PostgreSQL persistence layer |
 | `Mostlylucid.BotDetection.Demo` | Interactive demo with all 30 detectors |
@@ -99,7 +99,7 @@ Sessions are the primary behavioral unit. Per-request Markov chain transitions a
 **Markov states:** PageView, ApiCall, StaticAsset, WebSocket, SignalR, ServerSentEvent, FormSubmit, AuthAttempt, NotFound, Search
 
 **Key concepts:**
-- **Retrogressive session boundary:** Sessions are defined by inter-request gaps (default 30min), detected when the NEXT request reveals the gap — not by fixed time windows
+- **Retrogressive session boundary:** Sessions are defined by inter-request gaps (default 30min), detected when the NEXT request reveals the gap - not by fixed time windows
 - **Unified fingerprint dimensions:** TLS/TCP/H2 fingerprints are vector dimensions, so fingerprint mutation across sessions appears as velocity in those dimensions
 - **Snapshot compaction:** Old session snapshots merge into a maturity-weighted root vector preserving the behavioral baseline while discarding per-session detail
 - **Inter-session velocity:** L2 magnitude of the delta vector between consecutive sessions; high velocity = sudden behavioral shift (bot rotation, account takeover)
@@ -133,9 +133,9 @@ Sessions are the primary behavioral unit. Per-request Markov chain transitions a
 ### Transport-Aware Detection
 
 Detectors are aware of transport protocol context (API, SignalR, WebSocket, gRPC) to avoid false positives on non-document traffic. The `TransportProtocolContributor` (Priority 5) writes signals that downstream detectors consume:
-- `transport.protocol_class` — document, api, signalr, grpc, static
-- `transport.is_streaming` — WebSocket, SSE, SignalR
-- `transport.is_upgrade` — WebSocket upgrade
+- `transport.protocol_class` - document, api, signalr, grpc, static
+- `transport.is_streaming` - WebSocket, SSE, SignalR
+- `transport.is_upgrade` - WebSocket upgrade
 
 Detectors that consume transport context: HeuristicFeatureExtractor (8 features), InconsistencyDetector, MultiLayerCorrelation, ResponseBehavior, AdvancedBehavioral, Header, CacheBehavior.
 
@@ -202,33 +202,33 @@ Every detector touches exactly 5 files. Use `Http3FingerprintContributor` as a r
 
 ### 5-File Checklist
 
-1. **C# class** — `Orchestration/ContributingDetectors/{Name}Contributor.cs`
+1. **C# class** - `Orchestration/ContributingDetectors/{Name}Contributor.cs`
    - Inherit `ConfiguredContributorBase` (for YAML config) or `ContributingDetectorBase` (for no-config detectors)
    - Constructor takes `ILogger<T>` + `IDetectorConfigProvider` and calls `base(configProvider)`
    - Override `Name` (string), `Priority` (int), `TriggerConditions` (empty array for Wave 0, or signal triggers for later waves)
    - Implement `ContributeAsync(BlackboardState state, CancellationToken)` returning `IReadOnlyList<DetectionContribution>`
-   - Use `GetParam<T>(name, default)` for all tunable values — no magic numbers in code
+   - Use `GetParam<T>(name, default)` for all tunable values - no magic numbers in code
 
-2. **YAML manifest** — `Orchestration/Manifests/detectors/{name}.detector.yaml`
+2. **YAML manifest** - `Orchestration/Manifests/detectors/{name}.detector.yaml`
    - Follows the schema: `name`, `priority`, `enabled`, `scope`, `taxonomy`, `input`, `output`, `triggers`, `emits`, `defaults` (weights, confidence, timing, features, parameters)
    - The `*.yaml` glob in `.csproj` auto-includes it as an embedded resource
 
-3. **SignalKeys** — `Models/DetectionContext.cs`
+3. **SignalKeys** - `Models/DetectionContext.cs`
    - Add constants in the `SignalKeys` class grouped with a section header comment
    - Use hierarchical naming: `h3.protocol`, `h3.client_type`, etc.
 
-4. **DI registration** — `Extensions/ServiceCollectionExtensions.cs`
+4. **DI registration** - `Extensions/ServiceCollectionExtensions.cs`
    - Add `services.AddSingleton<IContributingDetector, {Name}Contributor>();` in the appropriate wave section
 
-5. **Narrative builder** — `Mostlylucid.BotDetection.UI/Services/DetectionNarrativeBuilder.cs`
+5. **Narrative builder** - `Mostlylucid.BotDetection.UI/Services/DetectionNarrativeBuilder.cs`
    - Add entries to both `DetectorFriendlyNames` and `DetectorCategories` dictionaries
 
 ### Key Rules
 
-- **No magic numbers** — all confidence, weight, and threshold values come from YAML `defaults.parameters` via `GetParam<T>()`
-- **Always add signals to the last contribution** — the orchestrator reads signals from contributions; ensure the final contribution carries the full `signals.ToImmutable()` dictionary
-- **Cross-detector communication** — use `TriggerConditions` (e.g., `SignalExistsTrigger`, `AnyOfTrigger`, `AllOfTrigger`) to declare dependencies, and `GetSignal<T>(state, key)` to read signals from earlier detectors
-- **Use helper methods** — `BotContribution()`, `HumanContribution()`, `NeutralContribution()`, `StrongBotContribution()` from `ConfiguredContributorBase`
+- **No magic numbers** - all confidence, weight, and threshold values come from YAML `defaults.parameters` via `GetParam<T>()`
+- **Always add signals to the last contribution** - the orchestrator reads signals from contributions; ensure the final contribution carries the full `signals.ToImmutable()` dictionary
+- **Cross-detector communication** - use `TriggerConditions` (e.g., `SignalExistsTrigger`, `AnyOfTrigger`, `AllOfTrigger`) to declare dependencies, and `GetSignal<T>(state, key)` to read signals from earlier detectors
+- **Use helper methods** - `BotContribution()`, `HumanContribution()`, `NeutralContribution()`, `StrongBotContribution()` from `ConfiguredContributorBase`
 
 ## Versioning
 
@@ -267,12 +267,12 @@ D:\Source\
 ## Dashboard
 
 Session-centric dashboard at `/_stylobot` with:
-- **Sessions tab** — Timeline of behavioral sessions with Markov chain previews, HTMX drill-in
-- **Session detail** — Behavioral radar chart (ApexCharts), transition bar visualization, paths visited
-- **Visitors/Top Bots** — Signature-level views with sparklines
-- **Countries/Endpoints** — Geographic and path-level aggregations
-- **Clusters** — Leiden community detection with diagnostics
-- **User Agents** — UA family breakdown with version distribution
+- **Sessions tab** - Timeline of behavioral sessions with Markov chain previews, HTMX drill-in
+- **Session detail** - Behavioral radar chart (ApexCharts), transition bar visualization, paths visited
+- **Visitors/Top Bots** - Signature-level views with sparklines
+- **Countries/Endpoints** - Geographic and path-level aggregations
+- **Clusters** - Leiden community detection with diagnostics
+- **User Agents** - UA family breakdown with version distribution
 
 **API endpoints:** `/api/sessions`, `/api/sessions/recent`, `/api/sessions/signature/{id}`, `/api/detections`, `/api/summary`, `/api/timeseries`, `/api/clusters`, `/api/countries`, `/api/endpoints`, `/api/topbots`, `/api/me`, `/api/diagnostics`, `/api/export`
 
@@ -283,11 +283,11 @@ Internet → Cloudflare Tunnel → Caddy (TLS) → YARP Gateway (bot detection) 
                                             → Website (direct for /_stylobot* / SignalR)
 ```
 
-- **Gateway** (`Stylobot.Gateway`) — YARP reverse proxy with all 31 detectors, no dashboard
-- **Website** (`mostlylucid.stylobot.website`) — ASP.NET Core MVC + dashboard UI + SignalR hub
+- **Gateway** (`Stylobot.Gateway`) - YARP reverse proxy with all 31 detectors, no dashboard
+- **Website** (`mostlylucid.stylobot.website`) - ASP.NET Core MVC + dashboard UI + SignalR hub
 - **Caddy** routes `/_stylobot*` directly to website (bypasses gateway for SignalR WebSocket)
-- **TimescaleDB** — Dashboard event persistence (commercial); SQLite for core product
-- **Ollama** — Local LLM for AI bot classification escalation
+- **TimescaleDB** - Dashboard event persistence (commercial); SQLite for core product
+- **Ollama** - Local LLM for AI bot classification escalation
 
 Config: `mostlylucid.stylobot.website/docker-compose.local.yml`
 
@@ -303,4 +303,3 @@ Detailed docs in `Mostlylucid.BotDetection/docs/`:
 - `ai-detection.md` - Heuristic model and LLM escalation
 - `learning-and-reputation.md` - Adaptive learning system
 - `yarp-integration.md` - Reverse proxy setup
-

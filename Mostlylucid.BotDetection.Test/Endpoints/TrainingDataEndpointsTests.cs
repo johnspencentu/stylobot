@@ -10,7 +10,7 @@ namespace Mostlylucid.BotDetection.Test.Endpoints;
 /// </summary>
 public class TrainingDataEndpointsTests
 {
-    #region FilterPiiSignals — Null / Empty
+    #region FilterPiiSignals - Null / Empty
 
     [Fact]
     public void FilterPiiSignals_Null_ReturnsNull()
@@ -29,7 +29,7 @@ public class TrainingDataEndpointsTests
 
     #endregion
 
-    #region FilterPiiSignals — PII Removal
+    #region FilterPiiSignals - PII Removal
 
     [Fact]
     public void FilterPiiSignals_RemovesUserAgent()
@@ -95,7 +95,7 @@ public class TrainingDataEndpointsTests
 
     #endregion
 
-    #region FilterPiiSignals — Conditional UA for Bots
+    #region FilterPiiSignals - Conditional UA for Bots
 
     [Fact]
     public void FilterPiiSignals_HumanVisitor_StripsUaClassificationKeys()

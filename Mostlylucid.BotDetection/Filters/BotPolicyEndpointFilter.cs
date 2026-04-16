@@ -61,11 +61,11 @@ public class BotPolicyEndpointFilter : IEndpointFilter
                         return null; // Response already written by the policy
                 }
 
-                // Evidence missing but bot detected — fall through to default block
+                // Evidence missing but bot detected - fall through to default block
             }
         }
 
-        // No action policy, policy not found, or evidence missing — default block
+        // No action policy, policy not found, or evidence missing - default block
         return Results.Json(new
         {
             error = "Access denied",

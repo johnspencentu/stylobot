@@ -146,7 +146,7 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
 
     public Task<List<DashboardTopBotEntry>> GetTopBotsAsync(int count = 10, DateTime? startTime = null, DateTime? endTime = null)
     {
-        // Group detections by signature — works even when signatures aren't stored
+        // Group detections by signature - works even when signatures aren't stored
         // (e.g. upstream-trusted mode where only detections are recorded).
         IEnumerable<DashboardDetectionEvent> source = _detections;
         if (startTime.HasValue) source = source.Where(d => d.Timestamp >= startTime.Value);

@@ -5,13 +5,13 @@ using Mostlylucid.BotDetection.Filters;
 namespace Mostlylucid.BotDetection.MinimalDemo.Controllers;
 
 /// <summary>
-///     Demonstrates [BlockBots] attribute — blocks bots, allows search engines.
+///     Demonstrates [BlockBots] attribute - blocks bots, allows search engines.
 /// </summary>
 [ApiController]
 [Route("[controller]")]
 public class ProductsController : ControllerBase
 {
-    // GET /products — blocks bots, allows search engines
+    // GET /products - blocks bots, allows search engines
     [HttpGet]
     [BlockBots(AllowSearchEngines = true)]
     public IActionResult List()
@@ -33,7 +33,7 @@ public class ProductsController : ControllerBase
         });
     }
 
-    // GET /products/5 — no bot protection (open)
+    // GET /products/5 - no bot protection (open)
     [HttpGet("{id:int}")]
     public IActionResult Get(int id)
     {

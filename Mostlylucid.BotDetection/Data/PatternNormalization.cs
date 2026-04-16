@@ -16,7 +16,7 @@ namespace Mostlylucid.BotDetection.Data;
 /// </summary>
 public static class PatternNormalization
 {
-    // Indicator flags — bit positions are in ALPHABETICAL order so iterating
+    // Indicator flags - bit positions are in ALPHABETICAL order so iterating
     // set bits low→high emits an already-sorted sequence. No LINQ OrderBy needed.
     [Flags]
     private enum Indicator : uint
@@ -202,7 +202,7 @@ public static class PatternNormalization
 
     /// <summary>
     ///     Compute non-cryptographic hash for pattern ID generation.
-    ///     Uses XxHash64 (~10x faster than SHA256) — we need collision resistance
+    ///     Uses XxHash64 (~10x faster than SHA256) - we need collision resistance
     ///     for cache keys, not cryptographic strength.
     ///     Returns 16 lowercase hex chars (full 64-bit hash).
     /// </summary>

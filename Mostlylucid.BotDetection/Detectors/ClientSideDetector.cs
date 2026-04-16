@@ -70,7 +70,7 @@ public class ClientSideDetector : IDetector
                 {
                     // Browser claims to render HTML but never ran our JS fingerprint.
                     // Could be: first load (JS pending), headless bot, script blocker.
-                    // Weak positive signal — enough to contribute alongside other detectors.
+                    // Weak positive signal - enough to contribute alongside other detectors.
                     var impact = 0.15;
                     result.Confidence += impact;
                     result.Reasons.Add(new DetectionReason

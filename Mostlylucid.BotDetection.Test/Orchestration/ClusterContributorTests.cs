@@ -424,7 +424,7 @@ public class ClusterContributorTests
 
     #endregion
 
-    #region Cluster Membership — BotProduct
+    #region Cluster Membership - BotProduct
 
     [Fact]
     public async Task ContributeAsync_InBotProductCluster_EmitsClusterSignals()

@@ -153,7 +153,7 @@ public class Http2FingerprintContributor : ConfiguredContributorBase
 
             if (!isHttp2)
             {
-                // HTTP/3 connections are handled by Http3FingerprintContributor — skip with neutral signal
+                // HTTP/3 connections are handled by Http3FingerprintContributor - skip with neutral signal
                 if (protocol.StartsWith("HTTP/3", StringComparison.OrdinalIgnoreCase))
                 {
                     state.WriteSignal("h2.is_http3", true);

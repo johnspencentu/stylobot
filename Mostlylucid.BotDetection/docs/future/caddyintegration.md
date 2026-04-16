@@ -412,6 +412,6 @@ If you want, I can turn this into:
 
 [2]: https://github.com/mholt/caddy-l4?utm_source=chatgpt.com "mholt/caddy-l4: Layer 4 (TCP/UDP) app for Caddy"
 
-[3]: https://caddyserver.com/docs/extending-caddy "Extending Caddy — Caddy Documentation"
+[3]: https://caddyserver.com/docs/extending-caddy "Extending Caddy - Caddy Documentation"
 
 [4]: https://github.com/mholt/caddy-l4 "GitHub - mholt/caddy-l4: Layer 4 (TCP/UDP) app for Caddy"

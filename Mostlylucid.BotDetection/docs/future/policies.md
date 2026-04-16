@@ -287,7 +287,7 @@ They’re just good open-source engineering.
 olicies are no longer static configs; they're workflow components.
 
 Policies are now first-class workflow units.
-A policy is not just “which detectors to run” — it is a flow that can react to signals, branch, escalate, or delegate to
+A policy is not just “which detectors to run” - it is a flow that can react to signals, branch, escalate, or delegate to
 other flows.
 
 This transforms the detection system into a policy-driven workflow engine.
@@ -304,7 +304,7 @@ actions (continue, escalate, switch policy, challenge, block)
 
 transitions (to other policies)
 
-Policies can call each other — enabling flow chaining.
+Policies can call each other - enabling flow chaining.
 
 Why This Matters
 
@@ -392,7 +392,7 @@ Why This Is Powerful
 
 1. Composable
 
-You define small, clear policies — then combine them.
+You define small, clear policies - then combine them.
 
 2. Extensible
 
@@ -465,7 +465,7 @@ This turns the detector into a small workflow engine instead of a fixed
 pipeline. Policies can be assigned per endpoint, per service, or
 dynamically during detection.
 
-Default policies work out of the box — advanced users can build
+Default policies work out of the box - advanced users can build
 custom flows without modifying library code.
 
 If you want, I can write:

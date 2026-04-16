@@ -85,7 +85,7 @@ LLM →
 }
 ```
 
-Your runtime never sees the free-form text again — it only works with this descriptor.
+Your runtime never sees the free-form text again - it only works with this descriptor.
 
 ---
 
