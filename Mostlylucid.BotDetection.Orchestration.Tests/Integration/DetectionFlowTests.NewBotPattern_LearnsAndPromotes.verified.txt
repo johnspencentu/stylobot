@@ -4,5 +4,5 @@
   BotScore: 1.0,
   Support: 60.0,
   CanTriggerFastAbort: true,
-  FastPathWeight: 1.0
+  FastPathWeight: 0.5
 }

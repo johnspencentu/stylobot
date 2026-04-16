@@ -218,14 +218,17 @@ public class PatternReputationUpdaterTests
     [Fact]
     public void ApplyEvidence_ConfirmedBadWithLowScore_DemotesToSuspect()
     {
-        // Arrange - ConfirmedBad with score dropped below demotion threshold
+        // Arrange - ConfirmedBad with score sitting close to the (lowered) DemoteFromBadScore.
+        // Since commit d241863 ("oscillation fixes") the demote threshold dropped from 0.7
+        // to 0.5 to widen the hysteresis gap with PromoteToBadScore (0.9). One round of
+        // human evidence at alpha=0.1 takes 0.55 -> 0.495, which crosses the new threshold.
         var current = new PatternReputation
         {
             PatternId = "ua:test123",
             PatternType = "UserAgent",
             Pattern = "TestBot/1.0",
-            BotScore = 0.72, // Just above 0.7 demotion threshold
-            Support = 100, // Meets demotion support requirement
+            BotScore = 0.55,
+            Support = 100, // Meets DemoteFromBadSupport (100)
             State = ReputationState.ConfirmedBad,
             FirstSeen = DateTimeOffset.UtcNow.AddDays(-30),
             LastSeen = DateTimeOffset.UtcNow.AddMinutes(-5)
@@ -234,8 +237,31 @@ public class PatternReputationUpdaterTests
         // Act - apply human evidence to drop below threshold
         var result = _updater.ApplyEvidence(current, current.PatternId, current.PatternType, current.Pattern, 0.0);
 
-        // Assert - score ~0.65, should demote to Suspect
+        // Assert - score ~0.495 (below 0.5), should demote to Suspect
         Assert.Equal(ReputationState.Suspect, result.State);
+    }
+
+    [Fact]
+    public void ApplyEvidence_ConfirmedBadInsideHysteresisGap_StaysConfirmedBad()
+    {
+        // Counterpart to the above: a single piece of human evidence applied to a
+        // ConfirmedBad pattern that's still well above DemoteFromBadScore must NOT
+        // flap the state. This is the actual oscillation-prevention contract.
+        var current = new PatternReputation
+        {
+            PatternId = "ua:test123",
+            PatternType = "UserAgent",
+            Pattern = "TestBot/1.0",
+            BotScore = 0.72, // Above the 0.5 demote threshold even after one rebuttal
+            Support = 100,
+            State = ReputationState.ConfirmedBad,
+            FirstSeen = DateTimeOffset.UtcNow.AddDays(-30),
+            LastSeen = DateTimeOffset.UtcNow.AddMinutes(-5)
+        };
+
+        var result = _updater.ApplyEvidence(current, current.PatternId, current.PatternType, current.Pattern, 0.0);
+
+        Assert.Equal(ReputationState.ConfirmedBad, result.State);
     }
 
     [Fact]
@@ -315,8 +341,14 @@ public class PatternReputationUpdaterTests
     [Fact]
     public void ApplyTimeDecay_StalePattern_DecaysTowardPrior()
     {
-        // Arrange - pattern not seen for 3 hours (1 τ for score)
-        // ScoreDecayTauHours = 3, SupportDecayTauHours = 6
+        // ConfirmedBad patterns use the longer tau pair (12h / 24h) introduced in commit
+        // d241863 to prevent oscillation. After 3h the decay is much gentler than the
+        // 3h/6h base tau would predict — that's the whole point.
+        // ScoreDecayTauHours          = 3   (used by Neutral / Suspect)
+        // ConfirmedBadScoreDecayTauHours = 12
+        // SupportDecayTauHours        = 6
+        // ConfirmedBadSupportDecayTauHours = 24
+        // Confidence here = min(100/100, 1.0) = 1.0, so confidenceScale = 1.0 (no extra slowdown).
         var current = new PatternReputation
         {
             PatternId = "ua:test123",
@@ -326,25 +358,26 @@ public class PatternReputationUpdaterTests
             Support = 100,
             State = ReputationState.ConfirmedBad,
             FirstSeen = DateTimeOffset.UtcNow.AddDays(-30),
-            LastSeen = DateTimeOffset.UtcNow.AddHours(-3) // 3 hours ago (1 τ for score)
+            LastSeen = DateTimeOffset.UtcNow.AddHours(-3)
         };
 
-        // Act
         var result = _updater.ApplyTimeDecay(current);
 
-        // Assert - score decay: 0.9 + (0.5 - 0.9) * (1 - e^(-3/3)) = 0.9 - 0.4 * 0.632 ≈ 0.647
-        Assert.InRange(result.BotScore, 0.60, 0.70);
+        // Score decay: 0.9 + (0.5 - 0.9) * (1 - e^(-3/12)) = 0.9 - 0.4 * 0.221 ≈ 0.812
+        Assert.InRange(result.BotScore, 0.79, 0.83);
 
-        // Support decay: 100 * e^(-3/6) = 100 * 0.607 ≈ 60.7
-        Assert.InRange(result.Support, 55, 70);
+        // Support decay: 100 * e^(-3/24) = 100 * 0.882 ≈ 88.2
+        Assert.InRange(result.Support, 85, 92);
     }
 
     [Fact]
     public void ApplyTimeDecay_VeryStalePattern_NearPrior()
     {
-        // Arrange - pattern not seen for 12 hours
-        // ScoreDecayTauHours = 3, so 12/3 = 4 τ for score
-        // SupportDecayTauHours = 6, so 12/6 = 2 τ for support
+        // After 12h on a ConfirmedBad pattern: score has done one ConfirmedBad-tau worth
+        // of decay (12/12 = 1τ → ~63% of the way to prior), support half a tau (12/24 →
+        // drops ~39%). Still nowhere near "near prior" — the test name predates the
+        // ConfirmedBad-tau split and is kept for git history continuity even though the
+        // assertion is now "decayed but still suspicious".
         var current = new PatternReputation
         {
             PatternId = "ua:test123",
@@ -354,17 +387,16 @@ public class PatternReputationUpdaterTests
             Support = 500,
             State = ReputationState.ConfirmedBad,
             FirstSeen = DateTimeOffset.UtcNow.AddDays(-60),
-            LastSeen = DateTimeOffset.UtcNow.AddHours(-12) // 12 hours ago (4 τ for score)
+            LastSeen = DateTimeOffset.UtcNow.AddHours(-12)
         };
 
-        // Act
         var result = _updater.ApplyTimeDecay(current);
 
-        // Assert - score: 0.95 + (0.5 - 0.95) * (1 - e^(-12/3)) ≈ 0.95 - 0.45 * 0.982 ≈ 0.508
-        Assert.InRange(result.BotScore, 0.5, 0.55);
+        // Score: 0.95 + (0.5 - 0.95) * (1 - e^(-12/12)) = 0.95 - 0.45 * 0.632 ≈ 0.665
+        Assert.InRange(result.BotScore, 0.64, 0.69);
 
-        // Support: 500 * e^(-12/6) ≈ 500 * 0.135 ≈ 67.7
-        Assert.InRange(result.Support, 55, 80);
+        // Support: 500 * e^(-12/24) = 500 * 0.607 ≈ 303.5
+        Assert.InRange(result.Support, 290, 315);
     }
 
     [Fact]

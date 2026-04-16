@@ -96,9 +96,11 @@ public class DetectionFlowTests
     [Fact]
     public async Task TimeDecay_ForgetsStalePatterns()
     {
-        // Create a pattern that was confirmed bad but hasn't been seen for 12 hours
-        // ScoreDecayTauHours = 3, so 12/3 = 4 τ (nearly full decay)
-        // SupportDecayTauHours = 6, so 12/6 = 2 τ (significant support loss)
+        // Create a pattern that was confirmed bad but hasn't been seen for 12 hours.
+        // Since commit d241863 ("oscillation fixes"), ConfirmedBad uses the longer
+        // ConfirmedBadScoreDecayTauHours / ConfirmedBadSupportDecayTauHours pair (12 / 24)
+        // rather than the base 3 / 6 — strong-evidence patterns shouldn't lose status easily.
+        // 12h elapsed = 1τ score, ½τ support against the ConfirmedBad tau.
         var current = new PatternReputation
         {
             PatternId = "ua:StaleBot",
@@ -297,7 +299,10 @@ public class DetectionFlowTests
     [Fact]
     public async Task DecaySweep_UpdatesAllStalePatterns()
     {
-        // Add some stale patterns
+        // ConfirmedBad uses the longer 12 / 24 tau pair post-d241863, so 6h elapsed is
+        // half a tau for score and a quarter tau for support — partial decay, no demotion.
+        // Test still validates that the sweep moves the stale pattern but leaves the fresh
+        // one untouched; it just no longer expects state to flip after a single sweep.
         var stalePattern = new PatternReputation
         {
             PatternId = "ua:stale1",
@@ -307,7 +312,7 @@ public class DetectionFlowTests
             Support = 100,
             State = ReputationState.ConfirmedBad,
             FirstSeen = DateTimeOffset.UtcNow.AddDays(-60),
-            LastSeen = DateTimeOffset.UtcNow.AddHours(-6) // 6 hours stale (1 τ for support)
+            LastSeen = DateTimeOffset.UtcNow.AddHours(-6)
         };
         _cache.Update(stalePattern);
 
