@@ -827,7 +827,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
                     Confidence = r.Confidence ?? 0,
                     Action = r.Action,
                     CountryCode = countryCode.ToUpperInvariant(),
-                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0,
+                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0.0,
                     LastSeen = r.LastSeen,
                     IsKnownBot = true
                 }).ToList()
@@ -1035,7 +1035,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
                     Confidence = r.Confidence ?? 0,
                     Action = r.Action,
                     CountryCode = r.CountryCode,
-                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0,
+                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0.0,
                     TopReasons = DeserializeJsonOrNull<List<string>>(r.TopReasons),
                     LastSeen = r.LastSeen,
                     Narrative = r.Narrative,
@@ -1052,7 +1052,7 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
                     StatusCode = r.StatusCode,
                     Path = r.Path,
                     Method = r.Method,
-                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0,
+                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0.0,
                     Action = r.Action
                 }).ToList()
             };
