@@ -1,121 +1,130 @@
 # StyloBot
 by ***mostly*lucid**
 
-> **NOTE:** StyloBot is a FOSS project under active development. To tune detection against real traffic I collect REAL traffic on [stylobot.net](https://www.stylobot.net) (zero PII - see the [API docs](Mostlylucid.BotDetection/docs/api-reference.md)), so the live site may be temporarily broken as I test improvements. Expect rough edges!
+> **Active development.** Real traffic is collected on [stylobot.net](https://www.stylobot.net) (zero PII — see the [API docs](Mostlylucid.BotDetection/docs/api-reference.md)) to tune detection. The live site may be temporarily rough as new detectors land — expect rough edges.
 
-Enterprise bot detection framework for ASP.NET Core. 31 detectors, wave-based orchestration, adaptive AI learning, session-level Markov chain behavioral compression, intent classification with threat scoring, real-time dashboard with session drill-in, and reverse-proxy integration - all in two lines of code.
+**Self-hosted bot defense with audit-grade decision evidence on every request.** 30+ detectors, wave-based orchestration, session-level Markov-chain behavioral compression, intent classification with threat scoring, real-time dashboard with session drill-in, and reverse-proxy integration — all in two lines of code. Runs in your VPC, your Kubernetes cluster, or as an embedded YARP gateway. Your traffic never leaves your perimeter.
 
 <img src="https://raw.githubusercontent.com/scottgal/stylobot/refs/heads/main/mostlylucid.stylobot.website/src/Stylobot.Website/wwwroot/img/stylowall.svg?raw=true" alt="StyloBot" style="max-width:200px; height:auto;" />
 
-## What's New in v5.5
+## Two products, one codebase boundary
 
-- **Session Vector Architecture** - per-request Markov chain transitions compressed into 118-dimensional normalized vectors (100 transitions + 10 stationary + 8 temporal + 8 fingerprint). Sessions are the primary behavioral unit with retrogressive boundary detection, inter-session velocity analysis, and snapshot compaction
-- **Unified Fingerprint Dimensions** - TLS/TCP/H2 network fingerprints are vector dimensions in the same space as behavioral features. Fingerprint mutation across sessions appears as velocity - no separate fingerprint tracking needed
-- **SQLite Persistence** - sessions, signatures, and aggregated counters stored in SQLite (zero-dependency). PostgreSQL + pgvector is the commercial upgrade path for scale. ~100x compression vs per-request storage
-- **Transport-Aware Detection** - 7 detectors now consume transport protocol context (API, SignalR, WebSocket, gRPC) to suppress false positives on non-document traffic
-- **Oscillation Prevention** - configurable probability ceiling (0.90), state-aware reputation decay (12h for ConfirmedBad vs 3h), widened hysteresis gap, configurable browser attestation downgrade
-- **Session Dashboard** - new Sessions tab with Markov chain previews, behavioral radar charts (ApexCharts), transition bar visualization, HTMX drill-in
-- **Signature 404 Fix** - event store fallback when in-memory cache evicts signatures
+| Tier | Repo | What you get |
+|---|---|---|
+| **FOSS (this repo)** | `stylobot` — Unlicense | All detectors, session vectors, SQLite persistence, local dashboard, YAML-driven config, ASP.NET Core Identity local accounts, local Ollama LLM. **Fully standalone** — no external dependencies, no phone-home, no license required. |
+| **Commercial** | [`stylobot-commercial`](https://github.com/scottgal/stylobot-commercial) | Adds Postgres + Redis persistence, central control plane, live config editor (per-endpoint + per-user + per-API-key overrides), multi-gateway fleet dashboard, pgvector HNSW session similarity, OIDC/SAML SSO, scheduled reports, Kubernetes operator. Tiers: Startup $149/mo, SME $499/mo, Enterprise custom. |
 
-### What's New in v5.0
+The commercial product plugs in via extension interfaces in FOSS — `IConfigurationOverrideSource` and `IFleetReporter` — that customers never see unless they install the commercial plugin package. **OSS shows all the levers in the dashboard; only commercial allows runtime edits.** FOSS is YAML-file-only by design.
 
-- **Intent Classification** - new HNSW-backed detector classifies request intent (reconnaissance, exploitation, scraping, benign) with adaptive learning
-- **Threat Scoring** - independent threat dimension (Low/Elevated/High/Critical) orthogonal to bot probability, surfaced across all dashboard views, APIs, and SignalR broadcasts
-- **Stream Abuse Detection** - dedicated StreamAbuseContributor catches connection churn, payload flooding, and protocol switching hidden in streaming traffic
-- **Stream-Aware Pipeline** - TransportProtocolContributor classifies WebSocket/SSE/SignalR/gRPC early; 5 downstream detectors suppress false positives on legitimate streaming
-- **Dashboard Threat Visualization** - threat badges on detections, visitors, clusters; cluster-level dominant intent and threat percentage; threat-prefixed narratives
+Licenses are Ed25519-signed JWTs issued by the [stylobot.net customer portal](https://stylobot.net/portal). The customer's control plane validates tokens against the vendor public key baked into the release binary — no phone-home required. See [`stylobot-commercial/docs/licensing-tiers.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/licensing-tiers.md).
+
+## What's New
+
+**v5.6 (in-flight):**
+- **Commercial plugin architecture** — FOSS extension interfaces let commercial packages add per-target config overrides + fleet telemetry reporting without touching detection code
+- **Keycloak-based customer portal** on stylobot.net — signup, org management, trial issuance (Ed25519-signed 30-day SME), license download/rotate/revoke, team invites, API tokens, audit log
+- **Cluster coordination primitives** — Redis-backed backplane, shared reputation cache, cluster-wide work-unit meter for multi-YARP deployments
+- **Pipeline coordination spec** — distributed-blackboard model so chained YARP instances (edge → regional → app-side) avoid redundant detector execution via input-hash-per-detector deduplication, while letting later hops contribute signals earlier hops couldn't see
+- **Layered action policies** — each YARP in a chain applies its own response policy (monotone-escalating down the chain: `block` at an inner hop can't be softened by an outer hop's `allow`)
+
+**v5.5:**
+- **Session Vector Architecture** — per-request Markov chain transitions compressed into 118-dimensional normalized vectors (100 transitions + 10 stationary + 8 temporal + 8 fingerprint). Sessions are the primary behavioral unit with retrogressive boundary detection, inter-session velocity analysis, and snapshot compaction
+- **Unified Fingerprint Dimensions** — TLS/TCP/H2 network fingerprints are vector dimensions in the same space as behavioral features; fingerprint mutation across sessions appears as velocity
+- **SQLite Persistence** — sessions, signatures, and aggregated counters stored in SQLite (zero-dependency). PostgreSQL + pgvector is the commercial upgrade path for scale. ~100× compression vs per-request storage
+- **Transport-Aware Detection** — 7 detectors now consume transport protocol context (API, SignalR, WebSocket, gRPC) to suppress false positives on non-document traffic
+- **Oscillation Prevention** — configurable probability ceiling (0.90), state-aware reputation decay (12h for ConfirmedBad vs 3h), widened hysteresis gap
+- **Session Dashboard** — Sessions tab with Markov chain previews, behavioral radar charts (ApexCharts), transition bar visualization, HTMX drill-in
 
 See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 
-## What This Repo Contains
+## Repo layout
 
-This repository is a monorepo for the StyloBot ecosystem:
+**Detection engine:**
+- `Mostlylucid.BotDetection` — core detection library, 30+ detectors, middleware, blackboard orchestration
+- `Mostlylucid.BotDetection.Demo` — end-to-end demo app with test pages, API endpoints, live signatures
 
-- `Mostlylucid.BotDetection`: Core detection library and middleware
-- `Mostlylucid.BotDetection.Demo`: End-to-end demo app with test pages, API endpoints, and live signatures
-- `Stylobot.Gateway`: Docker-first YARP gateway with built-in detection
-- `Mostlylucid.BotDetection.UI`: Dashboard/tag helpers/view components
-- `Mostlylucid.BotDetection.UI.PostgreSQL`: PostgreSQL + pgvector persistence (commercial)
-- `mostlylucid.stylobot.website`: Marketing/demo website using the detection stack
+**UI & persistence:**
+- `Mostlylucid.BotDetection.UI` — dashboard, tag helpers, view components, SignalR hub
+- `Mostlylucid.BotDetection.UI.PostgreSQL` — PostgreSQL + TimescaleDB persistence
+
+**Deployment:**
+- `Stylobot.Gateway` — Docker-first YARP reverse proxy with built-in detection
+- `mostlylucid.stylobot.website` — marketing site + customer portal (Keycloak OIDC RP + license issuer) + docs
+
+**Geo (separate)**
+- `Mostlylucid.GeoDetection`, `Mostlylucid.GeoDetection.Contributor` — country routing + bot detection signals from geo data
 
 ## Requirements
 
-- .NET SDK `10.0` (repo projects target `net10.0`)
-- No external database required - SQLite is the default persistence (ships with .NET)
+- .NET SDK `10.0`
+- No external database required — SQLite is the default
 - Docker + Docker Compose (optional, for containerized flows)
 - Optional for advanced scenarios:
   - PostgreSQL + pgvector (commercial, for vector similarity at scale)
-  - Ollama (for LLM provider mode)
+  - Redis (commercial, for multi-gateway coordination)
+  - Keycloak (commercial portal auth — self-hostable)
+  - Ollama (FOSS LLM provider) or OpenAI/Anthropic/Azure OpenAI (commercial)
 
-## Quick Start (Local Demo)
+## Quick Start — OSS, one gateway
 
 ```bash
 dotnet run --project Mostlylucid.BotDetection.Demo
 ```
 
 Open:
-
 - `http://localhost:5080/bot-test`
 - `http://localhost:5080/SignatureDemo`
-- `http://localhost:5080/bot-detection/check`
+- `http://localhost:5080/_stylobot` — live dashboard
 
-If you run the HTTPS launch profile, HTTPS is also available at `https://localhost:5001`.
-
-## Quick Start (Gateway)
-
-Run gateway with one upstream (zero-config mode):
+## Quick Start — gateway container
 
 ```bash
 docker run --rm -p 8080:8080 -e DEFAULT_UPSTREAM=http://host.docker.internal:3000 scottgal/stylobot-gateway:latest
-```
-
-Health endpoint:
-
-```bash
 curl http://localhost:8080/admin/health
 ```
 
 If `ADMIN_SECRET` is configured, include header `X-Admin-Secret` for `/admin/*` endpoints.
 
-## Detection Surface - 31 Detectors
+## Quick Start — commercial trial
+
+1. Sign up at [stylobot.net/portal](https://stylobot.net/portal) — one 30-day SME trial per organization, no credit card.
+2. Download the signed license JWT, place in `BotDetection:Commercial:LicenseToken` env var.
+3. `docker compose up` the commercial stack (see [`stylobot-commercial/docs/kubernetes-deployment.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/kubernetes-deployment.md) for K8s).
+4. Create a `StyloBotGateway` CR via `kubectl apply -f …` or point the gateway container at your control plane.
+
+## Detection Surface — 30+ Detectors
 
 All detectors run in a wave-based pipeline. Fast-path detectors execute in parallel in <1ms; advanced detectors fire only when triggered by upstream signals.
 
 | Wave | Detectors | Latency |
 |------|-----------|---------|
-| **Wave 0 - Fast Path** | UserAgent, Header, IP, SecurityTool, TransportProtocol, VersionAge, AiScraper, FastPathReputation, ReputationBias, VerifiedBot | <1ms |
-| **Wave 1 - Behavioral** | Behavioral, AdvancedBehavioral, BehavioralWaveform, CacheBehavior, ClientSide, GeoChange, ResponseBehavior, StreamAbuse, **SessionVector** | 1-5ms |
-| **Wave 2 - Fingerprinting** | TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI), HTTP/3 (QUIC), MultiLayerCorrelation | <1ms |
-| **Wave 3 - AI + Learning** | Heuristic, HeuristicLate, Similarity, Cluster (Leiden), Intent, TimescaleReputation, LLM (optional) | 1-500ms |
+| **Wave 0 — Fast Path** | UserAgent, Header, IP, SecurityTool, TransportProtocol, VersionAge, AiScraper, FastPathReputation, ReputationBias, VerifiedBot | <1ms |
+| **Wave 1 — Behavioral** | Behavioral, AdvancedBehavioral, BehavioralWaveform, CacheBehavior, ClientSide, GeoChange, ResponseBehavior, StreamAbuse, **SessionVector** | 1–5ms |
+| **Wave 2 — Fingerprinting** | TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI), HTTP/3 (QUIC), MultiLayerCorrelation | <1ms |
+| **Wave 3 — AI + Learning** | Heuristic, HeuristicLate, Similarity, Cluster (Leiden), Intent, TimescaleReputation, LLM (optional) | 1–500ms |
 | **Slow Path** | ProjectHoneypot (DNS lookup) | ~100ms |
 
-Real contributor lists are controlled by `BotDetection:Policies` in each app config.
+Active detector list is controlled by `BotDetection:Policies` in each app config. See [`Mostlylucid.BotDetection/docs/detector-weights-audit.md`](Mostlylucid.BotDetection/docs/detector-weights-audit.md) for the current weight/confidence baseline across all detectors.
 
-### Key Capabilities
+### Key capabilities
 
-- **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent (reconnaissance, exploitation, scraping, benign) and assigns a threat score orthogonal to bot probability - a human probing `.env` files gets low bot probability but high threat score
-- **Protocol-level fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 - detect bots even when they spoof headers perfectly
+- **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent (reconnaissance, exploitation, scraping, benign) and assigns a threat score orthogonal to bot probability — a human probing `.env` files gets low bot probability but high threat score
+- **Protocol-level fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 — detect bots even when they spoof headers perfectly
 - **Stream-aware detection**: WebSocket, SSE, SignalR, and gRPC traffic classified early; downstream detectors suppress false positives; dedicated stream abuse detection catches connection churn, payload flooding, and protocol switching
 - **Bot network discovery**: Leiden clustering finds coordinated bot campaigns across thousands of signatures
-- **Session behavioral vectors**: Markov chain transitions compressed into 118-dim vectors with unified fingerprint dimensions - enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
-- **Adaptive AI**: Heuristic model extracts ~130 features per request (including transport context) and learns from feedback - detection improves over time
+- **Session behavioral vectors**: Markov chain transitions compressed into 118-dim vectors with unified fingerprint dimensions — enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
+- **Adaptive AI**: Heuristic model extracts ~130 features per request (including transport context) and learns from feedback
 - **Geo intelligence**: Country reputation tracking, geographic drift detection, VPN/proxy/Tor/datacenter identification
 - **Verified bot authentication**: DNS-verified identification of Googlebot, Bingbot, and 30+ legitimate crawlers
 - **AI scraper detection**: GPTBot, ClaudeBot, PerplexityBot, Google-Extended and Cloudflare AI signals
-- **Zero PII**: All persistence uses HMAC-SHA256 hashed signatures - no raw IPs or user agents stored
+- **Zero PII**: All persistence uses HMAC-SHA256 hashed signatures — no raw IPs or user agents stored
 
 ### Training Data API
-
-Export detection data for ML training:
 
 ```bash
 # JSONL streaming export with labels
 curl http://localhost:5080/bot-detection/training/export > training-data.jsonl
-
-# Cluster data
 curl http://localhost:5080/bot-detection/training/clusters
-
-# Country reputation
 curl http://localhost:5080/bot-detection/training/countries
 ```
 
@@ -123,17 +132,13 @@ Register with `app.MapBotTrainingEndpoints()`. See [Training Data API docs](Most
 
 ## Real-Time Dashboard
 
-The built-in dashboard (`Mostlylucid.BotDetection.UI`) provides live monitoring via SignalR:
+Built into `Mostlylucid.BotDetection.UI`, live monitoring via SignalR:
 
-- **Sessions Tab**: Session timeline with Markov chain previews, behavioral radar charts, transition bar visualization, HTMX drill-in to see request chains without storing individual requests
-- **Overview**: Total/bot/human request counts, bot rate, unique signatures, top bots
-- **World Map**: Countries colored by bot rate with markers sized by traffic volume
-- **Countries Tab**: Country-level bot rates, reputation scores, request volumes
-- **Clusters Tab**: Leiden-detected bot networks with similarity scores, dominant intent, and threat level per cluster
-- **User Agents Tab**: UA family breakdown with category badges, version distribution, country per UA
-- **Visitors Tab**: Live signature feed with risk bands, threat bands, sparkline histories, drill-down details
-- **Endpoints Tab**: Path-level aggregations with bot rates, sorting, detail drill-in
-- **Threat Scoring**: Independent threat bands (Low/Elevated/High/Critical) displayed alongside bot probability across all views
+- **Sessions Tab** — timeline with Markov chain previews, behavioral radar charts, transition bar visualization, HTMX drill-in
+- **Overview** — total/bot/human request counts, bot rate, unique signatures, top bots
+- **World Map** — countries colored by bot rate with markers sized by traffic volume
+- **Countries / Endpoints / User Agents / Clusters / Visitors** — drill-in views on each dimension
+- **Threat Scoring** — independent threat bands (Low/Elevated/High/Critical) alongside bot probability
 
 All data updates in real-time via SignalR. JSON API endpoints available for programmatic access (`/api/sessions`, `/api/detections`, `/api/clusters`, etc.).
 
@@ -143,96 +148,62 @@ builder.Services.AddStyloBotDashboard();
 app.UseStyloBotDashboard();  // Dashboard at /_stylobot/
 ```
 
-## Core Product Differentiators
+**OSS dashboard is read + static-YAML-config only.** Live runtime config editing — per-endpoint, per-user, per-API-key detector overrides — is a commercial feature gated on `stylobot.config-editor.live` (Startup+).
 
-- **Speed with intelligence**: <1ms fast path across 31 detectors with explainable evidence per decision
-- **Protocol-deep fingerprinting**: TLS, TCP/IP, HTTP/2, HTTP/3 fingerprints catch bots that spoof everything else
-- **Temporal behavior resolution**: cross-request, windowed signal correlation for stronger bot/human discrimination
-- **Adaptive learning**: Heuristic weights evolve based on detection outcomes - gets smarter over time
-- **Powered by `mostlylucid.ephemeral`**: efficient ephemeral state and coordinator patterns that enable across-time analysis without heavy per-request latency
-- **Operator-first control**: composable action policies - you decide how to respond (block, throttle, challenge, honeypot, log)
+## Product differentiators
 
-## Common Dev Commands
+- **Self-hosted at every tier.** Even the $499/mo SME tier runs in the customer's VPC. Your traffic data never leaves your perimeter.
+- **<1ms fast path** with explainable evidence per decision — detector contributions, confidence deltas, reason strings, optional response headers
+- **Protocol-deep fingerprinting** — TLS/TCP/IP/HTTP/2/HTTP/3 fingerprints catch bots that spoof everything else
+- **Temporal behavior resolution** — cross-request, session-vector correlation for stronger bot/human discrimination
+- **Adaptive learning** — Heuristic weights evolve based on detection outcomes
+- **Multi-YARP pipeline coordination** — signed decisions + input-hash-per-detector dedup across edge/regional/app-side YARPs. Detection runs once per unique-input-set; later hops contribute new signals earlier hops couldn't see. See [`stylobot-commercial/docs/pipeline-coordination-spec.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/pipeline-coordination-spec.md).
+- **Operator-first control** — composable action policies (block, throttle, challenge, honeypot, logonly), chain-aware monotone-escalating policy cascade
+- **Powered by `mostlylucid.ephemeral` + `StyloFlow`** — efficient ephemeral state, signal coordination, licensing/metering without heavy per-request latency
+
+## Common dev commands
 
 ```bash
-# Build all projects
 dotnet build mostlylucid.stylobot.sln
-
-# Run the demo app
 dotnet run --project Mostlylucid.BotDetection.Demo
-
-# Run the gateway app
 dotnet run --project Stylobot.Gateway
-
-# Run tests
 dotnet test mostlylucid.stylobot.sln
 ```
 
-## Docker Compose Stacks
+## Docker Compose stacks
 
-- `docker-compose.demo.yml`: full stack (Caddy + gateway + website + DB + extras)
-- `mostlylucid.stylobot.website/docker-compose.local.yml`: production-like stack with Cloudflare tunnel
-
-Start minimal compose stack:
+- `docker-compose.demo.yml` — full stack (Caddy + gateway + website + DB)
+- `mostlylucid.stylobot.website/docker-compose.local.yml` — production-like stack with Cloudflare tunnel
+- `mostlylucid.stylobot.website/docker-compose.dev.yml` — dev stack incl. Keycloak + portal-db for the customer-portal auth flow
 
 ```bash
 cp .env.example .env
-# set POSTGRES_PASSWORD in .env
 docker compose up -d
 ```
 
-## Documentation Map
+## Documentation
 
-Start here for canonical docs:
-
-- [`docs/README.md`](docs/README.md) (entry index)
-- [`QUICKSTART.md`](QUICKSTART.md) (hands-on local runbook)
-- [`DOCKER_SETUP.md`](DOCKER_SETUP.md) (compose and deployment workflows)
+Start here:
+- [`docs/README.md`](docs/README.md) — entry index
+- [`QUICKSTART.md`](QUICKSTART.md) — hands-on local runbook
+- [`DOCKER_SETUP.md`](DOCKER_SETUP.md) — compose and deployment workflows
 
 Library and component docs:
-
 - [`Mostlylucid.BotDetection/README.md`](Mostlylucid.BotDetection/README.md)
-- [`Mostlylucid.BotDetection/docs/`](Mostlylucid.BotDetection/docs/)
+- [`Mostlylucid.BotDetection/docs/`](Mostlylucid.BotDetection/docs/) — 20+ detector-specific docs
 - [`Stylobot.Gateway/README.md`](Stylobot.Gateway/README.md)
 - [`Mostlylucid.BotDetection.UI/README.md`](Mostlylucid.BotDetection.UI/README.md)
 - [`Mostlylucid.BotDetection.UI.PostgreSQL/README.md`](Mostlylucid.BotDetection.UI.PostgreSQL/README.md)
-- [`Mostlylucid.BotDetection/docs/detection-strategies.md`](Mostlylucid.BotDetection/docs/detection-strategies.md)
-- [`Mostlylucid.BotDetection/docs/action-policies.md`](Mostlylucid.BotDetection/docs/action-policies.md)
 
-Detector docs (31 detectors):
-
-- [`user-agent-detection.md`](Mostlylucid.BotDetection/docs/user-agent-detection.md) - UA parsing, bot pattern matching
-- [`header-detection.md`](Mostlylucid.BotDetection/docs/header-detection.md) - HTTP header anomalies
-- [`ip-detection.md`](Mostlylucid.BotDetection/docs/ip-detection.md) - Datacenter, botnet, proxy IP ranges
-- [`behavioral-analysis.md`](Mostlylucid.BotDetection/docs/behavioral-analysis.md) - Request pattern analysis
-- [`advanced-behavioral-detection.md`](Mostlylucid.BotDetection/docs/advanced-behavioral-detection.md) - Entropy, Markov chains, anomaly detection
-- [`behavioral-waveform.md`](Mostlylucid.BotDetection/docs/behavioral-waveform.md) - FFT spectral timing fingerprinting
-- [`client-side-fingerprinting.md`](Mostlylucid.BotDetection/docs/client-side-fingerprinting.md) - Headless browser detection via JS
-- [`version-age-detection.md`](Mostlylucid.BotDetection/docs/version-age-detection.md) - Browser/OS version freshness
-- [`security-tools-detection.md`](Mostlylucid.BotDetection/docs/security-tools-detection.md) - Burp, Metasploit, sqlmap, etc.
-- [`cache-behavior-detection.md`](Mostlylucid.BotDetection/docs/cache-behavior-detection.md) - ETag, gzip, cache header analysis
-- [`response-behavior.md`](Mostlylucid.BotDetection/docs/response-behavior.md) - Honeypot and response-side patterns
-- [`ai-detection.md`](Mostlylucid.BotDetection/docs/ai-detection.md) - Heuristic model + LLM escalation
-- [`ai-scraper-detection.md`](Mostlylucid.BotDetection/docs/ai-scraper-detection.md) - GPTBot, ClaudeBot, PerplexityBot
-- [`cluster-detection.md`](Mostlylucid.BotDetection/docs/cluster-detection.md) - Leiden clustering for bot networks
-- [`AdvancedFingerprintingDetectors.md`](Mostlylucid.BotDetection/docs/AdvancedFingerprintingDetectors.md) - TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI)
-- [`http3-fingerprinting.md`](Mostlylucid.BotDetection/docs/http3-fingerprinting.md) - QUIC transport fingerprinting
-- [`multi-layer-correlation.md`](Mostlylucid.BotDetection/docs/multi-layer-correlation.md) - Cross-layer consistency
-- [`transport-protocol-detection.md`](Mostlylucid.BotDetection/docs/transport-protocol-detection.md) - WebSocket, gRPC, GraphQL, SSE protocol validation
-- [`stream-transport-detection.md`](Mostlylucid.BotDetection/docs/stream-transport-detection.md) - Stream-aware detection, SignalR classification, stream abuse
-- [`dashboard-threat-scoring.md`](Mostlylucid.BotDetection/docs/dashboard-threat-scoring.md) - Intent/threat scoring dashboard integration, data flow, API endpoints
-- [`learning-and-reputation.md`](Mostlylucid.BotDetection/docs/learning-and-reputation.md) - Adaptive learning system
-- [`timescale-reputation.md`](Mostlylucid.BotDetection/docs/timescale-reputation.md) - TimescaleDB reputation tracking
-- [`training-data-api.md`](Mostlylucid.BotDetection/docs/training-data-api.md) - ML training data export
+Architecture:
+- [`detector-weights-audit.md`](Mostlylucid.BotDetection/docs/detector-weights-audit.md) — baseline weight/confidence snapshot for every detector
+- [`stylobot-commercial/docs/cluster-architecture.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/cluster-architecture.md) — multi-gateway topology, state taxonomy, failure modes
+- [`stylobot-commercial/docs/pipeline-coordination-spec.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/pipeline-coordination-spec.md) — multi-YARP distributed-blackboard model
+- [`stylobot-commercial/docs/licensing-tiers.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/licensing-tiers.md) — tier structure, feature gating, competitive landscape
 
 Release notes:
-
-- [`CHANGELOG.md`](CHANGELOG.md) - Version history and release notes
-
-## Notes on Existing Docs
-
-This repo has many historical architecture/experiment docs. Prefer the files listed above when you need current setup and operational behavior.
+- [`CHANGELOG.md`](CHANGELOG.md)
 
 ## License
 
-[The Unlicense](https://unlicense.org/)
+[The Unlicense](https://unlicense.org/) — FOSS core. Commercial tiers licensed separately via the customer portal.
