@@ -202,6 +202,18 @@ public class StyloBotDashboardMiddleware
                 await ServeMeApiAsync(context);
                 break;
 
+            case "api/labels":
+                await ServeLabelsListApiAsync(context);
+                break;
+
+            case "api/labels/counts":
+                await ServeLabelsCountsApiAsync(context);
+                break;
+
+            case var p when p.StartsWith("api/labels/", StringComparison.OrdinalIgnoreCase):
+                await ServeSignatureLabelApiAsync(context, relativePath["api/labels/".Length..]);
+                break;
+
             case "api/sessions":
             case "api/sessions/recent":
                 await ServeSessionsApiAsync(context);
@@ -487,6 +499,168 @@ public class StyloBotDashboardMiddleware
         var json = BuildYourDetectionJson(context);
         await context.Response.WriteAsync(json);
     }
+
+    /// <summary>
+    ///     <c>POST /api/labels/{signature}</c> upserts a label. Body JSON:
+    ///     <c>{ "kind": "bot|human|benign-bot|uncertain", "confidence"?: 0..1, "note"?: string }</c>.
+    ///     <c>GET /api/labels/{signature}</c> returns the most recent label for that signature, or 404.
+    ///     <c>DELETE /api/labels/{signature}</c> removes the caller's label.
+    /// </summary>
+    private async Task ServeSignatureLabelApiAsync(HttpContext context, string signature)
+    {
+        var labelStore = context.RequestServices.GetService(typeof(ISignatureLabelStore)) as ISignatureLabelStore;
+        if (labelStore is null)
+        {
+            context.Response.StatusCode = 501;
+            await context.Response.WriteAsync("ISignatureLabelStore not registered");
+            return;
+        }
+
+        signature = Uri.UnescapeDataString(signature).Trim();
+        if (string.IsNullOrWhiteSpace(signature))
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("signature is required");
+            return;
+        }
+
+        context.Response.ContentType = "application/json";
+
+        if (HttpMethods.IsGet(context.Request.Method))
+        {
+            var existing = await labelStore.GetLatestAsync(signature, context.RequestAborted);
+            if (existing is null) { context.Response.StatusCode = 404; return; }
+            await JsonSerializer.SerializeAsync(context.Response.Body, existing, CamelCaseJson);
+            return;
+        }
+
+        if (HttpMethods.IsDelete(context.Request.Method))
+        {
+            var labeler = ResolveLabeler(context);
+            await labelStore.RemoveAsync(signature, labeler, context.RequestAborted);
+            context.Response.StatusCode = 204;
+            return;
+        }
+
+        if (!HttpMethods.IsPost(context.Request.Method))
+        {
+            context.Response.StatusCode = 405;
+            return;
+        }
+
+        LabelPayload? payload;
+        try
+        {
+            payload = await JsonSerializer.DeserializeAsync<LabelPayload>(
+                context.Request.Body, CamelCaseJson, context.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("malformed JSON body");
+            return;
+        }
+
+        if (payload is null || !TryParseLabelKind(payload.Kind, out var kind))
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("kind must be one of: bot, human, benign-bot, uncertain");
+            return;
+        }
+
+        var label = new SignatureLabel
+        {
+            Signature = signature,
+            Kind = kind,
+            Confidence = Math.Clamp(payload.Confidence ?? 1.0, 0.0, 1.0),
+            LabeledBy = ResolveLabeler(context),
+            LabeledAt = DateTime.UtcNow,
+            Note = string.IsNullOrWhiteSpace(payload.Note) ? null : payload.Note.Trim()
+        };
+
+        var saved = await labelStore.UpsertAsync(label, context.RequestAborted);
+        _logger.LogInformation(
+            "Signature labeled: {Sig} → {Kind} by {Labeler}",
+            signature[..Math.Min(12, signature.Length)], kind, label.LabeledBy);
+
+        await JsonSerializer.SerializeAsync(context.Response.Body, saved, CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     <c>GET /api/labels?since=…&amp;limit=…</c> — bulk export for offline weight-tuning.
+    ///     Output is the raw <see cref="SignatureLabel"/> list; pair with <c>/api/signatures</c>
+    ///     to get each signature's detection context.
+    /// </summary>
+    private async Task ServeLabelsListApiAsync(HttpContext context)
+    {
+        var labelStore = context.RequestServices.GetService(typeof(ISignatureLabelStore)) as ISignatureLabelStore;
+        if (labelStore is null) { context.Response.StatusCode = 501; return; }
+
+        DateTime? since = null;
+        var sinceStr = context.Request.Query["since"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(sinceStr) && DateTime.TryParse(sinceStr, out var s))
+            since = s.ToUniversalTime();
+
+        var limit = int.TryParse(context.Request.Query["limit"].FirstOrDefault(), out var l)
+            ? Math.Clamp(l, 1, 10_000)
+            : 1000;
+
+        var labels = await labelStore.ListSinceAsync(since, limit, context.RequestAborted);
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, labels, CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     <c>GET /api/labels/counts</c> — count per label kind for the dashboard badge.
+    /// </summary>
+    private async Task ServeLabelsCountsApiAsync(HttpContext context)
+    {
+        var labelStore = context.RequestServices.GetService(typeof(ISignatureLabelStore)) as ISignatureLabelStore;
+        if (labelStore is null) { context.Response.StatusCode = 501; return; }
+
+        var counts = await labelStore.GetCountsAsync(context.RequestAborted);
+        context.Response.ContentType = "application/json";
+        // Serialise with enum names rather than integers for readability.
+        var payload = counts.ToDictionary(k => k.Key.ToString(), v => v.Value);
+        await JsonSerializer.SerializeAsync(context.Response.Body, payload, CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     Resolve the labeler identity from request context. Falls back to "anonymous" when
+    ///     no auth is configured — operators running on a private dashboard with no OIDC
+    ///     still get useful single-operator corpora.
+    /// </summary>
+    private static string ResolveLabeler(HttpContext context)
+    {
+        if (context.User?.Identity?.IsAuthenticated == true)
+        {
+            var name = context.User.FindFirst("email")?.Value
+                       ?? context.User.FindFirst("preferred_username")?.Value
+                       ?? context.User.Identity.Name;
+            if (!string.IsNullOrEmpty(name)) return name;
+        }
+        // Header override lets dev tooling attribute labels without a full auth setup.
+        var hdr = context.Request.Headers["X-SB-Labeler"].FirstOrDefault();
+        return !string.IsNullOrWhiteSpace(hdr) ? hdr.Trim() : "anonymous";
+    }
+
+    private static bool TryParseLabelKind(string? raw, out SignatureLabelKind kind)
+    {
+        kind = SignatureLabelKind.Uncertain;
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        switch (raw.Trim().ToLowerInvariant())
+        {
+            case "bot":         kind = SignatureLabelKind.Bot; return true;
+            case "human":       kind = SignatureLabelKind.Human; return true;
+            case "benign-bot":
+            case "benignbot":
+            case "good-bot":    kind = SignatureLabelKind.BenignBot; return true;
+            case "uncertain":   kind = SignatureLabelKind.Uncertain; return true;
+            default: return false;
+        }
+    }
+
+    private sealed record LabelPayload(string? Kind, double? Confidence, string? Note);
 
     private async Task ServeDetectionsApiAsync(HttpContext context)
     {

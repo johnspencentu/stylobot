@@ -81,6 +81,10 @@ public static class StyloBotDashboardServiceExtensions
         // Event store for in-memory history
         services.AddSingleton<IDashboardEventStore, InMemoryDashboardEventStore>();
 
+        // Operator-supplied signature labels (for detector weighting / ground truth).
+        // In-memory by default; production hosts can register SQLite / PostgreSQL impls.
+        services.TryAddSingleton<ISignatureLabelStore, InMemorySignatureLabelStore>();
+
         // Aggregate cache - populated by beacon, read by API endpoints
         services.AddSingleton<DashboardAggregateCache>();
 
@@ -209,6 +213,10 @@ public static class StyloBotDashboardServiceExtensions
 
         // Event store (in-memory by default, replaced by PostgreSQL when configured)
         services.TryAddSingleton<IDashboardEventStore, InMemoryDashboardEventStore>();
+
+        // Operator-supplied signature labels for detector weighting / ground truth
+        // (in-memory by default; production wires a SQLite or PostgreSQL implementation).
+        services.TryAddSingleton<ISignatureLabelStore, InMemorySignatureLabelStore>();
 
         // Aggregate cache - populated by beacon, read by API endpoints
         services.TryAddSingleton<DashboardAggregateCache>();
