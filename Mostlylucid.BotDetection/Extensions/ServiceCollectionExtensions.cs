@@ -308,6 +308,17 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Orchestration.Telemetry.IDetectionEventPublisher,
             Orchestration.Telemetry.NullDetectionEventPublisher>();
 
+        // FOSS hot-reload: watch {ContentRoot}/stylobot-config for YAML/JSON edits and
+        // invalidate the DetectorConfigProvider cache on change. Hosted service starts
+        // the watcher; registered as IConfigurationOverrideSource so ConfigurationWatcher
+        // subscribes to its change stream. Creates the directory (with a README) on first
+        // start — no effect if the operator deletes it later.
+        services.TryAddSingleton<Orchestration.Manifests.FileSystemConfigurationOverrideSource>();
+        services.AddSingleton<Orchestration.Manifests.IConfigurationOverrideSource>(sp =>
+            sp.GetRequiredService<Orchestration.Manifests.FileSystemConfigurationOverrideSource>());
+        services.AddHostedService(sp =>
+            sp.GetRequiredService<Orchestration.Manifests.FileSystemConfigurationOverrideSource>());
+
         // Register individual detectors
         // Each detector is responsible for one detection strategy
         // Register as both interface and concrete type for DI flexibility
