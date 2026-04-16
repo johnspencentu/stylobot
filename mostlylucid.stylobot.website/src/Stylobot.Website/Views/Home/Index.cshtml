@@ -145,46 +145,54 @@
                     <img src="/img/stylowall.svg" alt="stylo bot mark" class="logo-adaptive" />
                     <span class="brand-chip-label"><span class="stylo-text brand-italic">stylo</span><span class="bot-text">bot</span></span>
                 </a>
-                <p class="text-xs uppercase tracking-widest text-base-content/60 brand-wordmark-sub">Open source, production-ready bot defense</p>
+                <p class="text-xs uppercase tracking-widest text-base-content/60 brand-wordmark-sub">Self-hosted bot defense — OSS + commercial</p>
                 <h1 class="text-3xl lg:text-5xl font-extrabold leading-tight text-base-content">
-                    Stop bot abuse with <span class="hero-accent-text">explainable decisions</span>.
+                    Stop credential stuffing, API abuse, and scraping — <span class="hero-accent-text">before they cost you</span>.
                 </h1>
                 <p class="text-base lg:text-lg text-base-content/80 max-w-xl">
-                    StyloBot scores every request with detector-level evidence so your team can block, challenge, throttle, or allow traffic with confidence.
+                    Self-hosted bot defense with audit-grade decision evidence on every request.
+                    Runs in your VPC, in your Kubernetes cluster, or as an embedded YARP gateway.
+                    Your traffic never leaves your perimeter.
                 </p>
                 <div class="grid grid-cols-3 gap-3 max-w-xl">
                     <div class="marketing-card p-3">
+                        <div class="text-xs text-base-content/60">ATO breach cost</div>
+                        <div class="text-sm font-semibold hero-accent-text">$4.88M avg</div>
+                        <div class="text-[10px] text-base-content/50 mt-1">IBM 2024</div>
+                    </div>
+                    <div class="marketing-card p-3">
+                        <div class="text-xs text-base-content/60">Of internet traffic</div>
+                        <div class="text-sm font-semibold hero-zero-pii">~42% bots</div>
+                        <div class="text-[10px] text-base-content/50 mt-1">Imperva 2024</div>
+                    </div>
+                    <div class="marketing-card p-3">
                         <div class="text-xs text-base-content/60">Detection latency</div>
-                        <div class="text-sm font-semibold hero-accent-text">&lt;1ms fast path</div>
-                    </div>
-                    <div class="marketing-card p-3">
-                        <div class="text-xs text-base-content/60">Privacy posture</div>
-                        <div class="text-sm font-semibold hero-zero-pii">Zero PII stored</div>
-                    </div>
-                    <div class="marketing-card p-3">
-                        <div class="text-xs text-base-content/60">Licence</div>
-                        <div class="text-sm font-semibold text-base-content">Core OSS Forever</div>
+                        <div class="text-sm font-semibold text-base-content">&lt;1ms fast path</div>
+                        <div class="text-[10px] text-base-content/50 mt-1">p99 at ~100k RPS</div>
                     </div>
                 </div>
                 <div class="space-y-2 text-sm max-w-xl">
-                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span>Layered signals: browser, network, behavioral, fingerprinting, and optional AI escalation.</span></div>
-                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span>Transparent outputs: probability, confidence, risk band, detector contributions, and narrative reasons.</span></div>
-                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span>No lock-in: open source core, self-hosted options, and enterprise controls when you need them.</span></div>
+                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>31 detectors across 4 waves:</strong> protocol, behavioral, fingerprinting, AI escalation. Every hit is explainable — contributing detectors, confidence deltas, reasons.</span></div>
+                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>Session-level behavioral vectors:</strong> 118-dim Markov chains catch attack tooling even when IPs, UAs, and TLS fingerprints rotate.</span></div>
+                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>Fail2ban-style escalation</strong> with automatic decay. Throttle, challenge, block, honeypot — configurable per-endpoint via the control plane.</span></div>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3 items-start">
-                    <a href="/Home/LiveDemo" class="btn gap-2 px-6 btn-live-demo">
+                    <a href="/pricing" class="btn btn-primary gap-2 px-6">
+                        See pricing &amp; start a trial
+                    </a>
+                    <a href="/threats" class="btn gap-2 px-6 btn-outline">
+                        Threats we stop
+                    </a>
+                    <a href="/Home/LiveDemo" class="btn gap-2 px-6 btn-ghost btn-live-demo">
                         <span class="relative flex h-2 w-2">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 live-dot"></span>
                             <span class="relative inline-flex rounded-full h-2 w-2 live-dot"></span>
                         </span>
-                        See Live Detection
-                    </a>
-                    <a href="/docs" class="btn btn-primary gap-2 px-6">
-                        Explore Docs
+                        Live detection
                     </a>
                 </div>
                 <p class="text-xs text-base-content/50">
-                    <span class="hero-zero-pii">Open source and free (at present)</span> with full policy control from day one.
+                    <span class="hero-zero-pii">OSS core free forever</span> · Startup from $149/mo · 30-day SME trial · No credit card
                 </p>
             </div>
 

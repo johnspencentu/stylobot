@@ -81,6 +81,24 @@ public class HomeController : Controller
         return View();
     }
 
+    public IActionResult Threats()
+    {
+        ViewData["SeoMetadata"] = _seoService.GetDefaultMetadata();
+        return View();
+    }
+
+    public IActionResult Trust()
+    {
+        ViewData["SeoMetadata"] = _seoService.GetDefaultMetadata();
+        return View();
+    }
+
+    public IActionResult Pricing()
+    {
+        ViewData["SeoMetadata"] = _seoService.GetDefaultMetadata();
+        return View();
+    }
+
     public IActionResult LiveDemo()
     {
         return RedirectPermanent("/Dashboard");

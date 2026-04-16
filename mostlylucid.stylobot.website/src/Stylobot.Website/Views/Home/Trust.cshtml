@@ -1,0 +1,124 @@
+@{
+    ViewData["Title"] = "Trust, security &amp; compliance — StyloBot";
+}
+
+<section class="px-6 py-16">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-xs uppercase tracking-widest text-base-content/60">Trust &amp; security</div>
+    <h1 class="text-4xl sm:text-5xl font-semibold mt-2 leading-tight">
+      A security product has to be secure, first.
+    </h1>
+    <p class="mt-4 text-lg text-base-content/80">
+      StyloBot is self-hosted by default. Your traffic, your signatures, and your detection
+      decisions stay in your infrastructure. We don't proxy your requests, we don't sink your
+      logs, and we don't train on your data. This page documents exactly how.
+    </p>
+  </div>
+</section>
+
+<section class="px-6 py-10 bg-base-200">
+  <div class="max-w-4xl mx-auto space-y-10">
+    <div>
+      <h2 class="text-2xl font-semibold">Data residency</h2>
+      <p class="text-base-content/80 mt-3">
+        StyloBot runs entirely inside your environment — Docker, Kubernetes, bare metal, or the
+        YARP reverse-proxy gateway embedded in your ASP.NET Core app. No request payloads, user
+        agents, IPs, or detection decisions are sent to stylobot.net. The only data that ever
+        reaches us is billing / licensing metadata when you interact with the customer portal.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Zero-PII architecture</h2>
+      <p class="text-base-content/80 mt-3">
+        Raw IPs and user agents live only in request-scoped memory, never on durable storage.
+        Signatures used for cross-request tracking are HMAC-SHA256 hashes with a per-deployment
+        key — reversible only by the customer. The blackboard that detectors write to carries
+        categorical signals (<code>request.ip.is_datacenter</code>,
+        <code>detection.useragent.confidence</code>) not raw values.
+      </p>
+      <p class="text-sm text-base-content/60 mt-3">
+        See <code>Mostlylucid.BotDetection/docs/blackboard-and-pii.md</code> in the OSS repo
+        for the full signal catalogue.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Explainable decisions &amp; audit trail</h2>
+      <p class="text-base-content/80 mt-3">
+        Every detection includes the contributing detectors, their confidence deltas, and the
+        reason strings — both in the <code>X-BotDetection-Reasons</code> response headers (if
+        enabled) and in the dashboard event store. On the commercial tier, operators can
+        configure per-endpoint overrides and the change history is append-only.
+      </p>
+      <p class="text-base-content/80 mt-3">
+        On the customer portal, license issuance, team changes, and token downloads all land in
+        an immutable <code>license_audits</code> table. Exportable as CSV for SOC 2 evidence.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Encryption</h2>
+      <p class="text-base-content/80 mt-3">
+        TLS 1.2+ everywhere — customer portal terminates at Caddy with automatic Let's Encrypt
+        certificates. Portal database uses Postgres native TLS. License tokens are Ed25519-signed;
+        the vendor private key lives in a secrets vault (HashiCorp Vault / AWS KMS / Azure Key
+        Vault) and is never exposed to application memory beyond the signing call.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Authentication</h2>
+      <p class="text-base-content/80 mt-3">
+        The customer portal authenticates via Keycloak 26, with MFA (TOTP) available and
+        optionally required. External identity providers (Google, Microsoft, GitHub) plug in
+        at the realm level. For the self-hosted product, OSS ships ASP.NET Core Identity
+        (local accounts + MFA); commercial tiers unlock OIDC relying-party configuration
+        so you bring your own IdP — Keycloak, Azure AD, Okta, Auth0, Google Workspace.
+        Enterprise adds SAML 2.0 + SCIM.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Compliance posture</h2>
+      <ul class="list-disc ml-6 mt-3 space-y-2 text-base-content/80">
+        <li><strong>GDPR:</strong> zero-PII by design means no DSR workflow needed for the
+            detection pipeline itself. Portal customer data (email, org name) is covered by
+            standard DPA.</li>
+        <li><strong>SOC 2 Type II:</strong> in progress — audit log, change management, and
+            access control infrastructure in place; auditor engagement scheduled.</li>
+        <li><strong>Data processing agreements:</strong> on request for commercial customers.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Responsible disclosure</h2>
+      <p class="text-base-content/80 mt-3">
+        Report security issues to <a class="link" href="mailto:security@stylobot.net">security@stylobot.net</a>
+        with your PGP-encrypted report. We acknowledge within 48 hours, ship a fix or workaround
+        within 14 days for critical issues, and credit reporters in the release notes unless
+        asked otherwise. No lawyers, no NDAs required for good-faith research.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-2xl font-semibold">Incident history</h2>
+      <p class="text-base-content/80 mt-3">
+        None reported. We'll publish post-mortems publicly when they happen — every security
+        product has incidents eventually, and honest disclosure is part of how we earn the
+        trust we're asking for.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="px-6 py-16">
+  <div class="max-w-3xl mx-auto text-center">
+    <h2 class="text-3xl font-semibold">Questions?</h2>
+    <p class="mt-4 text-base-content/80">
+      Security reviews, DPA requests, pen-test results, and SOC 2 progress updates:
+      <a class="link" href="mailto:security@stylobot.net">security@stylobot.net</a>. For sales
+      or general inquiries, the <a class="link" href="/contact">contact form</a> is fine.
+    </p>
+  </div>
+</section>
