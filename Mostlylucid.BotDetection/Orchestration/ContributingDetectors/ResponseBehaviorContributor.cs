@@ -107,6 +107,17 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
     private double Exclusive404Confidence => GetParam("exclusive_404_confidence", 0.75);
     private double Exclusive404Weight => GetParam("exclusive_404_weight", 2.0);
 
+    // Fail2ban-style escalating action policies based on persistent 404 abuse.
+    // Each threshold triggers a progressively harsher action policy override.
+    // Policy names must match registered action policies (ActionPolicyRegistry).
+    private bool Fail2BanEnabled => GetParam("fail2ban_enabled", true);
+    private int Fail2BanThrottleThreshold => GetParam("fail2ban_throttle_threshold", 5);
+    private int Fail2BanBlockThreshold => GetParam("fail2ban_block_threshold", 15);
+    private int Fail2BanHardBlockThreshold => GetParam("fail2ban_hard_block_threshold", 50);
+    private string Fail2BanThrottlePolicy => GetParam("fail2ban_throttle_policy", "throttle-stealth");
+    private string Fail2BanBlockPolicy => GetParam("fail2ban_block_policy", "block");
+    private string Fail2BanHardBlockPolicy => GetParam("fail2ban_hard_block_policy", "block-hard");
+
     public override async Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
         BlackboardState state,
         CancellationToken cancellationToken = default)
@@ -258,7 +269,10 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
     }
 
     /// <summary>
-    ///     Analyze 404 scanning patterns - systematic probing for vulnerabilities
+    ///     Analyze 404 scanning patterns - systematic probing for vulnerabilities.
+    ///     Also applies fail2ban-style escalating action policies based on 404 count:
+    ///     the ResponseCoordinator's sliding window (10 min default) provides automatic
+    ///     decay — if the client stops scanning, the count drops and escalation relaxes.
     /// </summary>
     private void AnalyzeScanPatterns(
         BlackboardState state,
@@ -269,6 +283,43 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
             new(SignalKeys.ResponseCount404, behavior.Count404),
             new(SignalKeys.ResponseUnique404Paths, behavior.UniqueNotFoundPaths)
         ]);
+
+        // Fail2ban-style escalation: apply progressively harsher action policies as
+        // 404 count grows within the sliding window. The window gives automatic
+        // decay — offenders who stop get their ban downgraded/removed as old 404s
+        // age out. Only escalate when we have real scanning evidence (multiple
+        // unique paths), not a single stale bookmark.
+        if (Fail2BanEnabled && behavior.UniqueNotFoundPaths >= 2)
+        {
+            string? policy = null;
+            string reason = "";
+            if (behavior.Count404 >= Fail2BanHardBlockThreshold)
+            {
+                policy = Fail2BanHardBlockPolicy;
+                reason = $"Persistent scanning: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths — hard block";
+            }
+            else if (behavior.Count404 >= Fail2BanBlockThreshold)
+            {
+                policy = Fail2BanBlockPolicy;
+                reason = $"Active scanning: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths — block";
+            }
+            else if (behavior.Count404 >= Fail2BanThrottleThreshold)
+            {
+                policy = Fail2BanThrottlePolicy;
+                reason = $"Repeat 404s: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths — throttle";
+            }
+
+            if (policy != null)
+            {
+                state.WriteSignals([
+                    new(SignalKeys.ActionPolicyTrigger, policy),
+                    new(SignalKeys.ActionPolicyTriggerReason, reason),
+                    new(SignalKeys.ActionPolicyEscalationCount, behavior.Count404)
+                ]);
+                _logger.LogInformation(
+                    "Fail2ban escalation: {Count}x 404 → {Policy}", behavior.Count404, policy);
+            }
+        }
 
         // EXCLUSIVE 404: ALL (or nearly all) responses are 404 - never legitimate.
         // Catches single-path hammering that existing multi-path tiers miss.

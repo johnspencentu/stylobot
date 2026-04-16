@@ -921,6 +921,20 @@ public static class SignalKeys
     public const string StreamAbuseChecked = "stream.abuse_checked";
 
     // ==========================================
+    // Action policy escalation signals (fail2ban-style)
+    // Set by contributors to override policy evaluator and trigger action policies directly
+    // ==========================================
+
+    /// <summary>String: action policy name to trigger (e.g., "block-hard", "throttle-stealth")</summary>
+    public const string ActionPolicyTrigger = "action.trigger_policy";
+
+    /// <summary>String: human-readable reason for the triggered policy</summary>
+    public const string ActionPolicyTriggerReason = "action.trigger_reason";
+
+    /// <summary>Int: offense count that triggered the escalation</summary>
+    public const string ActionPolicyEscalationCount = "action.escalation_count";
+
+    // ==========================================
     // Session vector signals
     // Set by SessionVectorContributor for Markov-chain-based session analysis
     // ==========================================

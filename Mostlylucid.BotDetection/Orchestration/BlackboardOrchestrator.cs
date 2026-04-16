@@ -586,6 +586,22 @@ public class BlackboardOrchestrator
                                (finalAction.Value == PolicyAction.Allow || finalAction.Value == PolicyAction.Block) &&
                                result.ContributingDetectors.Count < availableDetectors.Count;
 
+            // Check for contributor-triggered action policy (fail2ban-style escalation).
+            // A contributor can write ActionPolicyTrigger signal to override the policy
+            // evaluator's decision. Policy evaluator decisions take precedence; this is
+            // a fallback when the evaluator didn't trigger a policy.
+            if (string.IsNullOrEmpty(triggeredActionPolicyName) &&
+                signals.TryGetValue(SignalKeys.ActionPolicyTrigger, out var trigPolicy) &&
+                trigPolicy is string trigPolicyName && !string.IsNullOrEmpty(trigPolicyName))
+            {
+                triggeredActionPolicyName = trigPolicyName;
+                var trigReason = signals.TryGetValue(SignalKeys.ActionPolicyTriggerReason, out var r)
+                    ? r?.ToString() : "contributor-triggered";
+                _logger.LogInformation(
+                    "Contributor-triggered action policy {Policy} for {RequestId}: {Reason}",
+                    trigPolicyName, requestId, trigReason);
+            }
+
             if (finalAction.HasValue || !string.IsNullOrEmpty(triggeredActionPolicyName))
                 result = result with
                 {
