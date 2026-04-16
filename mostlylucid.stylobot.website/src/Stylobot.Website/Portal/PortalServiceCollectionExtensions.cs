@@ -111,7 +111,11 @@ public static class PortalServiceCollectionExtensions
                             ctx.HttpContext.RequestAborted);
                     }
                 };
-            });
+            })
+            // Programmatic API: Authorization: Bearer sbk_xxx — only accepted for /api/v1/*
+            // endpoints that explicitly opt in via [Authorize(AuthenticationSchemes = ...)].
+            .AddScheme<ApiTokenOptions, ApiTokenAuthenticationHandler>(
+                ApiTokenAuthenticationHandler.SchemeName, _ => { });
 
         services.AddScoped<PortalProvisioningService>();
 

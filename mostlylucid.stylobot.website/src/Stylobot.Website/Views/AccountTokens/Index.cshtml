@@ -1,0 +1,117 @@
+@using Stylobot.Website.Portal.Licensing
+@model Stylobot.Website.Portal.TokensIndexViewModel
+@{
+    ViewData["Title"] = "API tokens";
+    var error = TempData["TokenError"]?.ToString();
+}
+
+<section class="min-h-[70vh] px-6 py-16">
+  <div class="max-w-4xl mx-auto">
+    <a class="btn btn-ghost btn-sm mb-4" href="/portal">← Portal</a>
+    <h1 class="text-3xl font-semibold">Personal API tokens</h1>
+    <p class="text-base-content/70 mt-2">
+      Tokens let CI/CD pull the current license for any org you belong to. Hit
+      <code>GET /api/v1/orgs/{slug}/licenses/current</code> with
+      <code>Authorization: Bearer sbk_…</code>.
+    </p>
+
+    @if (error is not null) { <div class="alert alert-warning mt-6"><span>@error</span></div> }
+
+    @if (Model.JustCreatedPlaintext is not null)
+    {
+      <div class="alert alert-success mt-6">
+        <div>
+          <h3 class="font-bold">Token created: @Model.JustCreatedName</h3>
+          <p class="mt-2">
+            <strong>Copy this now — it won't be shown again.</strong>
+            We store only a hash, so we can't recover it for you.
+          </p>
+          <div class="mt-3 flex gap-2 items-center">
+            <input id="plaintext-token" class="input input-bordered font-mono text-xs w-full" readonly value="@Model.JustCreatedPlaintext" />
+            <button class="btn btn-primary btn-sm" type="button" onclick="copyPlaintext()">Copy</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="card bg-base-200 p-6 mt-6">
+      <h2 class="text-lg font-semibold mb-4">Create a token</h2>
+      <form method="post" asp-controller="AccountTokens" asp-action="Create" class="space-y-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text">Name</span></label>
+          <input name="name" required maxlength="128" class="input input-bordered" placeholder="prod CI, staging deploy, …" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">Scopes</span></label>
+          <div class="space-y-2">
+            @foreach (var (key, label, description) in ApiTokenScopes.All)
+            {
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" name="scopes" value="@key" class="checkbox checkbox-sm mt-1" checked="@(key == ApiTokenScopes.LicensesRead)" />
+                <span>
+                  <span class="font-medium">@label</span> <code class="text-xs">@key</code>
+                  <span class="block text-sm text-base-content/70">@description</span>
+                </span>
+              </label>
+            }
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">Generate token</button>
+      </form>
+    </div>
+
+    <h2 class="text-lg font-semibold mt-10 mb-3">Existing tokens</h2>
+    @if (!Model.Tokens.Any())
+    {
+      <div class="card bg-base-100 border border-base-300 p-5 text-base-content/60 text-sm">
+        No tokens yet.
+      </div>
+    }
+    else
+    {
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr><th>Name</th><th>Scopes</th><th>Created</th><th>Last used</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            @foreach (var t in Model.Tokens)
+            {
+              <tr class="@(t.IsActive ? "" : "opacity-50")">
+                <td class="font-medium">@t.Name</td>
+                <td>
+                  @foreach (var s in t.Scopes)
+                  {
+                    <span class="badge badge-outline badge-sm mr-1">@s</span>
+                  }
+                </td>
+                <td class="text-xs">@t.CreatedAt.ToString("yyyy-MM-dd")</td>
+                <td class="text-xs">@(t.LastUsedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                <td>
+                  @if (t.IsActive) { <span class="badge badge-success">Active</span> }
+                  else             { <span class="badge badge-error">Revoked</span> }
+                </td>
+                <td class="text-right">
+                  @if (t.IsActive)
+                  {
+                    <form method="post" asp-controller="AccountTokens" asp-action="Revoke" asp-route-id="@t.Id" class="inline">
+                      <button class="btn btn-ghost btn-xs text-error" type="submit" onclick="return confirm('Revoke this token? Any CI job using it will start failing.');">Revoke</button>
+                    </form>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>
+
+<script>
+function copyPlaintext() {
+  const el = document.getElementById('plaintext-token');
+  el.select();
+  navigator.clipboard.writeText(el.value).then(() => { el.blur(); });
+}
+</script>

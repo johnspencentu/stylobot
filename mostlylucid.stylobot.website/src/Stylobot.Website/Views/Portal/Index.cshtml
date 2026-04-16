@@ -11,9 +11,12 @@
         <h1 class="text-3xl font-semibold mt-1">Welcome, @(string.IsNullOrWhiteSpace(Model.DisplayName) ? Model.Email : Model.DisplayName)</h1>
         <div class="text-sm text-base-content/70 mt-1">@Model.Email</div>
       </div>
-      <form method="get" asp-controller="Account" asp-action="Logout">
-        <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
-      </form>
+      <div class="flex items-center gap-2">
+        <a class="btn btn-ghost btn-sm" href="/account/tokens">API tokens</a>
+        <form method="get" asp-controller="Account" asp-action="Logout">
+          <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
+        </form>
+      </div>
     </div>
 
     <h2 class="text-lg font-semibold mb-3">Your organizations</h2>
