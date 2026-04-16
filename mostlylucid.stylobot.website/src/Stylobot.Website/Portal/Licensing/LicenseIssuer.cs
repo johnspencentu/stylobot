@@ -31,7 +31,7 @@ public sealed class LicenseIssuer
     }
 
     /// <summary>
-    ///     Issue a 30-day SME trial license for the org. One-per-org — returns
+    ///     Issue a 30-day SME trial license for the org. One-per-org - returns
     ///     <see cref="IssueResult.AlreadyHasTrial"/> if the org ever had a trial before.
     /// </summary>
     public async Task<IssueResult> IssueTrialAsync(
@@ -42,7 +42,7 @@ public sealed class LicenseIssuer
         IReadOnlyList<string>? domains,
         CancellationToken ct)
     {
-        // One trial per org, ever — including revoked/expired ones.
+        // One trial per org, ever - including revoked/expired ones.
         var everHadTrial = await _db.Licenses
             .AnyAsync(l => l.OrganizationId == org.Id && l.IsTrial, ct);
 
@@ -71,7 +71,7 @@ public sealed class LicenseIssuer
         return IssueResult.Success(license);
     }
 
-    /// <summary>Common issuance path — signs, persists, audits.</summary>
+    /// <summary>Common issuance path - signs, persists, audits.</summary>
     public async Task<License> IssueAsync(
         Organization org,
         string tier,
@@ -163,7 +163,7 @@ public sealed class LicenseIssuer
     {
         var quotas = StyloBotLimits.ForTier(tier);
         // StyloFlow.Licensing.LicenseToken uses MaxNodes / MaxMoleculeSlots / MaxWorkUnitsPerMinute
-        // as its wire contract — those are StyloFlow's fields, not ours, and we have to fill them.
+        // as its wire contract - those are StyloFlow's fields, not ours, and we have to fill them.
         // Our tier model doesn't cap nodes or slots (capability-only; see docs/licensing-tiers.md),
         // so we send null/high values there. The one field that genuinely matters for us is
         // MaxWorkUnitsPerMinute → customer's burst-rate-limit ceiling for fair-use throttling.
@@ -171,7 +171,7 @@ public sealed class LicenseIssuer
             MaxNodes: null,                                              // no cap
             MaxMoleculeSlots: 1_000_000,                                 // functionally unlimited
             MaxWorkUnitsPerMinute: quotas.BurstWorkUnitsPerMinute == 0   // 0 in our model means
-                ? 1_000_000                                              // "no ceiling" — convert
+                ? 1_000_000                                              // "no ceiling" - convert
                 : quotas.BurstWorkUnitsPerMinute);                       // for StyloFlow
     }
 
@@ -205,7 +205,7 @@ public sealed class LicenseIssuer
     ///     Validate and normalize a domain list. Rejects:
     ///     - empty / whitespace entries
     ///     - cloud-pool hostnames as PRIMARY domains (azurewebsites.net, vercel.app, etc.);
-    ///       they'd cover thousands of unrelated customers. Fine as additional hosts — if
+    ///       they'd cover thousands of unrelated customers. Fine as additional hosts - if
     ///       all domains on a license are cloud-pool, reject; if at least one is a real
     ///       domain, allow the cloud-pool ones as staging hosts.
     ///     - obviously malformed hosts (no dot; reserved TLDs like .local)
@@ -232,14 +232,14 @@ public sealed class LicenseIssuer
             if (!LooksLikeDomain(host))
                 return (Array.Empty<string>(), $"\"{entry}\" isn't a valid domain.");
 
-            // Reserved dev-only TLDs shouldn't be licensed — they're covered implicitly.
+            // Reserved dev-only TLDs shouldn't be licensed - they're covered implicitly.
             if (host.EndsWith(".test", StringComparison.Ordinal) ||
                 host.EndsWith(".local", StringComparison.Ordinal) ||
                 host.EndsWith(".localhost", StringComparison.Ordinal) ||
                 host == "localhost")
             {
                 return (Array.Empty<string>(),
-                    $"\"{entry}\" is a development host — these are always allowed without licensing.");
+                    $"\"{entry}\" is a development host - these are always allowed without licensing.");
             }
 
             if (!Mostlylucid.BotDetection.Licensing.CloudPoolHosts.IsCloudPoolHost(host))
@@ -265,7 +265,7 @@ public sealed class LicenseIssuer
         if (string.IsNullOrWhiteSpace(host)) return false;
         if (host.Length is < 3 or > 253) return false;
         if (!host.Contains('.')) return false;
-        // Basic character set check — letters, digits, dots, hyphens.
+        // Basic character set check - letters, digits, dots, hyphens.
         foreach (var c in host)
             if (!(char.IsLetterOrDigit(c) || c is '.' or '-'))
                 return false;

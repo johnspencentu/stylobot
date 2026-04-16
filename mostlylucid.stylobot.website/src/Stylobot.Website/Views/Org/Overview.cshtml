@@ -1,7 +1,7 @@
 @using Stylobot.Commercial.Abstractions
 @model Stylobot.Website.Portal.OrgOverviewViewModel
 @{
-    ViewData["Title"] = $"{Model.Org.Name} — Portal";
+    ViewData["Title"] = $"{Model.Org.Name} - Portal";
     var activeLicense = Model.Licenses.FirstOrDefault(l => l.IsActive);
     var canAdmin = Model.Me.Role >= Stylobot.Website.Portal.Data.OrgRole.Admin;
     var everHadTrial = Model.Licenses.Any(l => l.IsTrial);
@@ -44,7 +44,7 @@
           else
           {
             <h2 class="text-xl font-semibold mt-1">
-              @activeLicense.Tier.ToUpper() — @(activeLicense.IsTrial ? "Trial" : "Paid")
+              @activeLicense.Tier.ToUpper() - @(activeLicense.IsTrial ? "Trial" : "Paid")
             </h2>
             <div class="text-sm text-base-content/80 mt-2">
               Expires <strong>@activeLicense.ExpiresAt.ToString("yyyy-MM-dd")</strong>
@@ -89,7 +89,7 @@
         </form>
         <p class="text-xs text-base-content/50 mt-2">
           Shared platform hostnames (azurewebsites.net, vercel.app, herokuapp.com, etc.) aren't
-          valid as your primary — use your company domain. You can add additional hosts later.
+          valid as your primary - use your company domain. You can add additional hosts later.
         </p>
       }
     </div>

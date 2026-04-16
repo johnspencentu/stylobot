@@ -7,7 +7,7 @@ namespace Stylobot.Website.Portal;
 
 /// <summary>
 ///     SOC 2-grade audit log UI. Shows the append-only LicenseAudit stream for an org.
-///     Read-only — audits are written by other controllers' actions; nothing here mutates.
+///     Read-only - audits are written by other controllers' actions; nothing here mutates.
 /// </summary>
 [Route("portal/org/{slug}/audit")]
 [Authorize(Policy = PortalServiceCollectionExtensions.PortalAuthorizationPolicy)]

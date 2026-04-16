@@ -2,7 +2,7 @@
 
 Snapshot of every detector's current weight / confidence defaults, compiled from the 27
 YAML manifests under `Orchestration/Manifests/detectors/`. This is the baseline for the
-weighting refinement pass — **no changes proposed yet**, this is just the map.
+weighting refinement pass - **no changes proposed yet**, this is just the map.
 
 ## Full table
 
@@ -12,7 +12,7 @@ weighting refinement pass — **no changes proposed yet**, this is just the map.
 | aiscraper | 9 | 1.0 / 2.0 / 1.0 | 0.0 / 0.8 / 0.0 | known_ai_bot 0.95, web_bot_auth 0.95 |
 | behavioral | 20 | 1.0 / 1.5 / 1.0 | 0.0 / 0.4 / −0.30 | rate_limit 0.5, rapid_request 0.3 |
 | cluster | 850 | 1.0 / 1.5 / 1.0 | 0.0 / 0.3 / −0.1 | product_delta 0.4, network_delta 0.25 |
-| geochange | 16 | — / 1.5 / 1.0 | base 0.5 | rapid_drift_conf 0.8, rapid_drift_weight 1.8 |
+| geochange | 16 | - / 1.5 / 1.0 | base 0.5 | rapid_drift_conf 0.8, rapid_drift_weight 1.8 |
 | haxxor | 7 | 1.0 / 2.0 / 0.0 | 0.0 / 0.85 / 0.0 | sqli 0.95, xss 0.90, max_compound 0.99 |
 | header | 10 | 1.0 / 1.2 / 1.2 | 0.0 / 0.2 / −0.15 | missing_header 0.1, order_anomaly 0.15 |
 | heuristic | 50 | 1.0 / 1.8 / 1.2 | 0.5 / 0.7 / 0.3 | escalation 0.5, heuristic_weight 2.0 |
@@ -38,19 +38,19 @@ weighting refinement pass — **no changes proposed yet**, this is just the map.
 
 ## High-impact detectors
 
-**`bot_signal ≥ 2.0` (6 detectors):** aiscraper, haxxor, securitytool, accounttakeover, verifiedbot, llm (2.5). These dominate aggregate confidence when they fire — correctly so for definitive signals (known attack payload, confirmed security-tool UA, etc.), but they also *compound* if two fire on the same request.
+**`bot_signal ≥ 2.0` (6 detectors):** aiscraper, haxxor, securitytool, accounttakeover, verifiedbot, llm (2.5). These dominate aggregate confidence when they fire - correctly so for definitive signals (known attack payload, confirmed security-tool UA, etc.), but they also *compound* if two fire on the same request.
 
 **`bot_detected ≥ 0.85` (individually authoritative, 7 detectors):** aiscraper (0.8), haxxor (0.85), securitytool (0.95), tls known_bot_fp (0.85), accounttakeover (0.85), verifiedbot (0.85), responsebehavior honeypot (0.9). A single hit on any of these already exceeds the default block threshold of 0.7 without any other contribution.
 
-**No detector has `human_signal > 2.0`.** All human signals top out at 1.5. This is deliberate — we're happy to err on the side of false-negative bots over false-positive humans, and the pipeline trusts bot evidence more than human evidence.
+**No detector has `human_signal > 2.0`.** All human signals top out at 1.5. This is deliberate - we're happy to err on the side of false-negative bots over false-positive humans, and the pipeline trusts bot evidence more than human evidence.
 
 ## Double-counting risks (same signal, multiple detectors)
 
 1. **Datacenter IP + browser UA → bot.** Both `ip` (0.6) and `inconsistency` (datacenter_browser 0.7) score this. A request from AWS with Chrome UA fires both, adding ~1.3 combined confidence. Almost certainly intentional layering, but worth checking whether the `inconsistency` check should gate on `ip.is_datacenter` or run independently.
 2. **Client fingerprinting trio.** `tls` (JA3/JA4), `http2` (SETTINGS), `http3` (QUIC transport params) all emit "this fingerprint doesn't match a real browser" at 0.35–0.85. A headless Chromium hits all three. May want a one-of-three cap via cross-detector aggregation.
-3. **Behavioral quartet.** `behavioral` (rate/pattern), `stream-abuse` (streaming protocols), `sessionvector` (Markov chain), `responsebehavior` (historical) all look at request sequences from different angles. Each firing at 0.3–0.5 can sum to >1.0 on any active bot session. This is *probably* correct aggregation — different signals, same story — but worth verifying with labeled data.
+3. **Behavioral quartet.** `behavioral` (rate/pattern), `stream-abuse` (streaming protocols), `sessionvector` (Markov chain), `responsebehavior` (historical) all look at request sequences from different angles. Each firing at 0.3–0.5 can sum to >1.0 on any active bot session. This is *probably* correct aggregation - different signals, same story - but worth verifying with labeled data.
 4. **UA analysis pair.** `useragent` (pattern match) and `verifiedbot` (UA spoofing) both key off the UA string. They typically don't fire together (verifiedbot only acts on known-bot UAs), but worth a sanity check.
-5. **Reputation trio.** `fastpath` (instant cache), `reputation` (learned bias), `timescale` (90-day history) all pull from reputation state. Different time horizons, same underlying pattern — the fan-out was intentional to let fresh signals override stale ones, but the weight sum (1.5 + 1.5 + 1.0 = 4.0) is the largest cumulative bot signal in the pipeline.
+5. **Reputation trio.** `fastpath` (instant cache), `reputation` (learned bias), `timescale` (90-day history) all pull from reputation state. Different time horizons, same underlying pattern - the fan-out was intentional to let fresh signals override stale ones, but the weight sum (1.5 + 1.5 + 1.0 = 4.0) is the largest cumulative bot signal in the pipeline.
 
 ## Priority distribution
 
@@ -59,9 +59,9 @@ weighting refinement pass — **no changes proposed yet**, this is just the map.
 | Fast-path (<10) | 7 | fastpath, verifiedbot, transport-protocol, haxxor, securitytool, aiscraper, header(10) |
 | Middle (10–30) | 13 | useragent, tls, ip, responsebehavior, http2, http3, timescale, geochange, behavioral, versionage, accounttakeover, sessionvector, stream-abuse |
 | Late (40–100) | 6 | intent, llm, reputation, heuristic, inconsistency, ai |
-| Coordinator (>100) | 1 | cluster (850 — runs in a separate wave after signature aggregation) |
+| Coordinator (>100) | 1 | cluster (850 - runs in a separate wave after signature aggregation) |
 
-Shape is correct — cheap detectors fire first, expensive ML/LLM/coordinator-driven ones fire late. `cluster`'s priority is the intentional outlier (it's in wave 2, gated on waveform signatures, not a per-request detector).
+Shape is correct - cheap detectors fire first, expensive ML/LLM/coordinator-driven ones fire late. `cluster`'s priority is the intentional outlier (it's in wave 2, gated on waveform signatures, not a per-request detector).
 
 ## Next steps for the weighting pass
 
@@ -71,4 +71,4 @@ Shape is correct — cheap detectors fire first, expensive ML/LLM/coordinator-dr
 4. **Targeted weight adjustments.** Probably a handful of 20% nudges, not a wholesale rebalance. Ship each behind shadow mode for a week before promoting.
 5. **Per-API-key overrides.** Commercial portal UX for customers to locally adjust weights that don't fit their traffic (e.g., a SaaS with heavy API usage wants `behavioral` weights softened on `/api/*`).
 
-Separate concern, not a weighting issue: **BDF temporal scenarios.** We need tests that replay synthetic sessions with evolving behavior — human→bot transition, bot→human rehabilitation, misclassification decay — so we can assert the reputation state moves in the right direction over time, not just per-request.
+Separate concern, not a weighting issue: **BDF temporal scenarios.** We need tests that replay synthetic sessions with evolving behavior - human→bot transition, bot→human rehabilitation, misclassification decay - so we can assert the reputation state moves in the right direction over time, not just per-request.

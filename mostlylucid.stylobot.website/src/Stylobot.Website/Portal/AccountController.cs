@@ -45,7 +45,7 @@ public sealed class AccountController : Controller
     public IActionResult Denied() => View();
 
     /// <summary>
-    ///     Lightweight JSON "who am I" endpoint — useful for debugging OIDC claims
+    ///     Lightweight JSON "who am I" endpoint - useful for debugging OIDC claims
     ///     during Phase 1. Removed or guarded before shipping to prod.
     /// </summary>
     [HttpGet("whoami")]

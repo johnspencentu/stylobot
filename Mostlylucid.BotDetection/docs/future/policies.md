@@ -116,7 +116,7 @@ Expected performance cost
 The goal:
 
 You never need to tune weights.
-But if you want to, you get full access—with zero penalties.
+But if you want to, you get full access-with zero penalties.
 
 Per-Policy Weight Overrides
 

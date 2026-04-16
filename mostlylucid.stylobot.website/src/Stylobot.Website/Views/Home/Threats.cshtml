@@ -1,16 +1,16 @@
 @{
-    ViewData["Title"] = "Threats — what bots actually cost you";
+    ViewData["Title"] = "Threats - what bots actually cost you";
 }
 
 <section class="px-6 py-16">
   <div class="max-w-5xl mx-auto">
     <div class="text-xs uppercase tracking-widest text-base-content/60">Threat landscape</div>
     <h1 class="text-4xl sm:text-5xl font-semibold mt-2 leading-tight">
-      What bots actually cost you — and how StyloBot stops them.
+      What bots actually cost you - and how StyloBot stops them.
     </h1>
     <p class="mt-4 text-lg text-base-content/80 max-w-3xl">
       Not every bot is a scraper. The attacks that empty your accounts, deplete your inventory,
-      and trigger your WAF bill look different from each other — and need different responses.
+      and trigger your WAF bill look different from each other - and need different responses.
       Here's what we see in production traffic and exactly how StyloBot defends against each.
     </p>
   </div>
@@ -39,7 +39,7 @@
             Throttle at 5 failures/10min → block at 15 → hard block at 50, with decay.</li>
         <li>→ <strong>Session-vector velocity</strong>: credential stuffers cycle sessions
             rapidly; inter-session L2 delta crosses a threshold long before the attack succeeds.</li>
-        <li>→ <strong>TLS + header fingerprint rotation</strong> tracked across sessions —
+        <li>→ <strong>TLS + header fingerprint rotation</strong> tracked across sessions -
             attack tools (curl_cffi, Go http/2) leave signature patterns humans don't.</li>
         <li>→ <strong>Leiden clustering</strong> groups IPs that share behavior even when UAs
             and source IPs differ. Botnets surface as graph communities.</li>
@@ -61,7 +61,7 @@
       <div class="text-xs uppercase tracking-widest text-warning">Data exfil + cost attack</div>
       <h2 class="text-2xl font-semibold mt-1">API abuse &amp; scraping</h2>
       <p class="text-base-content/80 mt-3">
-        Automated clients pull your product catalog, pricing, inventory, user profiles —
+        Automated clients pull your product catalog, pricing, inventory, user profiles -
         anything behind a pageable API. Your egress bill climbs, your data ends up on a
         competitor's site, and your rate limiter is the only thing standing in the way.
       </p>
@@ -77,10 +77,10 @@
             distinct Markov signature (ApiCall → ApiCall → ApiCall, high velocity, low page
             interleave) vs. human browsing.</li>
         <li>→ <strong>Response-behavior detector</strong> catches bots that ignore 429s and keep
-            pounding — a tell no legitimate client exhibits.</li>
+            pounding - a tell no legitimate client exhibits.</li>
         <li>→ <strong>Headless browser fingerprints</strong>: Playwright, Puppeteer, and
             Selenium each leave TLS/TCP/H2 signatures and client-side canvas/audio anomalies.</li>
-        <li>→ <strong>Datacenter IP + reputation signals</strong> from GeoDetection — most
+        <li>→ <strong>Datacenter IP + reputation signals</strong> from GeoDetection - most
             scrapers run from AWS/GCP/Hetzner, not residential ISPs.</li>
       </ul>
       <h3 class="font-semibold mt-5">Response policies</h3>
@@ -100,7 +100,7 @@
       <div class="text-xs uppercase tracking-widest text-info">Scarcity attack</div>
       <h2 class="text-2xl font-semibold mt-1">Inventory hoarding &amp; scalping</h2>
       <p class="text-base-content/80 mt-3">
-        E-commerce drops, concert tickets, limited sneaker releases — bots buy everything in
+        E-commerce drops, concert tickets, limited sneaker releases - bots buy everything in
         seconds and resell. Your real customers never saw the inventory. Your brand takes the
         reputational hit; the scalper keeps the margin.
       </p>
@@ -128,7 +128,7 @@
       <div class="text-xs uppercase tracking-widest text-error">Pre-breach reconnaissance</div>
       <h2 class="text-2xl font-semibold mt-1">Vulnerability scanning</h2>
       <p class="text-base-content/80 mt-3">
-        Nmap, Nikto, sqlmap, WPScan, Burp — most breaches start with a bot walking your
+        Nmap, Nikto, sqlmap, WPScan, Burp - most breaches start with a bot walking your
         attack surface looking for unpatched software, exposed admin panels, or leaked secrets
         in /.git/. Stopping the scanner is the cheapest defense you can buy.
       </p>
@@ -138,9 +138,9 @@
       <ul class="mt-3 space-y-2 text-sm">
         <li>→ <strong>SecurityTool detector</strong> fingerprints 40+ known scanner signatures
             (user-agent, header order, request-sequence patterns).</li>
-        <li>→ <strong>Fail2ban on 404 floods</strong> — automated path enumeration is a clear
+        <li>→ <strong>Fail2ban on 404 floods</strong> - automated path enumeration is a clear
             signal; escalate fast, decay slowly.</li>
-        <li>→ <strong>Honeypot endpoints</strong> — bait paths like <code>/admin</code>,
+        <li>→ <strong>Honeypot endpoints</strong> - bait paths like <code>/admin</code>,
             <code>/.env</code>, <code>/wp-login.php</code> that only scanners hit. One touch
             flips the session to <code>block</code> globally.</li>
       </ul>
@@ -180,7 +180,7 @@
     <h2 class="text-3xl font-semibold">One detector won't stop any of these. Thirty-one might.</h2>
     <p class="mt-4 text-base-content/80">
       StyloBot combines fast-path protocol analysis, behavioral session vectors, AI escalation
-      for edge cases, and a fail2ban-style escalation model — all configurable per-endpoint
+      for edge cases, and a fail2ban-style escalation model - all configurable per-endpoint
       and per-user via the control plane. Every decision is explainable. Every action leaves
       an audit trail. No PII leaves your perimeter.
     </p>

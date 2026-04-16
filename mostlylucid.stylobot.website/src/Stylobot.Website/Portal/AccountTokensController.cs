@@ -8,7 +8,7 @@ namespace Stylobot.Website.Portal;
 
 /// <summary>
 ///     Personal API tokens for programmatic license retrieval (CI/CD). Tokens are scoped
-///     to the user, not the org — a single token can fetch licenses for any org the user
+///     to the user, not the org - a single token can fetch licenses for any org the user
 ///     is an accepted member of. Plaintext is shown exactly once, at creation.
 /// </summary>
 [Route("account/tokens")]

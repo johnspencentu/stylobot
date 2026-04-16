@@ -9,7 +9,7 @@ namespace Stylobot.Website.Portal;
 ///     Team management: list members, invite by email, change role, remove. Pending invites
 ///     (<see cref="Member.KeycloakSub"/> null) get auto-accepted in
 ///     <see cref="PortalProvisioningService.OnUserSignedInAsync"/> when the invitee first
-///     logs into Keycloak — the provisioning service detects a pending Member row by email
+///     logs into Keycloak - the provisioning service detects a pending Member row by email
 ///     and binds it to the new sub.
 /// </summary>
 [Route("portal/org/{slug}/team")]
@@ -71,7 +71,7 @@ public sealed class TeamController : Controller
             OrganizationId = ctx.Org.Id,
             Email = email,
             Role = parsedRole
-            // KeycloakSub and AcceptedAt stay null — filled by provisioning on first login.
+            // KeycloakSub and AcceptedAt stay null - filled by provisioning on first login.
         });
 
         _db.LicenseAudits.Add(new LicenseAudit

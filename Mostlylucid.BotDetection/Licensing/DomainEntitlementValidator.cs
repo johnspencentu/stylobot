@@ -49,7 +49,7 @@ public sealed class DomainEntitlementValidator
     }
 
     /// <summary>
-    ///     True if the license is configured with any domains — when false, the validator
+    ///     True if the license is configured with any domains - when false, the validator
     ///     runs in pass-through mode (no counting, no warnings). OSS / unconfigured state.
     /// </summary>
     public bool IsEnforcing => _allowedWildcardDomains.Length > 0 || _allowedExactDomains.Length > 0;
@@ -93,7 +93,7 @@ public sealed class DomainEntitlementValidator
             }
         }
 
-        // Mismatched — classify further for dashboard granularity.
+        // Mismatched - classify further for dashboard granularity.
         Interlocked.Increment(ref _requestsMismatched);
         _mismatchedHosts.AddOrUpdate(normalized, 1, (_, v) => v + 1);
 
@@ -107,7 +107,7 @@ public sealed class DomainEntitlementValidator
     }
 
     /// <summary>
-    ///     Hosts always allowed regardless of license — dev environments, loopback.
+    ///     Hosts always allowed regardless of license - dev environments, loopback.
     ///     Matches cover both literal and subdomain use.
     /// </summary>
     private static bool IsAlwaysAllowed(string host)
@@ -152,15 +152,15 @@ public sealed class DomainEntitlementValidator
 /// <summary>One-word advice on what to show in the dashboard for this host.</summary>
 public enum DomainEntitlementResult
 {
-    /// <summary>No domains configured on this install — validator is pass-through.</summary>
+    /// <summary>No domains configured on this install - validator is pass-through.</summary>
     NotEnforced,
     /// <summary>Host matched a licensed domain (or the always-allow list).</summary>
     Licensed,
     /// <summary>Host didn't match; operator likely needs to add it to the license.</summary>
     Mismatch,
-    /// <summary>Host is a shared cloud-pool platform hostname — warn but don't escalate.</summary>
+    /// <summary>Host is a shared cloud-pool platform hostname - warn but don't escalate.</summary>
     MismatchCloudPool,
-    /// <summary>Host header was empty / malformed — should be rare behind a real reverse proxy.</summary>
+    /// <summary>Host header was empty / malformed - should be rare behind a real reverse proxy.</summary>
     NoHost
 }
 

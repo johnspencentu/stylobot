@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Stylobot.Website.Portal.Data;
 
 /// <summary>
-///     Portal database — organizations, memberships, licenses, audit log, API tokens.
+///     Portal database - organizations, memberships, licenses, audit log, API tokens.
 ///     Deliberately does NOT include a Users table: Keycloak owns user identity and we
 ///     just key by <c>sub</c> claim. Every row in <see cref="Members"/> and
 ///     <see cref="ApiTokens"/> references a Keycloak sub string.
@@ -56,7 +56,7 @@ public sealed class PortalDbContext : DbContext
             // Store feature flags + licensed domains as JSON array columns (native jsonb in Npgsql).
             e.Property(x => x.Features).HasColumnType("jsonb");
             e.Property(x => x.Domains).HasColumnType("jsonb");
-            // Token body can be several KB — text column is fine.
+            // Token body can be several KB - text column is fine.
             e.Property(x => x.SignedToken).HasColumnType("text").IsRequired();
             e.HasIndex(x => new { x.OrganizationId, x.RevokedAt });
         });

@@ -9,7 +9,7 @@ namespace Mostlylucid.BotDetection.Licensing;
 ///     staging deploy at acme-stg.azurewebsites.net).
 ///
 ///     List drawn from the public suffix list's PRIVATE section
-///     (https://publicsuffix.org/list/effective_tld_names.dat) — specifically the entries
+///     (https://publicsuffix.org/list/effective_tld_names.dat) - specifically the entries
 ///     marked as multi-tenant platform hosting. Refresh quarterly.
 ///
 ///     A match is a suffix check: <c>IsCloudPoolHost("acme.azurewebsites.net")</c> = true
@@ -40,7 +40,7 @@ public static class CloudPoolHosts
         "cloudfunctions.net",
         "firebaseapp.com",
         "web.app",
-        "pages.dev",           // also Cloudflare — safe to list both times; HashSet de-dupes
+        "pages.dev",           // also Cloudflare - safe to list both times; HashSet de-dupes
 
         // Cloudflare
         "workers.dev",

@@ -376,7 +376,7 @@ In this foveated market:
 
 All while preserving **absolute privacy**.
 
-Stylocoin turns the world’s behavioural noise into a continuously improving defence system —
+Stylocoin turns the world’s behavioural noise into a continuously improving defence system -
 the first **Forensic Semantic Intelligence Marketplace**.
 
 ---

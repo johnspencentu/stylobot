@@ -9,7 +9,7 @@
 
     <div class="text-xs uppercase tracking-widest text-success">License issued</div>
     <h1 class="text-3xl font-semibold mt-1">
-      @Model.License.Tier.ToUpper() — @(Model.License.IsTrial ? "30-day trial" : "paid") active
+      @Model.License.Tier.ToUpper() - @(Model.License.IsTrial ? "30-day trial" : "paid") active
     </h1>
     <p class="text-base-content/80 mt-3">
       Copy the token below into your control plane's config under

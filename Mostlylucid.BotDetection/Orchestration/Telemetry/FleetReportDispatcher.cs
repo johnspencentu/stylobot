@@ -39,7 +39,7 @@ public sealed class FleetReportDispatcher
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                // Request completing/cancelled — normal, don't log
+                // Request completing/cancelled - normal, don't log
             }
             catch (Exception ex)
             {

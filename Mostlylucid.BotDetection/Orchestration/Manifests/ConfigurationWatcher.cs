@@ -8,7 +8,7 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 ///     implementations and invalidates the <see cref="IDetectorConfigProvider"/> cache when
 ///     config changes flow in.
 ///
-///     Enables live config updates without detector restart — commercial packages push changes
+///     Enables live config updates without detector restart - commercial packages push changes
 ///     via Redis pub/sub, this service picks them up and invalidates the cache, and the next
 ///     request reads the fresh value.
 ///
@@ -34,7 +34,7 @@ public sealed class ConfigurationWatcher : BackgroundService
     {
         if (_sources.Count == 0)
         {
-            _logger.LogDebug("No configuration override sources registered — watcher idle");
+            _logger.LogDebug("No configuration override sources registered - watcher idle");
             return;
         }
 

@@ -8,7 +8,7 @@ public sealed class PortalOptions
 {
     /// <summary>
     ///     Master switch. When false, the /portal routes, OIDC wiring, and PortalDbContext
-    ///     are not registered — useful for environments that only serve marketing content
+    ///     are not registered - useful for environments that only serve marketing content
     ///     (e.g., a CDN edge that never touches Keycloak).
     /// </summary>
     public bool Enabled { get; set; }

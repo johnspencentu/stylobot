@@ -7,7 +7,7 @@ namespace Stylobot.Website.Portal.Licensing;
 ///     Supplies the vendor Ed25519 keypair to <see cref="LicenseIssuer"/>. Priority order:
 ///     <list type="number">
 ///       <item><description><c>Portal:License:PrivateKeyBase64</c> in config (production should pull this from Vault/KMS via env var).</description></item>
-///       <item><description><c>Portal:License:PrivateKeyFilePath</c> — path to a file containing the base64 key.</description></item>
+///       <item><description><c>Portal:License:PrivateKeyFilePath</c> - path to a file containing the base64 key.</description></item>
 ///       <item><description>Development fallback: generate a fresh ephemeral keypair, log a BIG warning, and cache in memory.</description></item>
 ///     </list>
 ///     NEVER commit a keypair to source control. In production the key should live in a
@@ -46,11 +46,11 @@ public sealed class VendorKeyProvider
         }
 
         // Dev-only fallback: generate ephemeral. Restarting the portal rotates the key and
-        // invalidates every previously-issued license — surface this loudly.
+        // invalidates every previously-issued license - surface this loudly.
         var (priv, pub) = Ed25519Signer.GenerateKeyPair();
         _logger.LogWarning(
             "═════════════════════════════════════════════════════════════════════\n" +
-            " NO VENDOR SIGNING KEY CONFIGURED — generated a temporary one in memory.\n" +
+            " NO VENDOR SIGNING KEY CONFIGURED - generated a temporary one in memory.\n" +
             " Licenses issued with this key will stop validating after a portal restart.\n" +
             "\n" +
             " For persistent dev usage, set one of:\n" +

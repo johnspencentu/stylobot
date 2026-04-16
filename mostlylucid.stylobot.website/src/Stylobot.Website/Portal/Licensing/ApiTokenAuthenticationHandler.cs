@@ -13,7 +13,7 @@ namespace Stylobot.Website.Portal.Licensing;
 ///     hash is looked up in <see cref="PortalDbContext.ApiTokens"/>; on match we mint a
 ///     ClaimsPrincipal with the token owner's sub + the token's scopes.
 ///
-///     Tokens are stored hashed — the plaintext is only visible to the user at creation
+///     Tokens are stored hashed - the plaintext is only visible to the user at creation
 ///     time. <see cref="AccountTokensController"/> generates the plaintext, then only the
 ///     hash is persisted.
 /// </summary>
@@ -45,7 +45,7 @@ public sealed class ApiTokenAuthenticationHandler : AuthenticationHandler<ApiTok
 
         var raw = header["Bearer ".Length..].Trim();
         if (!raw.StartsWith(TokenPrefix, StringComparison.Ordinal))
-            return AuthenticateResult.NoResult(); // Not our scheme — let others handle it.
+            return AuthenticateResult.NoResult(); // Not our scheme - let others handle it.
 
         var hash = HashToken(raw);
 
@@ -55,7 +55,7 @@ public sealed class ApiTokenAuthenticationHandler : AuthenticationHandler<ApiTok
         if (token is null)
             return AuthenticateResult.Fail("Invalid or revoked API token");
 
-        // Touch LastUsedAt — cheap, helps UI show "stale" tokens.
+        // Touch LastUsedAt - cheap, helps UI show "stale" tokens.
         token.LastUsedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 

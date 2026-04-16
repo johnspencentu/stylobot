@@ -3,12 +3,12 @@ using System.Collections.Concurrent;
 namespace Mostlylucid.BotDetection.UI.Services;
 
 /// <summary>
-///     Default in-memory label store. Lost on restart — intended for small manual labeling
+///     Default in-memory label store. Lost on restart - intended for small manual labeling
 ///     sessions, dev loops, and smoke tests. Production installs should register a SQLite
 ///     or PostgreSQL implementation so labels accumulate across deploys.
 ///
 ///     Upsert semantics: a given signature can carry at most one label per labeler (email);
-///     re-labeling replaces the prior value. Cross-labeler disagreement is preserved — a
+///     re-labeling replaces the prior value. Cross-labeler disagreement is preserved - a
 ///     signature with {alice: Bot, bob: Human} returns alice's as "latest" if newer.
 /// </summary>
 public sealed class InMemorySignatureLabelStore : ISignatureLabelStore

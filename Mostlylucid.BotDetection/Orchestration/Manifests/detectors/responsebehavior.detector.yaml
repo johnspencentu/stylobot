@@ -140,7 +140,7 @@ defaults:
     exclusive_404_weight: 2.0       # Contribution weight
 
     # FAIL2BAN: escalating action policy for persistent 404 abuse.
-    # ResponseCoordinator's 10-minute sliding window provides automatic decay —
+    # ResponseCoordinator's 10-minute sliding window provides automatic decay -
     # offenders who stop scanning get their ban downgraded/removed as old 404s age out.
     # Only applies when unique_paths >= 2 (single stale bookmark won't trigger).
     fail2ban_enabled: true

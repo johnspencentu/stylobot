@@ -272,7 +272,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
     ///     Analyze 404 scanning patterns - systematic probing for vulnerabilities.
     ///     Also applies fail2ban-style escalating action policies based on 404 count:
     ///     the ResponseCoordinator's sliding window (10 min default) provides automatic
-    ///     decay — if the client stops scanning, the count drops and escalation relaxes.
+    ///     decay - if the client stops scanning, the count drops and escalation relaxes.
     /// </summary>
     private void AnalyzeScanPatterns(
         BlackboardState state,
@@ -286,7 +286,7 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
 
         // Fail2ban-style escalation: apply progressively harsher action policies as
         // 404 count grows within the sliding window. The window gives automatic
-        // decay — offenders who stop get their ban downgraded/removed as old 404s
+        // decay - offenders who stop get their ban downgraded/removed as old 404s
         // age out. Only escalate when we have real scanning evidence (multiple
         // unique paths), not a single stale bookmark.
         if (Fail2BanEnabled && behavior.UniqueNotFoundPaths >= 2)
@@ -296,17 +296,17 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
             if (behavior.Count404 >= Fail2BanHardBlockThreshold)
             {
                 policy = Fail2BanHardBlockPolicy;
-                reason = $"Persistent scanning: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths — hard block";
+                reason = $"Persistent scanning: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths - hard block";
             }
             else if (behavior.Count404 >= Fail2BanBlockThreshold)
             {
                 policy = Fail2BanBlockPolicy;
-                reason = $"Active scanning: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths — block";
+                reason = $"Active scanning: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths - block";
             }
             else if (behavior.Count404 >= Fail2BanThrottleThreshold)
             {
                 policy = Fail2BanThrottlePolicy;
-                reason = $"Repeat 404s: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths — throttle";
+                reason = $"Repeat 404s: {behavior.Count404} 404s across {behavior.UniqueNotFoundPaths} paths - throttle";
             }
 
             if (policy != null)

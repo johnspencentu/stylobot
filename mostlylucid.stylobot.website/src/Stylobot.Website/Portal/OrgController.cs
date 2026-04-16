@@ -8,7 +8,7 @@ namespace Stylobot.Website.Portal;
 
 /// <summary>
 ///     Per-org routes: overview, trial request, license list, download, revoke.
-///     All actions authorize against membership in the org — a user must have an
+///     All actions authorize against membership in the org - a user must have an
 ///     accepted <see cref="Member"/> row for the org or they get 404.
 /// </summary>
 [Route("portal/org/{slug}")]
@@ -50,7 +50,7 @@ public sealed class OrgController : Controller
         var sub = User.FindFirst("sub")!.Value;
         var email = User.FindFirst("email")?.Value;
 
-        // Primary domain is the license entitlement boundary — see licensing-simplified.md.
+        // Primary domain is the license entitlement boundary - see licensing-simplified.md.
         // Parse comma / newline-separated input so operators can enter one or several
         // (e.g., "acme.com, acme.io" for multi-brand). Trial starts with Startup-tier
         // entitlement (1 primary domain); additional domains can be added in the

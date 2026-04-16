@@ -880,7 +880,7 @@ public class BotClusterService : BackgroundService
         else
         {
             // Emergent cluster: community detection grouped these together but they
-            // don't yet meet strict BotProduct/BotNetwork thresholds. Still valuable —
+            // don't yet meet strict BotProduct/BotNetwork thresholds. Still valuable -
             // these may be evolving campaigns, new bot software, or DDoS participants.
             clusterType = BotClusterType.Emergent;
         }

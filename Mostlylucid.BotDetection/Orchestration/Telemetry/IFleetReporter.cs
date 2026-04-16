@@ -5,14 +5,14 @@ namespace Mostlylucid.BotDetection.Orchestration.Telemetry;
 ///     Commercial packages implement this to push telemetry to a central control plane via
 ///     HTTPS + Redis for cross-instance correlation and aggregated reporting.
 ///
-///     FOSS ships with no implementations — detection events stay local to the gateway.
+///     FOSS ships with no implementations - detection events stay local to the gateway.
 ///     Multiple implementations can be registered; each gets a copy of every report.
 /// </summary>
 public interface IFleetReporter
 {
     /// <summary>
     ///     Report a completed detection event. Implementations should buffer internally
-    ///     and flush asynchronously — this call must not block the request pipeline.
+    ///     and flush asynchronously - this call must not block the request pipeline.
     /// </summary>
     /// <param name="report">The detection event data</param>
     /// <param name="ct">Cancellation token (request scope, not reporter scope)</param>
@@ -24,7 +24,7 @@ public interface IFleetReporter
 
 /// <summary>
 ///     Single detection event for fleet-wide aggregation. This is a flattened, serializable
-///     snapshot — not the in-memory AggregatedEvidence.
+///     snapshot - not the in-memory AggregatedEvidence.
 /// </summary>
 public sealed record DetectionReport
 {

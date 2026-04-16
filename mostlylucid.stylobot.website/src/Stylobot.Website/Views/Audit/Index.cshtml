@@ -1,6 +1,6 @@
 @model Stylobot.Website.Portal.AuditIndexViewModel
 @{
-    ViewData["Title"] = $"Audit log — {Model.Org.Name}";
+    ViewData["Title"] = $"Audit log - {Model.Org.Name}";
 
     string ActionBadge(string action) => action switch
     {
@@ -50,7 +50,7 @@
                     <div class="text-xs text-base-content/50 font-mono">license: @a.LicenseId.Value.ToString()[..8]…</div>
                   }
                 </td>
-                <td>@(a.Reason ?? "—")</td>
+                <td>@(a.Reason ?? "-")</td>
               </tr>
             }
           </tbody>

@@ -7,7 +7,7 @@ using Stylobot.Website.Portal.Licensing;
 namespace Stylobot.Website.Portal;
 
 /// <summary>
-///     Programmatic license API for CI/CD. Authenticated via personal API token only —
+///     Programmatic license API for CI/CD. Authenticated via personal API token only -
 ///     cookie auth is not accepted so browser sessions can't accidentally pull tokens.
 /// </summary>
 [ApiController]
@@ -48,7 +48,7 @@ public sealed class LicenseApiController : ControllerBase
         if (license is null)
             return NotFound(new { error = "no_active_license" });
 
-        // Mark a download audit — CI/CD pulls are user-initiated even if automated.
+        // Mark a download audit - CI/CD pulls are user-initiated even if automated.
         _db.LicenseAudits.Add(new LicenseAudit
         {
             OrganizationId = orgId.Value,

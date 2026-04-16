@@ -7,7 +7,7 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     state so offline weight-tuning can compute per-detector precision/recall against
 ///     real ground truth.
 ///
-///     FOSS ships <see cref="InMemorySignatureLabelStore"/> (lost on restart — fine for
+///     FOSS ships <see cref="InMemorySignatureLabelStore"/> (lost on restart - fine for
 ///     small manual labeling sessions). Production wires a SQLite or PostgreSQL implementation
 ///     so labels accumulate across deploys.
 /// </summary>
@@ -30,7 +30,7 @@ public interface ISignatureLabelStore
 }
 
 /// <summary>
-///     An operator-supplied judgement on a signature. Treated as ground truth — the
+///     An operator-supplied judgement on a signature. Treated as ground truth - the
 ///     weighting pipeline will promote these into detector training / F1 evaluation.
 /// </summary>
 public sealed record SignatureLabel
@@ -41,12 +41,12 @@ public sealed record SignatureLabel
     /// <summary>Operator's self-assessed confidence in their label (0.0 – 1.0).</summary>
     public double Confidence { get; init; } = 1.0;
 
-    /// <summary>Opaque identifier — e.g., the dashboard user's email or admin session.</summary>
+    /// <summary>Opaque identifier - e.g., the dashboard user's email or admin session.</summary>
     public required string LabeledBy { get; init; }
 
     public DateTime LabeledAt { get; init; } = DateTime.UtcNow;
 
-    /// <summary>Short free-text justification — e.g., "Classic cred-stuffing pattern on /login".</summary>
+    /// <summary>Short free-text justification - e.g., "Classic cred-stuffing pattern on /login".</summary>
     public string? Note { get; init; }
 }
 
@@ -59,6 +59,6 @@ public enum SignatureLabelKind
     Human = 1,
     /// <summary>Legitimate bot (Googlebot, Bingbot, status checker). Not malicious.</summary>
     BenignBot = 2,
-    /// <summary>Operator looked, couldn't tell — logged for later revisit rather than polluting the corpus.</summary>
+    /// <summary>Operator looked, couldn't tell - logged for later revisit rather than polluting the corpus.</summary>
     Uncertain = 3
 }

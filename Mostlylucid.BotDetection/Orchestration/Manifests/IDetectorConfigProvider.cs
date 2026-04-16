@@ -23,7 +23,7 @@ public interface IDetectorConfigProvider
     T GetParameter<T>(string detectorName, string parameterName, T defaultValue);
 
     /// <summary>
-    /// Get a specific parameter value for a request context — consults
+    /// Get a specific parameter value for a request context - consults
     /// registered IConfigurationOverrideSource implementations before falling back
     /// to appsettings/YAML/defaults. Commercial packages use this for per-target overrides.
     /// </summary>
@@ -136,11 +136,11 @@ public sealed class DetectorConfigProvider : IDetectorConfigProvider
                 if (value is not null)
                 {
                     try { return ConvertParameter<T>(value); }
-                    catch { /* type mismatch — try next source */ }
+                    catch { /* type mismatch - try next source */ }
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch { /* source failed — try next */ }
+            catch { /* source failed - try next */ }
         }
 
         // 2. Fall through to synchronous resolution (appsettings → YAML → default)

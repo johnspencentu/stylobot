@@ -719,7 +719,7 @@ public partial class DetectionBroadcastMiddleware
     /// <summary>
     ///     Projects the in-process <c>DashboardDetectionEvent</c> into the transport-friendly
     ///     <c>DetectionEvent</c> record and hands it to the registered publisher. Catches and
-    ///     logs any failure — publish errors must never affect request processing.
+    ///     logs any failure - publish errors must never affect request processing.
     /// </summary>
     private async Task PublishEventAsync(
         Mostlylucid.BotDetection.Orchestration.Telemetry.IDetectionEventPublisher publisher,
@@ -768,7 +768,7 @@ public partial class DetectionBroadcastMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Detection event publisher {Name} threw — dropping event", publisher.Name);
+            _logger.LogDebug(ex, "Detection event publisher {Name} threw - dropping event", publisher.Name);
         }
     }
 }

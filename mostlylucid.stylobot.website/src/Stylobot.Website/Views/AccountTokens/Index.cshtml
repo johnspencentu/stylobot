@@ -23,7 +23,7 @@
         <div>
           <h3 class="font-bold">Token created: @Model.JustCreatedName</h3>
           <p class="mt-2">
-            <strong>Copy this now — it won't be shown again.</strong>
+            <strong>Copy this now - it won't be shown again.</strong>
             We store only a hash, so we can't recover it for you.
           </p>
           <div class="mt-3 flex gap-2 items-center">
@@ -86,7 +86,7 @@
                   }
                 </td>
                 <td class="text-xs">@t.CreatedAt.ToString("yyyy-MM-dd")</td>
-                <td class="text-xs">@(t.LastUsedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                <td class="text-xs">@(t.LastUsedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
                 <td>
                   @if (t.IsActive) { <span class="badge badge-success">Active</span> }
                   else             { <span class="badge badge-error">Revoked</span> }

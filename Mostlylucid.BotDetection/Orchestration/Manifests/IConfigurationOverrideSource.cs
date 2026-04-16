@@ -8,7 +8,7 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 /// </summary>
 /// <remarks>
 ///     Resolution chain (most specific wins):
-///     1. IConfigurationOverrideSource implementations (commercial — database-backed, per-target)
+///     1. IConfigurationOverrideSource implementations (commercial - database-backed, per-target)
 ///     2. appsettings.json (BotDetection:Detectors:{Name}:*)
 ///     3. YAML manifest defaults
 ///     4. Built-in code defaults
@@ -17,14 +17,14 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 ///     in registration order (first match wins) and their changes flow back via
 ///     <see cref="WatchAsync"/> to invalidate the <see cref="IDetectorConfigProvider"/> cache.
 ///
-///     FOSS ships with no implementations of this interface — the provider uses YAML + appsettings only.
+///     FOSS ships with no implementations of this interface - the provider uses YAML + appsettings only.
 ///     Commercial packages register PostgreSQL + Redis-backed implementations.
 /// </remarks>
 public interface IConfigurationOverrideSource
 {
     /// <summary>
     ///     Resolve a parameter override for a detector in a given request context.
-    ///     Returns null if this source has no override for this lookup — the provider falls
+    ///     Returns null if this source has no override for this lookup - the provider falls
     ///     through to the next source, then appsettings, then YAML, then the code default.
     /// </summary>
     /// <param name="detectorName">Detector name (e.g., "Heuristic", "Fail2Ban")</param>
@@ -45,7 +45,7 @@ public interface IConfigurationOverrideSource
     IAsyncEnumerable<ConfigurationChangeNotification> WatchAsync(CancellationToken ct = default);
 
     /// <summary>
-    ///     Priority ordering — lower values are queried first (more specific).
+    ///     Priority ordering - lower values are queried first (more specific).
     ///     Default 100; commercial per-request overrides use 10, global overrides use 50.
     /// </summary>
     int Priority { get; }
@@ -79,7 +79,7 @@ public sealed record ConfigResolutionContext
     /// <summary>Active detection policy name (default, strict, learning, etc.)</summary>
     public string? StrategyName { get; init; }
 
-    /// <summary>Empty context — global scope only.</summary>
+    /// <summary>Empty context - global scope only.</summary>
     public static readonly ConfigResolutionContext Empty = new();
 }
 

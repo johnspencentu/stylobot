@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Trust, security &amp; compliance — StyloBot";
+    ViewData["Title"] = "Trust, security &amp; compliance - StyloBot";
 }
 
 <section class="px-6 py-16">
@@ -21,7 +21,7 @@
     <div>
       <h2 class="text-2xl font-semibold">Data residency</h2>
       <p class="text-base-content/80 mt-3">
-        StyloBot runs entirely inside your environment — Docker, Kubernetes, bare metal, or the
+        StyloBot runs entirely inside your environment - Docker, Kubernetes, bare metal, or the
         YARP reverse-proxy gateway embedded in your ASP.NET Core app. No request payloads, user
         agents, IPs, or detection decisions are sent to stylobot.net. The only data that ever
         reaches us is billing / licensing metadata when you interact with the customer portal.
@@ -33,7 +33,7 @@
       <p class="text-base-content/80 mt-3">
         Raw IPs and user agents live only in request-scoped memory, never on durable storage.
         Signatures used for cross-request tracking are HMAC-SHA256 hashes with a per-deployment
-        key — reversible only by the customer. The blackboard that detectors write to carries
+        key - reversible only by the customer. The blackboard that detectors write to carries
         categorical signals (<code>request.ip.is_datacenter</code>,
         <code>detection.useragent.confidence</code>) not raw values.
       </p>
@@ -47,7 +47,7 @@
       <h2 class="text-2xl font-semibold">Explainable decisions &amp; audit trail</h2>
       <p class="text-base-content/80 mt-3">
         Every detection includes the contributing detectors, their confidence deltas, and the
-        reason strings — both in the <code>X-BotDetection-Reasons</code> response headers (if
+        reason strings - both in the <code>X-BotDetection-Reasons</code> response headers (if
         enabled) and in the dashboard event store. On the commercial tier, operators can
         configure per-endpoint overrides and the change history is append-only.
       </p>
@@ -60,7 +60,7 @@
     <div>
       <h2 class="text-2xl font-semibold">Encryption</h2>
       <p class="text-base-content/80 mt-3">
-        TLS 1.2+ everywhere — customer portal terminates at Caddy with automatic Let's Encrypt
+        TLS 1.2+ everywhere - customer portal terminates at Caddy with automatic Let's Encrypt
         certificates. Portal database uses Postgres native TLS. License tokens are Ed25519-signed;
         the vendor private key lives in a secrets vault (HashiCorp Vault / AWS KMS / Azure Key
         Vault) and is never exposed to application memory beyond the signing call.
@@ -74,7 +74,7 @@
         optionally required. External identity providers (Google, Microsoft, GitHub) plug in
         at the realm level. For the self-hosted product, OSS ships ASP.NET Core Identity
         (local accounts + MFA); commercial tiers unlock OIDC relying-party configuration
-        so you bring your own IdP — Keycloak, Azure AD, Okta, Auth0, Google Workspace.
+        so you bring your own IdP - Keycloak, Azure AD, Okta, Auth0, Google Workspace.
         Enterprise adds SAML 2.0 + SCIM.
       </p>
     </div>
@@ -85,7 +85,7 @@
         <li><strong>GDPR:</strong> zero-PII by design means no DSR workflow needed for the
             detection pipeline itself. Portal customer data (email, org name) is covered by
             standard DPA.</li>
-        <li><strong>SOC 2 Type II:</strong> in progress — audit log, change management, and
+        <li><strong>SOC 2 Type II:</strong> in progress - audit log, change management, and
             access control infrastructure in place; auditor engagement scheduled.</li>
         <li><strong>Data processing agreements:</strong> on request for commercial customers.</li>
       </ul>
@@ -104,7 +104,7 @@
     <div>
       <h2 class="text-2xl font-semibold">Incident history</h2>
       <p class="text-base-content/80 mt-3">
-        None reported. We'll publish post-mortems publicly when they happen — every security
+        None reported. We'll publish post-mortems publicly when they happen - every security
         product has incidents eventually, and honest disclosure is part of how we earn the
         trust we're asking for.
       </p>

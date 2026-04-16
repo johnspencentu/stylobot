@@ -31,7 +31,7 @@ public sealed class PortalProvisioningService
 
         if (string.IsNullOrEmpty(sub) || string.IsNullOrEmpty(email))
         {
-            _logger.LogWarning("OIDC sign-in missing sub or email — cannot provision org");
+            _logger.LogWarning("OIDC sign-in missing sub or email - cannot provision org");
             return;
         }
 

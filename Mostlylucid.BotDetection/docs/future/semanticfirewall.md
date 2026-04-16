@@ -290,5 +290,5 @@ public sealed class RolePolicyOverrides
 ---
 
 If you want, I can generate a minimal repo scaffold with the interfaces above, a manifest schema, scorecard format, and
-CI pipeline that enforces signing, tests, and performance benchmarks—so you can operationalize this semantic firewall
+CI pipeline that enforces signing, tests, and performance benchmarks-so you can operationalize this semantic firewall
 layer quickly.

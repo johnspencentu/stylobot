@@ -21,7 +21,7 @@ public static class PortalServiceCollectionExtensions
     public const string OidcAuthScheme = OpenIdConnectDefaults.AuthenticationScheme;
 
     /// <summary>
-    ///     Adds portal services when enabled. Safe to call in all environments — if
+    ///     Adds portal services when enabled. Safe to call in all environments - if
     ///     <c>Portal:Enabled</c> is false (default), nothing is wired.
     /// </summary>
     public static IServiceCollection AddStyloBotPortal(
@@ -49,7 +49,7 @@ public static class PortalServiceCollectionExtensions
         // (<c>sub</c>, <c>email</c>, <c>preferred_username</c>) rather than the SOAP-era URIs
         // ASP.NET Core defaults to for back-compat. This must happen BEFORE any handler
         // is constructed. Both the legacy JwtSecurityTokenHandler and the newer
-        // JsonWebTokenHandler (.NET 8+) carry independent static remap tables — clear both.
+        // JsonWebTokenHandler (.NET 8+) carry independent static remap tables - clear both.
         JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
         Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
@@ -78,7 +78,7 @@ public static class PortalServiceCollectionExtensions
                 o.ClientSecret = opts.Oidc.ClientSecret;
                 o.RequireHttpsMetadata = opts.Oidc.RequireHttpsMetadata;
 
-                // Authorization-code flow with PKCE — the modern default for server-side RPs.
+                // Authorization-code flow with PKCE - the modern default for server-side RPs.
                 o.ResponseType = OpenIdConnectResponseType.Code;
                 o.UsePkce = true;
 
@@ -101,7 +101,7 @@ public static class PortalServiceCollectionExtensions
                 o.TokenValidationParameters.RoleClaimType = "roles";
 
                 // On first successful login, provision a personal org if this is a brand
-                // new Keycloak sub. Runs per login — cheap idempotent upsert after the
+                // new Keycloak sub. Runs per login - cheap idempotent upsert after the
                 // first time.
                 o.Events = new OpenIdConnectEvents
                 {
@@ -115,7 +115,7 @@ public static class PortalServiceCollectionExtensions
                     }
                 };
             })
-            // Programmatic API: Authorization: Bearer sbk_xxx — only accepted for /api/v1/*
+            // Programmatic API: Authorization: Bearer sbk_xxx - only accepted for /api/v1/*
             // endpoints that explicitly opt in via [Authorize(AuthenticationSchemes = ...)].
             .AddScheme<ApiTokenOptions, ApiTokenAuthenticationHandler>(
                 ApiTokenAuthenticationHandler.SchemeName, _ => { });
@@ -130,7 +130,7 @@ public static class PortalServiceCollectionExtensions
         services.AddAuthorization(a =>
         {
             // Baseline: the user successfully completed the Keycloak OIDC flow. Per-org
-            // authorization is done in each controller via the Member table — any user
+            // authorization is done in each controller via the Member table - any user
             // who made it into our realm is a legitimate portal visitor; what they can
             // ACT on is gated by the memberships we find for their sub claim.
             a.AddPolicy(PortalAuthorizationPolicy, p => p.RequireAuthenticatedUser());

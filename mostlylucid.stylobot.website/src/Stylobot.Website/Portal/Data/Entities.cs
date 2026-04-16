@@ -1,7 +1,7 @@
 namespace Stylobot.Website.Portal.Data;
 
 /// <summary>
-///     A customer organization / tenant. Licenses attach to orgs, not users — so team
+///     A customer organization / tenant. Licenses attach to orgs, not users - so team
 ///     members can rotate without invalidating licenses. A user auto-creates a personal
 ///     org on first login; they can create more orgs and be invited to orgs they don't own.
 /// </summary>
@@ -9,7 +9,7 @@ public sealed class Organization
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    /// <summary>URL slug (e.g., "acme-corp") — unique, used in /portal/org/{slug} routes.</summary>
+    /// <summary>URL slug (e.g., "acme-corp") - unique, used in /portal/org/{slug} routes.</summary>
     public required string Slug { get; set; }
 
     /// <summary>Display name.</summary>
@@ -36,7 +36,7 @@ public enum OrgRole
 
 /// <summary>
 ///     Join-table between a Keycloak-authenticated user and an Organization.
-///     We do NOT store Keycloak users ourselves — only their <c>sub</c> claim plus
+///     We do NOT store Keycloak users ourselves - only their <c>sub</c> claim plus
 ///     a cached email for convenience (so invite flows can show "Invite alice@example.com"
 ///     before the invitee has actually logged in).
 /// </summary>
@@ -49,14 +49,14 @@ public sealed class Member
 
     /// <summary>
     ///     Keycloak <c>sub</c> claim (stable per user, opaque). May be null for pending
-    ///     invites — the invitee hasn't logged in yet, so we only know their email.
+    ///     invites - the invitee hasn't logged in yet, so we only know their email.
     /// </summary>
     public string? KeycloakSub { get; set; }
 
-    /// <summary>Cached email — populated on first login from Keycloak's <c>email</c> claim.</summary>
+    /// <summary>Cached email - populated on first login from Keycloak's <c>email</c> claim.</summary>
     public required string Email { get; set; }
 
-    /// <summary>Cached display name — populated from <c>name</c> claim on login.</summary>
+    /// <summary>Cached display name - populated from <c>name</c> claim on login.</summary>
     public string? DisplayName { get; set; }
 
     public required OrgRole Role { get; set; }
@@ -88,7 +88,7 @@ public sealed class License
     public List<string> Features { get; set; } = new();
 
     /// <summary>
-    ///     Optional hardware fingerprint binding — customer provides it at trial request
+    ///     Optional hardware fingerprint binding - customer provides it at trial request
     ///     time for installs that want extra binding, otherwise null (portable license).
     /// </summary>
     public string? HardwareFingerprint { get; set; }
@@ -102,10 +102,10 @@ public sealed class License
     /// </summary>
     public List<string> Domains { get; set; } = new();
 
-    /// <summary>JWT <c>jti</c> — unique per token, used for revocation lookups.</summary>
+    /// <summary>JWT <c>jti</c> - unique per token, used for revocation lookups.</summary>
     public required string TokenJti { get; set; }
 
-    /// <summary>The signed JWT itself — stored so we can re-show "download" later.</summary>
+    /// <summary>The signed JWT itself - stored so we can re-show "download" later.</summary>
     public required string SignedToken { get; set; }
 
     public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
@@ -115,7 +115,7 @@ public sealed class License
     public bool IsActive => RevokedAt is null && ExpiresAt > DateTime.UtcNow;
 }
 
-/// <summary>Append-only record of license lifecycle events — SOC 2 evidence.</summary>
+/// <summary>Append-only record of license lifecycle events - SOC 2 evidence.</summary>
 public sealed class LicenseAudit
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -152,7 +152,7 @@ public sealed class ApiToken
 
     public required string Name { get; set; }
 
-    /// <summary>SHA256(token) — the plaintext is shown once at creation and never stored.</summary>
+    /// <summary>SHA256(token) - the plaintext is shown once at creation and never stored.</summary>
     public required string TokenHash { get; set; }
 
     /// <summary>Scopes: <c>licenses:read</c>, <c>licenses:rotate</c>, etc.</summary>

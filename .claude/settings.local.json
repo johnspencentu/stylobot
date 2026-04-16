@@ -258,7 +258,22 @@
       "Read(//opt/homebrew/**)",
       "Bash(npx:*)",
       "Bash(kill 86704)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(git remote:*)",
+      "Bash(export PATH=\"$PATH:/Users/scottgalloway/.dotnet/tools\")",
+      "Bash(rm src/Stylobot.Commercial.ControlPlane/Licensing/TrialIssuer.cs src/Stylobot.Commercial.ControlPlane/Licensing/ITrialRegistry.cs)",
+      "Bash(rmdir src/Stylobot.Commercial.ControlPlane/Licensing)",
+      "Bash(helm lint:*)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://localhost:5062 dotnet run:*)",
+      "Bash(/tmp/test-portal-flow.sh)",
+      "Bash(/tmp/probe-trial.sh)",
+      "Bash(git rm:*)",
+      "Bash(git reset:*)",
+      "Bash(git restore:*)",
+      "Bash(git rev-list:*)",
+      "Bash(/tmp/test-domain-flow.sh)",
+      "Bash(npm audit:*)",
+      "Bash(kill -TERM 22365)"
     ]
   }
 }

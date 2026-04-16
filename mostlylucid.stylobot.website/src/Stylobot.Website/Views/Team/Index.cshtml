@@ -1,7 +1,7 @@
 @using Stylobot.Website.Portal.Data
 @model Stylobot.Website.Portal.TeamIndexViewModel
 @{
-    ViewData["Title"] = $"Team — {Model.Org.Name}";
+    ViewData["Title"] = $"Team - {Model.Org.Name}";
     var canAdmin = Model.Me.Role >= OrgRole.Admin;
     var isOwner = Model.Me.Role >= OrgRole.Owner;
     var success = TempData["TeamSuccess"]?.ToString();
@@ -56,7 +56,7 @@
             var isSelf = m.Id == Model.Me.Id;
             <tr>
               <td>@m.Email</td>
-              <td>@(m.DisplayName ?? "—")</td>
+              <td>@(m.DisplayName ?? "-")</td>
               <td>
                 @if (canAdmin && !isSelf)
                 {

@@ -35,7 +35,7 @@ We use **status codes** and **response body cues** as low-cost signals to:
 * see **authentication flows** (repeated 401/403 patterns)
 * detect bot-like interactions with **error/validation pages**
 
-This detector **never stores full response bodies**—it only uses:
+This detector **never stores full response bodies**-it only uses:
 
 * codes,
 * small, configured pattern matches, and
