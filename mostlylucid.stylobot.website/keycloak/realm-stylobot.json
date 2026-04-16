@@ -8,6 +8,7 @@
   "verifyEmail": false,
   "resetPasswordAllowed": true,
   "rememberMe": true,
+  "sslRequired": "none",
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
@@ -59,6 +60,22 @@
         "openid",
         "profile",
         "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-flat",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
       ]
     }
   ],

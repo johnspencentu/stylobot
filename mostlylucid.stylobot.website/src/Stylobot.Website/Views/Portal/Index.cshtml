@@ -32,7 +32,7 @@
       <div class="grid gap-3 md:grid-cols-2">
         @foreach (var org in Model.Orgs)
         {
-          <a asp-controller="Portal" asp-action="Index" class="card bg-base-200 hover:bg-base-300 transition p-5 block" href="/portal/org/@org.Slug">
+          <a class="card bg-base-200 hover:bg-base-300 transition p-5 block" href="/portal/org/@org.Slug">
             <div class="flex items-baseline justify-between">
               <div class="font-medium">@org.Name</div>
               <span class="badge badge-ghost">@org.Role</span>

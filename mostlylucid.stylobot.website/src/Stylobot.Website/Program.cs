@@ -401,6 +401,13 @@ app.UseWebSockets();
 
 app.UseRouting();
 
+// Authentication + authorization must run BEFORE the bot detection / dashboard middlewares
+// because StyloBotDashboardMiddleware invokes endpoints directly (skipping downstream
+// middleware) — if auth isn't already on the pipeline by then, [Authorize] endpoints
+// throw "middleware not found that supports authorization".
+app.UseAuthentication();
+app.UseAuthorization();
+
 // GeoDetection middleware
 app.UseGeoRouting();
 
@@ -409,9 +416,6 @@ app.UseBotDetection();
 
 // Bot Detection Dashboard - live UI at /_stylobot
 app.UseStyloBotDashboard();
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapStaticAssets();
 

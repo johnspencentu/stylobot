@@ -47,8 +47,11 @@ public static class PortalServiceCollectionExtensions
 
         // Stop the default claim-type remapper so we see Keycloak's raw claim names
         // (<c>sub</c>, <c>email</c>, <c>preferred_username</c>) rather than the SOAP-era URIs
-        // ASP.NET Core defaults to for back-compat.
+        // ASP.NET Core defaults to for back-compat. This must happen BEFORE any handler
+        // is constructed. Both the legacy JwtSecurityTokenHandler and the newer
+        // JsonWebTokenHandler (.NET 8+) carry independent static remap tables — clear both.
         JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+        Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
         services.AddAuthentication(o =>
             {
@@ -126,14 +129,11 @@ public static class PortalServiceCollectionExtensions
 
         services.AddAuthorization(a =>
         {
-            // Baseline: signed in and has the portal-user realm role. Keycloak's default
-            // role mapper puts realm roles into a "roles" claim array; the OIDC handler
-            // above is configured to treat "roles" as the RoleClaimType.
-            a.AddPolicy(PortalAuthorizationPolicy, p => p
-                .RequireAuthenticatedUser()
-                .RequireAssertion(ctx =>
-                    ctx.User.HasClaim(c => c.Type == "roles" && c.Value == "portal-user") ||
-                    ctx.User.IsInRole("portal-user")));
+            // Baseline: the user successfully completed the Keycloak OIDC flow. Per-org
+            // authorization is done in each controller via the Member table — any user
+            // who made it into our realm is a legitimate portal visitor; what they can
+            // ACT on is gated by the memberships we find for their sub claim.
+            a.AddPolicy(PortalAuthorizationPolicy, p => p.RequireAuthenticatedUser());
         });
 
         return services;
