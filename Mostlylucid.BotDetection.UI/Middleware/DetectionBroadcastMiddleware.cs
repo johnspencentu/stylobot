@@ -67,6 +67,7 @@ public partial class DetectionBroadcastMiddleware
         IOptions<BotDetectionOptions> optionsAccessor,
         VisitorListCache visitorListCache,
         SignatureAggregateCache signatureAggregateCache,
+        Mostlylucid.BotDetection.Orchestration.Telemetry.IDetectionEventPublisher detectionEventPublisher,
         SignatureDescriptionService? signatureDescriptionService = null)
     {
         // Call next middleware first (so detection runs)
@@ -96,6 +97,10 @@ public partial class DetectionBroadcastMiddleware
                 // Beacon-only: signal which widgets need refreshing, never send full payloads
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
                 await hubContext.Clients.All.BroadcastInvalidation("summary");
+
+                // Fan out to any out-of-process event publisher (commercial Redis → separate
+                // UI container). No-op in FOSS. Fire-and-forget: must not block the response.
+                _ = PublishEventAsync(detectionEventPublisher, detection, context);
 
                 // Lightweight attack arc for world map visualization (only data payload we send)
                 if (detection.IsBot && !string.IsNullOrEmpty(detection.CountryCode)
@@ -139,6 +144,10 @@ public partial class DetectionBroadcastMiddleware
                 visitorListCache.Upsert(detection);
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
                 await hubContext.Clients.All.BroadcastInvalidation("summary");
+
+                // Fan out to any out-of-process event publisher (commercial Redis → separate
+                // UI container). No-op in FOSS. Fire-and-forget: must not block the response.
+                _ = PublishEventAsync(detectionEventPublisher, detection, context, evidence);
 
                 // Lightweight attack arc for world map visualization
                 if (detection.IsBot && !string.IsNullOrEmpty(detection.CountryCode)
@@ -705,5 +714,61 @@ public partial class DetectionBroadcastMiddleware
         var full = ua[start..end].ToString();
         var dot = full.IndexOf('.');
         return dot > 0 ? full[..dot] : full;
+    }
+
+    /// <summary>
+    ///     Projects the in-process <c>DashboardDetectionEvent</c> into the transport-friendly
+    ///     <c>DetectionEvent</c> record and hands it to the registered publisher. Catches and
+    ///     logs any failure — publish errors must never affect request processing.
+    /// </summary>
+    private async Task PublishEventAsync(
+        Mostlylucid.BotDetection.Orchestration.Telemetry.IDetectionEventPublisher publisher,
+        DashboardDetectionEvent detection,
+        HttpContext context,
+        AggregatedEvidence? evidence = null)
+    {
+        try
+        {
+            var topReasons = evidence?.Contributions
+                .Where(c => !string.IsNullOrWhiteSpace(c.Reason))
+                .OrderByDescending(c => Math.Abs(c.ConfidenceDelta * c.Weight))
+                .Take(5)
+                .Select(c => c.Reason!)
+                .ToList();
+
+            var detectorContribs = evidence?.Contributions
+                .Where(c => !string.IsNullOrWhiteSpace(c.DetectorName))
+                .GroupBy(c => c.DetectorName!)
+                .ToDictionary(g => g.Key, g => g.Sum(c => c.ConfidenceDelta * c.Weight));
+
+            var evt = new Mostlylucid.BotDetection.Orchestration.Telemetry.DetectionEvent
+            {
+                Timestamp = detection.Timestamp,
+                RequestId = context.TraceIdentifier,
+                Signature = detection.PrimarySignature ?? "",
+                Path = detection.Path,
+                Method = detection.Method,
+                StatusCode = detection.StatusCode,
+                IsBot = detection.IsBot,
+                BotProbability = detection.BotProbability,
+                Confidence = detection.Confidence,
+                RiskBand = detection.RiskBand,
+                ThreatBand = detection.ThreatBand,
+                Action = detection.Action,
+                BotName = detection.BotName,
+                BotType = detection.BotType,
+                CountryCode = detection.CountryCode,
+                ProcessingTimeMs = evidence?.TotalProcessingTimeMs ?? 0,
+                DetectorContributions = detectorContribs,
+                TopReasons = topReasons,
+                GatewayId = Environment.GetEnvironmentVariable("STYLOBOT_GATEWAY_ID")
+                            ?? Environment.MachineName
+            };
+            await publisher.PublishAsync(evt, context.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Detection event publisher {Name} threw — dropping event", publisher.Name);
+        }
     }
 }

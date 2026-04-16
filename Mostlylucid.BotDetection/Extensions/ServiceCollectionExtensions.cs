@@ -302,6 +302,12 @@ public static class ServiceCollectionExtensions
         // No-op when no reporters are registered (FOSS default).
         services.TryAddSingleton<Orchestration.Telemetry.FleetReportDispatcher>();
 
+        // Real-time detection event publisher — default no-op. Commercial Redis cluster
+        // package replaces this with a pub/sub fan-out so a separate Stylobot-UI
+        // container can render live events without being in the request path.
+        services.TryAddSingleton<Orchestration.Telemetry.IDetectionEventPublisher,
+            Orchestration.Telemetry.NullDetectionEventPublisher>();
+
         // Register individual detectors
         // Each detector is responsible for one detection strategy
         // Register as both interface and concrete type for DI flexibility
