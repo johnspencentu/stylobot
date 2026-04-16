@@ -3,11 +3,21 @@ by ***mostly*lucid**
 
 > **NOTE:** StyloBot is a FOSS project under active development. To tune detection against real traffic I collect REAL traffic on [stylobot.net](https://www.stylobot.net) (zero PII — see the [API docs](Mostlylucid.BotDetection/docs/api-reference.md)), so the live site may be temporarily broken as I test improvements. Expect rough edges!
 
-Enterprise bot detection framework for ASP.NET Core. 30 detectors, wave-based orchestration, adaptive AI learning, intent classification with threat scoring, real-time dashboard with world map, and reverse-proxy integration — all in two lines of code.
+Enterprise bot detection framework for ASP.NET Core. 31 detectors, wave-based orchestration, adaptive AI learning, session-level Markov chain behavioral compression, intent classification with threat scoring, real-time dashboard with session drill-in, and reverse-proxy integration — all in two lines of code.
 
 <img src="https://raw.githubusercontent.com/scottgal/stylobot/refs/heads/main/mostlylucid.stylobot.website/src/Stylobot.Website/wwwroot/img/stylowall.svg?raw=true" alt="StyloBot" style="max-width:200px; height:auto;" />
 
-## What's New in v5.0
+## What's New in v5.5
+
+- **Session Vector Architecture** — per-request Markov chain transitions compressed into 118-dimensional normalized vectors (100 transitions + 10 stationary + 8 temporal + 8 fingerprint). Sessions are the primary behavioral unit with retrogressive boundary detection, inter-session velocity analysis, and snapshot compaction
+- **Unified Fingerprint Dimensions** — TLS/TCP/H2 network fingerprints are vector dimensions in the same space as behavioral features. Fingerprint mutation across sessions appears as velocity — no separate fingerprint tracking needed
+- **SQLite Persistence** — sessions, signatures, and aggregated counters stored in SQLite (zero-dependency). PostgreSQL + pgvector is the commercial upgrade path for scale. ~100x compression vs per-request storage
+- **Transport-Aware Detection** — 7 detectors now consume transport protocol context (API, SignalR, WebSocket, gRPC) to suppress false positives on non-document traffic
+- **Oscillation Prevention** — configurable probability ceiling (0.90), state-aware reputation decay (12h for ConfirmedBad vs 3h), widened hysteresis gap, configurable browser attestation downgrade
+- **Session Dashboard** — new Sessions tab with Markov chain previews, behavioral radar charts (ApexCharts), transition bar visualization, HTMX drill-in
+- **Signature 404 Fix** — event store fallback when in-memory cache evicts signatures
+
+### What's New in v5.0
 
 - **Intent Classification** — new HNSW-backed detector classifies request intent (reconnaissance, exploitation, scraping, benign) with adaptive learning
 - **Threat Scoring** — independent threat dimension (Low/Elevated/High/Critical) orthogonal to bot probability, surfaced across all dashboard views, APIs, and SignalR broadcasts
@@ -25,15 +35,16 @@ This repository is a monorepo for the StyloBot ecosystem:
 - `Mostlylucid.BotDetection.Demo`: End-to-end demo app with test pages, API endpoints, and live signatures
 - `Stylobot.Gateway`: Docker-first YARP gateway with built-in detection
 - `Mostlylucid.BotDetection.UI`: Dashboard/tag helpers/view components
-- `Mostlylucid.BotDetection.UI.PostgreSQL`: PostgreSQL + TimescaleDB + pgvector persistence
+- `Mostlylucid.BotDetection.UI.PostgreSQL`: PostgreSQL + pgvector persistence (commercial)
 - `mostlylucid.stylobot.website`: Marketing/demo website using the detection stack
 
 ## Requirements
 
 - .NET SDK `10.0` (repo projects target `net10.0`)
+- No external database required — SQLite is the default persistence (ships with .NET)
 - Docker + Docker Compose (optional, for containerized flows)
 - Optional for advanced scenarios:
-  - PostgreSQL/TimescaleDB
+  - PostgreSQL + pgvector (commercial, for vector similarity at scale)
   - Ollama (for LLM provider mode)
 
 ## Quick Start (Local Demo)
@@ -66,14 +77,14 @@ curl http://localhost:8080/admin/health
 
 If `ADMIN_SECRET` is configured, include header `X-Admin-Secret` for `/admin/*` endpoints.
 
-## Detection Surface — 30 Detectors
+## Detection Surface — 31 Detectors
 
 All detectors run in a wave-based pipeline. Fast-path detectors execute in parallel in <1ms; advanced detectors fire only when triggered by upstream signals.
 
 | Wave | Detectors | Latency |
 |------|-----------|---------|
 | **Wave 0 — Fast Path** | UserAgent, Header, IP, SecurityTool, TransportProtocol, VersionAge, AiScraper, FastPathReputation, ReputationBias, VerifiedBot | <1ms |
-| **Wave 1 — Behavioral** | Behavioral, AdvancedBehavioral, BehavioralWaveform, CacheBehavior, ClientSide, GeoChange, ResponseBehavior, StreamAbuse | 1-5ms |
+| **Wave 1 — Behavioral** | Behavioral, AdvancedBehavioral, BehavioralWaveform, CacheBehavior, ClientSide, GeoChange, ResponseBehavior, StreamAbuse, **SessionVector** | 1-5ms |
 | **Wave 2 — Fingerprinting** | TLS (JA3/JA4), TCP/IP (p0f), HTTP/2 (AKAMAI), HTTP/3 (QUIC), MultiLayerCorrelation | <1ms |
 | **Wave 3 — AI + Learning** | Heuristic, HeuristicLate, Similarity, Cluster (Leiden), Intent, TimescaleReputation, LLM (optional) | 1-500ms |
 | **Slow Path** | ProjectHoneypot (DNS lookup) | ~100ms |
@@ -86,7 +97,8 @@ Real contributor lists are controlled by `BotDetection:Policies` in each app con
 - **Protocol-level fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 — detect bots even when they spoof headers perfectly
 - **Stream-aware detection**: WebSocket, SSE, SignalR, and gRPC traffic classified early; downstream detectors suppress false positives; dedicated stream abuse detection catches connection churn, payload flooding, and protocol switching
 - **Bot network discovery**: Leiden clustering finds coordinated bot campaigns across thousands of signatures
-- **Adaptive AI**: Heuristic model extracts ~50 features per request and learns from feedback — detection improves over time
+- **Session behavioral vectors**: Markov chain transitions compressed into 118-dim vectors with unified fingerprint dimensions — enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
+- **Adaptive AI**: Heuristic model extracts ~130 features per request (including transport context) and learns from feedback — detection improves over time
 - **Geo intelligence**: Country reputation tracking, geographic drift detection, VPN/proxy/Tor/datacenter identification
 - **Verified bot authentication**: DNS-verified identification of Googlebot, Bingbot, and 30+ legitimate crawlers
 - **AI scraper detection**: GPTBot, ClaudeBot, PerplexityBot, Google-Extended and Cloudflare AI signals
@@ -113,16 +125,17 @@ Register with `app.MapBotTrainingEndpoints()`. See [Training Data API docs](Most
 
 The built-in dashboard (`Mostlylucid.BotDetection.UI`) provides live monitoring via SignalR:
 
+- **Sessions Tab**: Session timeline with Markov chain previews, behavioral radar charts, transition bar visualization, HTMX drill-in to see request chains without storing individual requests
 - **Overview**: Total/bot/human request counts, bot rate, unique signatures, top bots
-- **World Map**: jsvectormap with countries colored by bot rate (green→amber→red) and markers sized by traffic volume
+- **World Map**: Countries colored by bot rate with markers sized by traffic volume
 - **Countries Tab**: Country-level bot rates, reputation scores, request volumes
 - **Clusters Tab**: Leiden-detected bot networks with similarity scores, dominant intent, and threat level per cluster
 - **User Agents Tab**: UA family breakdown with category badges, version distribution, country per UA
 - **Visitors Tab**: Live signature feed with risk bands, threat bands, sparkline histories, drill-down details
-- **Detections Tab**: Full detection event log with per-detector contributions, signal breakdown, and threat scoring
+- **Endpoints Tab**: Path-level aggregations with bot rates, sorting, detail drill-in
 - **Threat Scoring**: Independent threat bands (Low/Elevated/High/Critical) displayed alongside bot probability across all views
 
-All data updates in real-time via SignalR. JSON API endpoints available for programmatic access.
+All data updates in real-time via SignalR. JSON API endpoints available for programmatic access (`/api/sessions`, `/api/detections`, `/api/clusters`, etc.).
 
 ```csharp
 builder.Services.AddBotDetection();
@@ -132,7 +145,7 @@ app.UseStyloBotDashboard();  // Dashboard at /_stylobot/
 
 ## Core Product Differentiators
 
-- **Speed with intelligence**: <1ms fast path across 29 detectors with explainable evidence per decision
+- **Speed with intelligence**: <1ms fast path across 31 detectors with explainable evidence per decision
 - **Protocol-deep fingerprinting**: TLS, TCP/IP, HTTP/2, HTTP/3 fingerprints catch bots that spoof everything else
 - **Temporal behavior resolution**: cross-request, windowed signal correlation for stronger bot/human discrimination
 - **Adaptive learning**: Heuristic weights evolve based on detection outcomes — gets smarter over time
@@ -157,8 +170,8 @@ dotnet test mostlylucid.stylobot.sln
 
 ## Docker Compose Stacks
 
-- `docker-compose.yml`: TimescaleDB + demo app
 - `docker-compose.demo.yml`: full stack (Caddy + gateway + website + DB + extras)
+- `mostlylucid.stylobot.website/docker-compose.local.yml`: production-like stack with Cloudflare tunnel
 
 Start minimal compose stack:
 
@@ -186,7 +199,7 @@ Library and component docs:
 - [`Mostlylucid.BotDetection/docs/detection-strategies.md`](Mostlylucid.BotDetection/docs/detection-strategies.md)
 - [`Mostlylucid.BotDetection/docs/action-policies.md`](Mostlylucid.BotDetection/docs/action-policies.md)
 
-Detector docs (29 detectors):
+Detector docs (31 detectors):
 
 - [`user-agent-detection.md`](Mostlylucid.BotDetection/docs/user-agent-detection.md) — UA parsing, bot pattern matching
 - [`header-detection.md`](Mostlylucid.BotDetection/docs/header-detection.md) — HTTP header anomalies
