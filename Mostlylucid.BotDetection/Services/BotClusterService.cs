@@ -33,6 +33,7 @@ public class BotClusterService : BackgroundService
 {
     // Immutable snapshots swapped atomically via volatile reference
     private volatile ClusterSnapshot _snapshot = ClusterSnapshot.Empty;
+    private volatile ClusterDiagnosticsSnapshot _diagnostics = ClusterDiagnosticsSnapshot.Empty;
 
     private readonly ILogger<BotClusterService> _logger;
     private readonly ClusterOptions _options;
@@ -105,6 +106,11 @@ public class BotClusterService : BackgroundService
     {
         return _snapshot.Clusters.Values.ToList();
     }
+
+    /// <summary>
+    ///     Get the latest clustering diagnostics for operator visibility.
+    /// </summary>
+    public ClusterDiagnosticsSnapshot GetDiagnostics() => _diagnostics;
 
     /// <summary>
     ///     Get cached spectral features for a signature, if available.
@@ -196,6 +202,16 @@ public class BotClusterService : BackgroundService
 
         if (behaviors.Count < _options.MinClusterSize)
         {
+            _diagnostics = new ClusterDiagnosticsSnapshot
+            {
+                LastRunAt = DateTime.UtcNow,
+                Algorithm = _options.Algorithm,
+                Status = $"Insufficient signatures: {behaviors.Count} below MinClusterSize={_options.MinClusterSize}",
+                InputBehaviorCount = behaviors.Count,
+                FeatureCount = behaviors.Count,
+                SimilarityThreshold = _options.SimilarityThreshold,
+                MinClusterSize = _options.MinClusterSize
+            };
             _logger.LogInformation(
                 "Clustering: {Count} signatures below MinClusterSize={Min}. " +
                 "Top bot probs: [{TopProbs}]",
@@ -270,6 +286,7 @@ public class BotClusterService : BackgroundService
             .GroupBy(x => x.Label)
             .Where(g => g.Count() >= _options.MinClusterSize)
             .ToList();
+        var rawCommunityCount = labels.Distinct().Count();
 
         // 6. Classify and store clusters
         var newClusters = new Dictionary<string, BotCluster>();
@@ -306,8 +323,58 @@ public class BotClusterService : BackgroundService
             newClusters.Count, productCount, networkCount, emergentCount, humanCount, mixedCount,
             behaviors.Count, useLeiden ? "Leiden" : "LabelPropagation");
 
+        _diagnostics = new ClusterDiagnosticsSnapshot
+        {
+            LastRunAt = DateTime.UtcNow,
+            Algorithm = useLeiden ? "Leiden" : "LabelPropagation",
+            Status = newClusters.Count > 0 ? "Clusters discovered" : "No clusters passed thresholds",
+            InputBehaviorCount = behaviors.Count,
+            FeatureCount = features.Count,
+            EdgeCount = edgeCount,
+            GraphDensity = maxEdges > 0 ? (double)edgeCount / maxEdges : 0,
+            RawCommunityCount = rawCommunityCount,
+            ClusterCount = newClusters.Count,
+            ProductCount = productCount,
+            NetworkCount = networkCount,
+            EmergentCount = emergentCount,
+            HumanCount = humanCount,
+            MixedCount = mixedCount,
+            SimilarityThreshold = _options.SimilarityThreshold,
+            MinClusterSize = _options.MinClusterSize,
+            TopWeights = (_currentWeights ?? AdaptiveSimilarityWeighter.GetDefaultWeights())
+                .OrderByDescending(w => w.Value)
+                .Take(6)
+                .ToDictionary(k => k.Key, v => v.Value)
+        };
+
         // Always fire event — even when clusters dissolve, so callbacks can update
         ClustersUpdated?.Invoke(newClusters.Values.ToList(), behaviors);
+    }
+
+    public sealed record ClusterDiagnosticsSnapshot
+    {
+        public DateTime? LastRunAt { get; init; }
+        public string? Algorithm { get; init; }
+        public string? Status { get; init; }
+        public int InputBehaviorCount { get; init; }
+        public int FeatureCount { get; init; }
+        public int EdgeCount { get; init; }
+        public double GraphDensity { get; init; }
+        public int RawCommunityCount { get; init; }
+        public int ClusterCount { get; init; }
+        public int ProductCount { get; init; }
+        public int NetworkCount { get; init; }
+        public int EmergentCount { get; init; }
+        public int HumanCount { get; init; }
+        public int MixedCount { get; init; }
+        public double SimilarityThreshold { get; init; }
+        public int MinClusterSize { get; init; }
+        public IReadOnlyDictionary<string, double> TopWeights { get; init; } = new Dictionary<string, double>();
+
+        public static ClusterDiagnosticsSnapshot Empty => new()
+        {
+            Status = "Clustering has not run yet"
+        };
     }
 
     #region Feature Extraction

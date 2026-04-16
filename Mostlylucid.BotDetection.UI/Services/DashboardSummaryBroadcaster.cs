@@ -74,14 +74,16 @@ public class DashboardSummaryBroadcaster : BackgroundService
                 // Compute aggregates from DB in parallel (no TopBots — handled by write-through cache)
                 var summaryTask = _eventStore.GetSummaryAsync();
                 var countriesTask = _eventStore.GetCountryStatsAsync(50);
+                var endpointsTask = _eventStore.GetEndpointStatsAsync(50);
                 var userAgentsTask = ComputeUserAgentsAsync();
 
-                await Task.WhenAll(summaryTask, countriesTask, userAgentsTask);
+                await Task.WhenAll(summaryTask, countriesTask, endpointsTask, userAgentsTask);
 
                 // Update cache atomically
                 _cache.Update(new DashboardAggregateCache.AggregateSnapshot
                 {
                     Countries = await countriesTask,
+                    Endpoints = await endpointsTask,
                     UserAgents = await userAgentsTask
                 });
 
@@ -90,6 +92,7 @@ public class DashboardSummaryBroadcaster : BackgroundService
                 // No need to serialize full data payloads over the wire.
                 await _hubContext.Clients.All.BroadcastInvalidation("summary");
                 await _hubContext.Clients.All.BroadcastInvalidation("countries");
+                await _hubContext.Clients.All.BroadcastInvalidation("endpoints");
                 await _hubContext.Clients.All.BroadcastInvalidation("signature");
                 await _hubContext.Clients.All.BroadcastInvalidation("useragents");
 

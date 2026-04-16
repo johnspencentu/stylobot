@@ -79,6 +79,14 @@ public class DashboardController : Controller
         }
         catch { countriesData = []; }
 
+        List<DashboardEndpointStats> endpointsData;
+        try
+        {
+            var cached = _aggregateCache.Current.Endpoints;
+            endpointsData = cached.Count > 0 ? cached : await _eventStore.GetEndpointStatsAsync(100);
+        }
+        catch { endpointsData = []; }
+
         var allUserAgents = _aggregateCache.Current.UserAgents.Count > 0
             ? _aggregateCache.Current.UserAgents
             : await ComputeUserAgentsFallbackAsync();
@@ -99,6 +107,7 @@ public class DashboardController : Controller
             },
             YourDetection = BuildYourDetectionModel(basePath),
             Countries = BuildCountriesModel("total", "desc", 1, 20, countriesData, basePath),
+            Endpoints = BuildEndpointsModel("total", "desc", 1, 20, endpointsData, basePath),
             Clusters = BuildClustersModel(basePath),
             UserAgents = BuildUserAgentsModel("all", "requests", "desc", 1, 25, allUserAgents, basePath),
             TopBots = BuildTopBotsModel(1, 10, "hits", basePath)
@@ -187,6 +196,34 @@ public class DashboardController : Controller
         };
     }
 
+    private static EndpointsListModel BuildEndpointsModel(string sortField, string sortDir, int page, int pageSize, List<DashboardEndpointStats> all, string basePath)
+    {
+        IEnumerable<DashboardEndpointStats> sorted = sortField.ToLowerInvariant() switch
+        {
+            "method" => sortDir == "asc" ? all.OrderBy(e => e.Method) : all.OrderByDescending(e => e.Method),
+            "path" => sortDir == "asc" ? all.OrderBy(e => e.Path) : all.OrderByDescending(e => e.Path),
+            "bots" => sortDir == "asc" ? all.OrderBy(e => e.BotCount) : all.OrderByDescending(e => e.BotCount),
+            "botrate" => sortDir == "asc" ? all.OrderBy(e => e.BotRate) : all.OrderByDescending(e => e.BotRate),
+            "latency" => sortDir == "asc" ? all.OrderBy(e => e.AvgProcessingTimeMs) : all.OrderByDescending(e => e.AvgProcessingTimeMs),
+            "threat" => sortDir == "asc" ? all.OrderBy(e => e.AvgThreatScore) : all.OrderByDescending(e => e.AvgThreatScore),
+            "unique" => sortDir == "asc" ? all.OrderBy(e => e.UniqueSignatures) : all.OrderByDescending(e => e.UniqueSignatures),
+            "lastseen" => sortDir == "asc" ? all.OrderBy(e => e.LastSeen) : all.OrderByDescending(e => e.LastSeen),
+            _ => sortDir == "asc" ? all.OrderBy(e => e.TotalCount) : all.OrderByDescending(e => e.TotalCount)
+        };
+
+        var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return new EndpointsListModel
+        {
+            Endpoints = paged,
+            BasePath = basePath,
+            SortField = sortField,
+            SortDir = sortDir,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = all.Count
+        };
+    }
+
     private ClustersListModel BuildClustersModel(string basePath)
     {
         var clusters = _clusterService?.GetClusters()
@@ -201,7 +238,34 @@ public class DashboardController : Controller
                 AverageThreatScore = Math.Round(cl.AverageThreatScore, 3)
             }).ToList() ?? [];
 
-        return new ClustersListModel { Clusters = clusters, BasePath = basePath };
+        return new ClustersListModel
+        {
+            Clusters = clusters,
+            Diagnostics = _clusterService == null ? null : BuildClusterDiagnosticsModel(_clusterService),
+            BasePath = basePath
+        };
+    }
+
+    private static ClusterDiagnosticsViewModel BuildClusterDiagnosticsModel(BotClusterService clusterService)
+    {
+        var diagnostics = clusterService.GetDiagnostics();
+        return new ClusterDiagnosticsViewModel
+        {
+            Algorithm = diagnostics.Algorithm,
+            Status = diagnostics.Status,
+            LastRunAt = diagnostics.LastRunAt,
+            InputBehaviorCount = diagnostics.InputBehaviorCount,
+            EdgeCount = diagnostics.EdgeCount,
+            GraphDensity = Math.Round(diagnostics.GraphDensity, 3),
+            RawCommunityCount = diagnostics.RawCommunityCount,
+            ClusterCount = diagnostics.ClusterCount,
+            HumanClusterCount = diagnostics.HumanCount,
+            MachineClusterCount = diagnostics.ProductCount + diagnostics.NetworkCount + diagnostics.EmergentCount,
+            MixedClusterCount = diagnostics.MixedCount,
+            SimilarityThreshold = diagnostics.SimilarityThreshold,
+            MinClusterSize = diagnostics.MinClusterSize,
+            TopWeights = diagnostics.TopWeights.OrderByDescending(w => w.Value).Take(6).ToList()
+        };
     }
 
     private async Task<List<DashboardUserAgentSummary>> ComputeUserAgentsFallbackAsync()

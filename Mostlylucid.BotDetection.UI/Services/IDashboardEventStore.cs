@@ -57,4 +57,14 @@ public interface IDashboardEventStore
     ///     Get detailed statistics for a single country, including bot type and signature breakdowns.
     /// </summary>
     Task<DashboardCountryDetail?> GetCountryDetailAsync(string countryCode, DateTime? startTime = null, DateTime? endTime = null);
+
+    /// <summary>
+    ///     Get endpoint-level statistics aggregated by method + path.
+    /// </summary>
+    Task<List<DashboardEndpointStats>> GetEndpointStatsAsync(int count = 50, DateTime? startTime = null, DateTime? endTime = null);
+
+    /// <summary>
+    ///     Get detailed statistics for a single endpoint.
+    /// </summary>
+    Task<DashboardEndpointDetail?> GetEndpointDetailAsync(string method, string path, DateTime? startTime = null, DateTime? endTime = null);
 }

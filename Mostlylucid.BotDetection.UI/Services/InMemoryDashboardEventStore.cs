@@ -284,6 +284,165 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
         return Task.FromResult<DashboardCountryDetail?>(detail);
     }
 
+    public Task<List<DashboardEndpointStats>> GetEndpointStatsAsync(int count = 50, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        IEnumerable<DashboardDetectionEvent> source = _detections;
+        if (startTime.HasValue) source = source.Where(d => d.Timestamp >= startTime.Value);
+        if (endTime.HasValue) source = source.Where(d => d.Timestamp <= endTime.Value);
+
+        var endpoints = source
+            .Where(d => !string.IsNullOrWhiteSpace(d.Path) && !string.IsNullOrWhiteSpace(d.Method))
+            .GroupBy(d => new { d.Method, d.Path })
+            .Select(g =>
+            {
+                var items = g.ToList();
+                var latest = items.OrderByDescending(d => d.Timestamp).First();
+                var topAction = items
+                    .Where(d => !string.IsNullOrWhiteSpace(d.Action))
+                    .GroupBy(d => d.Action!)
+                    .OrderByDescending(x => x.Count())
+                    .FirstOrDefault()?.Key;
+                var dominantRiskBand = items
+                    .GroupBy(d => d.RiskBand)
+                    .OrderByDescending(x => x.Count())
+                    .FirstOrDefault()?.Key;
+                var avgThreatScore = items
+                    .Where(d => d.ThreatScore.HasValue)
+                    .Select(d => d.ThreatScore!.Value)
+                    .DefaultIfEmpty(0)
+                    .Average();
+
+                return new DashboardEndpointStats
+                {
+                    Method = g.Key.Method,
+                    Path = g.Key.Path,
+                    TotalCount = items.Count,
+                    BotCount = items.Count(d => d.IsBot),
+                    BotRate = items.Count > 0 ? Math.Round((double)items.Count(d => d.IsBot) / items.Count, 4) : 0,
+                    UniqueSignatures = items.Where(d => !string.IsNullOrWhiteSpace(d.PrimarySignature))
+                        .Select(d => d.PrimarySignature!)
+                        .Distinct(StringComparer.Ordinal)
+                        .Count(),
+                    AvgProcessingTimeMs = items.Count > 0 ? Math.Round(items.Average(d => d.ProcessingTimeMs), 2) : 0,
+                    AvgThreatScore = Math.Round(avgThreatScore, 3),
+                    TopAction = topAction,
+                    DominantRiskBand = dominantRiskBand,
+                    LastSeen = latest.Timestamp
+                };
+            })
+            .OrderByDescending(e => e.TotalCount)
+            .Take(count)
+            .ToList();
+
+        return Task.FromResult(endpoints);
+    }
+
+    public Task<DashboardEndpointDetail?> GetEndpointDetailAsync(string method, string path, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        IEnumerable<DashboardDetectionEvent> source = _detections;
+        if (startTime.HasValue) source = source.Where(d => d.Timestamp >= startTime.Value);
+        if (endTime.HasValue) source = source.Where(d => d.Timestamp <= endTime.Value);
+
+        var endpointDetections = source
+            .Where(d => string.Equals(d.Method, method, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(d.Path, path, StringComparison.Ordinal))
+            .OrderByDescending(d => d.Timestamp)
+            .ToList();
+
+        if (endpointDetections.Count == 0)
+            return Task.FromResult<DashboardEndpointDetail?>(null);
+
+        var totalCount = endpointDetections.Count;
+        var botCount = endpointDetections.Count(d => d.IsBot);
+        var avgThreatScore = endpointDetections
+            .Where(d => d.ThreatScore.HasValue)
+            .Select(d => d.ThreatScore!.Value)
+            .DefaultIfEmpty(0)
+            .Average();
+
+        var topBots = endpointDetections
+            .Where(d => d.IsBot && !string.IsNullOrWhiteSpace(d.PrimarySignature))
+            .GroupBy(d => d.PrimarySignature!)
+            .Select(g =>
+            {
+                var latest = g.OrderByDescending(d => d.Timestamp).First();
+                return new DashboardTopBotEntry
+                {
+                    PrimarySignature = g.Key,
+                    HitCount = g.Count(),
+                    BotName = latest.BotName,
+                    BotType = latest.BotType,
+                    RiskBand = latest.RiskBand,
+                    BotProbability = latest.BotProbability,
+                    Confidence = latest.Confidence,
+                    Action = latest.Action,
+                    CountryCode = latest.CountryCode,
+                    ProcessingTimeMs = latest.ProcessingTimeMs,
+                    TopReasons = latest.TopReasons,
+                    LastSeen = latest.Timestamp,
+                    Narrative = latest.Narrative,
+                    Description = latest.Description,
+                    IsKnownBot = true
+                };
+            })
+            .OrderByDescending(b => b.HitCount)
+            .Take(10)
+            .ToList();
+
+        var recentDetections = endpointDetections
+            .Take(15)
+            .Select(d => new SignatureDetectionRow
+            {
+                Timestamp = d.Timestamp,
+                IsBot = d.IsBot,
+                BotProbability = d.BotProbability,
+                Confidence = d.Confidence,
+                RiskBand = d.RiskBand,
+                StatusCode = d.StatusCode,
+                Path = d.Path,
+                Method = d.Method,
+                ProcessingTimeMs = d.ProcessingTimeMs,
+                Action = d.Action
+            })
+            .ToList();
+
+        var detail = new DashboardEndpointDetail
+        {
+            Method = method,
+            Path = path,
+            TotalCount = totalCount,
+            BotCount = botCount,
+            BotRate = totalCount > 0 ? Math.Round((double)botCount / totalCount, 4) : 0,
+            UniqueSignatures = endpointDetections
+                .Where(d => !string.IsNullOrWhiteSpace(d.PrimarySignature))
+                .Select(d => d.PrimarySignature!)
+                .Distinct(StringComparer.Ordinal)
+                .Count(),
+            AvgProcessingTimeMs = Math.Round(endpointDetections.Average(d => d.ProcessingTimeMs), 2),
+            AvgThreatScore = Math.Round(avgThreatScore, 3),
+            TopActions = endpointDetections
+                .Where(d => !string.IsNullOrWhiteSpace(d.Action))
+                .GroupBy(d => d.Action!)
+                .OrderByDescending(g => g.Count())
+                .Take(8)
+                .ToDictionary(g => g.Key, g => g.Count()),
+            TopCountries = endpointDetections
+                .Where(d => !string.IsNullOrWhiteSpace(d.CountryCode))
+                .GroupBy(d => d.CountryCode!)
+                .OrderByDescending(g => g.Count())
+                .Take(8)
+                .ToDictionary(g => g.Key, g => g.Count()),
+            RiskBands = endpointDetections
+                .GroupBy(d => d.RiskBand)
+                .OrderByDescending(g => g.Count())
+                .ToDictionary(g => g.Key, g => g.Count()),
+            TopBots = topBots,
+            RecentDetections = recentDetections
+        };
+
+        return Task.FromResult<DashboardEndpointDetail?>(detail);
+    }
+
     public Task<List<DashboardTimeSeriesPoint>> GetTimeSeriesAsync(
         DateTime startTime,
         DateTime endTime,

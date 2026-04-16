@@ -20,12 +20,14 @@ public sealed class DashboardAggregateCache
     public sealed record AggregateSnapshot
     {
         public required List<DashboardCountryStats> Countries { get; init; }
+        public required List<DashboardEndpointStats> Endpoints { get; init; }
         public required List<DashboardUserAgentSummary> UserAgents { get; init; }
         public DateTime ComputedAt { get; init; } = DateTime.UtcNow;
 
         public static AggregateSnapshot Empty => new()
         {
             Countries = [],
+            Endpoints = [],
             UserAgents = [],
             ComputedAt = DateTime.MinValue
         };

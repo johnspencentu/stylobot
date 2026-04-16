@@ -41,6 +41,7 @@
         <a href="@TabUrl("overview")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("overview")">Overview</a>
         <a href="@TabUrl("visitors")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("visitors")">Visitors</a>
         <a href="@TabUrl("countries")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("countries")">Countries</a>
+        <a href="@TabUrl("endpoints")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("endpoints")">Endpoints</a>
         <a href="@TabUrl("clusters")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("clusters")">Clusters</a>
         <a href="@TabUrl("useragents")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("useragents")">User Agents</a>
     </div>
@@ -99,6 +100,10 @@
             <div id="countries-map" class="relative" style="height: 440px;"></div>
         </div>
         @await Html.PartialAsync("~/Views/Dashboard/_CountriesList.cshtml", Model.Countries)
+    }
+    else if (tab == "endpoints")
+    {
+        @await Html.PartialAsync("~/Views/Dashboard/_EndpointsList.cshtml", Model.Endpoints)
     }
     else if (tab == "clusters")
     {

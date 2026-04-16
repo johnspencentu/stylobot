@@ -1,0 +1,88 @@
+# ============================================================
+# Stylobot Website - Dev Stack (local registry images)
+# ============================================================
+# Uses images from local registry at 192.168.0.89:5000
+# instead of Docker Hub. No Cloudflare tunnel, exposes
+# ports directly for local testing with Playwright.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   Open http://localhost:8080/_stylobot
+# ============================================================
+
+services:
+  gateway:
+    image: 192.168.0.89:5000/stylobot-gateway:latest
+    container_name: stylobot-gateway-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DEFAULT_UPSTREAM=http://website:8080
+      - StyloBotDashboard__PostgreSQL__ConnectionString=Host=timescaledb;Database=stylobot;Username=stylobot;Password=dev-password
+      - StyloBotDashboard__PostgreSQL__EnableTimescaleDB=true
+      - StyloBotDashboard__PostgreSQL__AutoInitializeSchema=true
+      - StyloBotDashboard__PostgreSQL__RetentionDays=7
+      # Heuristic-only AI (no Ollama dependency for dev)
+      - BotDetection__AiDetection__Provider=Heuristic
+      # Low cluster thresholds for dev
+      - BotDetection__Cluster__MinClusterSize=2
+      - BotDetection__Cluster__ClusterIntervalSeconds=15
+      # API keys for testing
+      - BotDetection__ApiKeys__DEV-BYPASS__Name=Dev Bypass
+      - BotDetection__ApiKeys__DEV-BYPASS__ActionPolicyName=logonly
+      - BotDetection__ApiKeys__DEV-BYPASS__Enabled=true
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      website:
+        condition: service_started
+    networks:
+      - stylobot-dev
+
+  website:
+    image: 192.168.0.89:5000/stylobot-site:latest
+    container_name: stylobot-website-dev
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - BOTDETECTION_TRUST_UPSTREAM=true
+      - STYLOBOT_DASHBOARD_PUBLIC=true
+      - StyloBotDashboard__PostgreSQL__ConnectionString=Host=timescaledb;Database=stylobot;Username=stylobot;Password=dev-password
+      - StyloBotDashboard__PostgreSQL__EnableTimescaleDB=true
+      - StyloBotDashboard__PostgreSQL__AutoInitializeSchema=true
+    expose:
+      - "8080"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - stylobot-dev
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: stylobot-timescale-dev
+    environment:
+      - POSTGRES_DB=stylobot
+      - POSTGRES_USER=stylobot
+      - POSTGRES_PASSWORD=dev-password
+      - TIMESCALEDB_TELEMETRY=off
+    volumes:
+      - timescale-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stylobot -d stylobot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - stylobot-dev
+
+networks:
+  stylobot-dev:
+    driver: bridge
+
+volumes:
+  timescale-dev-data:
+    driver: local

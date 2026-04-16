@@ -1,0 +1,55 @@
+# Minimal dev stack: Gateway (with dashboard) + TimescaleDB
+# No website needed — gateway serves the dashboard directly.
+# Usage: docker compose -f docker-compose.dev-gateway.yml up -d
+#        Open http://localhost:8080/_stylobot
+
+services:
+  gateway:
+    image: scottgal/stylobot-gateway:latest
+    container_name: stylobot-gw-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DEFAULT_UPSTREAM=http://host.docker.internal:9999
+      - StyloBotDashboard__PostgreSQL__ConnectionString=Host=timescaledb;Database=stylobot;Username=stylobot;Password=dev-password
+      - StyloBotDashboard__PostgreSQL__EnableTimescaleDB=true
+      - StyloBotDashboard__PostgreSQL__AutoInitializeSchema=true
+      - BotDetection__AiDetection__Provider=Heuristic
+      - BotDetection__Cluster__MinClusterSize=2
+      - BotDetection__Cluster__ClusterIntervalSeconds=15
+      - BotDetection__ApiKeys__DEV-BYPASS__Name=Dev Bypass
+      - BotDetection__ApiKeys__DEV-BYPASS__ActionPolicyName=logonly
+      - BotDetection__ApiKeys__DEV-BYPASS__Enabled=true
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - dev
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: stylobot-ts-dev
+    environment:
+      - POSTGRES_DB=stylobot
+      - POSTGRES_USER=stylobot
+      - POSTGRES_PASSWORD=dev-password
+      - TIMESCALEDB_TELEMETRY=off
+    volumes:
+      - ts-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stylobot -d stylobot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - dev
+
+networks:
+  dev:
+    driver: bridge
+
+volumes:
+  ts-dev-data:

@@ -846,6 +846,230 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
         }
     }
 
+    public async Task<List<DashboardEndpointStats>> GetEndpointStatsAsync(int count = 50, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        if (IsCircuitOpen) return [];
+
+        var timeFilter = "";
+        var parameters = new DynamicParameters();
+        parameters.Add("Count", count);
+        if (startTime.HasValue)
+        {
+            timeFilter += " AND timestamp >= @StartTime";
+            parameters.Add("StartTime", startTime.Value);
+        }
+        if (endTime.HasValue)
+        {
+            timeFilter += " AND timestamp <= @EndTime";
+            parameters.Add("EndTime", endTime.Value);
+        }
+
+        var sql = $@"
+            SELECT
+                method,
+                path,
+                COUNT(*)::int AS total_count,
+                COUNT(*) FILTER (WHERE is_bot)::int AS bot_count,
+                COUNT(DISTINCT primary_signature)::int AS unique_signatures,
+                AVG(processing_time_ms) AS avg_processing_time_ms,
+                AVG(COALESCE((important_signals->>'threat.score')::double precision, 0)) AS avg_threat_score,
+                mode() WITHIN GROUP (ORDER BY action) AS top_action,
+                mode() WITHIN GROUP (ORDER BY risk_band) AS dominant_risk_band,
+                MAX(timestamp) AS last_seen
+            FROM dashboard_detections
+            WHERE method IS NOT NULL
+              AND path IS NOT NULL
+              {timeFilter}
+            GROUP BY method, path
+            ORDER BY total_count DESC
+            LIMIT @Count";
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+            var rows = await connection.QueryAsync<EndpointStatsRow>(sql, parameters,
+                commandTimeout: _options.CommandTimeoutSeconds);
+
+            return rows.Select(r => new DashboardEndpointStats
+            {
+                Method = r.Method,
+                Path = r.Path,
+                TotalCount = r.TotalCount,
+                BotCount = r.BotCount,
+                BotRate = r.TotalCount > 0 ? Math.Round((double)r.BotCount / r.TotalCount, 4) : 0,
+                UniqueSignatures = r.UniqueSignatures,
+                AvgProcessingTimeMs = Math.Round(r.AvgProcessingTimeMs ?? 0, 2),
+                AvgThreatScore = Math.Round(r.AvgThreatScore ?? 0, 3),
+                TopAction = r.TopAction,
+                DominantRiskBand = r.DominantRiskBand,
+                LastSeen = r.LastSeen
+            }).ToList();
+        }
+        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
+        {
+            TripCircuit();
+            _logger.LogError(ex, "Failed to get endpoint stats from PostgreSQL");
+            return [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get endpoint stats from PostgreSQL");
+            throw;
+        }
+    }
+
+    public async Task<DashboardEndpointDetail?> GetEndpointDetailAsync(string method, string path, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        if (IsCircuitOpen) return null;
+
+        var timeFilter = "";
+        var parameters = new DynamicParameters();
+        parameters.Add("Method", method);
+        parameters.Add("Path", path);
+        if (startTime.HasValue)
+        {
+            timeFilter += " AND timestamp >= @StartTime";
+            parameters.Add("StartTime", startTime.Value);
+        }
+        if (endTime.HasValue)
+        {
+            timeFilter += " AND timestamp <= @EndTime";
+            parameters.Add("EndTime", endTime.Value);
+        }
+
+        var whereClause = $"WHERE method = @Method AND path = @Path{timeFilter}";
+        var summarySql = $@"
+            SELECT
+                COUNT(*)::int AS total_count,
+                COUNT(*) FILTER (WHERE is_bot)::int AS bot_count,
+                COUNT(DISTINCT primary_signature)::int AS unique_signatures,
+                AVG(processing_time_ms) AS avg_processing_time_ms,
+                AVG(COALESCE((important_signals->>'threat.score')::double precision, 0)) AS avg_threat_score
+            FROM dashboard_detections
+            {whereClause}";
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+            var summary = await connection.QuerySingleOrDefaultAsync<EndpointDetailSummaryRow>(summarySql, parameters,
+                commandTimeout: _options.CommandTimeoutSeconds);
+
+            if (summary == null || summary.TotalCount == 0)
+                return null;
+
+            var topActions = (await connection.QueryAsync<(string Action, int Count)>($@"
+                SELECT action, COUNT(*)::int AS count
+                FROM dashboard_detections
+                {whereClause} AND action IS NOT NULL
+                GROUP BY action
+                ORDER BY count DESC
+                LIMIT 8", parameters, commandTimeout: _options.CommandTimeoutSeconds))
+                .ToDictionary(x => x.Action, x => x.Count);
+
+            var topCountries = (await connection.QueryAsync<(string CountryCode, int Count)>($@"
+                SELECT country_code, COUNT(*)::int AS count
+                FROM dashboard_detections
+                {whereClause} AND country_code IS NOT NULL
+                GROUP BY country_code
+                ORDER BY count DESC
+                LIMIT 8", parameters, commandTimeout: _options.CommandTimeoutSeconds))
+                .ToDictionary(x => x.CountryCode, x => x.Count);
+
+            var riskBands = (await connection.QueryAsync<(string RiskBand, int Count)>($@"
+                SELECT risk_band, COUNT(*)::int AS count
+                FROM dashboard_detections
+                {whereClause}
+                GROUP BY risk_band
+                ORDER BY count DESC", parameters, commandTimeout: _options.CommandTimeoutSeconds))
+                .ToDictionary(x => x.RiskBand, x => x.Count);
+
+            var topBotRows = await connection.QueryAsync<TopBotRow>($@"
+                SELECT
+                    primary_signature,
+                    COUNT(*)::int AS hit_count,
+                    (array_agg(bot_name ORDER BY timestamp DESC))[1] AS bot_name,
+                    (array_agg(bot_type ORDER BY timestamp DESC))[1] AS bot_type,
+                    (array_agg(risk_band ORDER BY timestamp DESC))[1] AS risk_band,
+                    (array_agg(bot_probability ORDER BY timestamp DESC))[1] AS bot_probability,
+                    (array_agg(confidence ORDER BY timestamp DESC))[1] AS confidence,
+                    (array_agg(action ORDER BY timestamp DESC))[1] AS action,
+                    AVG(processing_time_ms) AS processing_time_ms,
+                    (array_agg(top_reasons ORDER BY timestamp DESC))[1] AS top_reasons,
+                    MAX(timestamp) AS last_seen,
+                    (array_agg(narrative ORDER BY timestamp DESC))[1] AS narrative,
+                    (array_agg(description ORDER BY timestamp DESC))[1] AS description,
+                    (array_agg(country_code ORDER BY timestamp DESC))[1] AS country_code
+                FROM dashboard_detections
+                {whereClause} AND is_bot = true AND primary_signature IS NOT NULL
+                GROUP BY primary_signature
+                ORDER BY hit_count DESC
+                LIMIT 10", parameters, commandTimeout: _options.CommandTimeoutSeconds);
+
+            var recentRows = await connection.QueryAsync<DetectionRow>($@"
+                SELECT * FROM dashboard_detections
+                {whereClause}
+                ORDER BY timestamp DESC
+                LIMIT 15", parameters, commandTimeout: _options.CommandTimeoutSeconds);
+
+            return new DashboardEndpointDetail
+            {
+                Method = method,
+                Path = path,
+                TotalCount = summary.TotalCount,
+                BotCount = summary.BotCount,
+                BotRate = summary.TotalCount > 0 ? Math.Round((double)summary.BotCount / summary.TotalCount, 4) : 0,
+                UniqueSignatures = summary.UniqueSignatures,
+                AvgProcessingTimeMs = Math.Round(summary.AvgProcessingTimeMs ?? 0, 2),
+                AvgThreatScore = Math.Round(summary.AvgThreatScore ?? 0, 3),
+                TopActions = topActions,
+                TopCountries = topCountries,
+                RiskBands = riskBands,
+                TopBots = topBotRows.Select(r => new DashboardTopBotEntry
+                {
+                    PrimarySignature = r.PrimarySignature,
+                    HitCount = r.HitCount,
+                    BotName = r.BotName,
+                    BotType = r.BotType,
+                    RiskBand = r.RiskBand,
+                    BotProbability = r.BotProbability ?? 0,
+                    Confidence = r.Confidence ?? 0,
+                    Action = r.Action,
+                    CountryCode = r.CountryCode,
+                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0,
+                    TopReasons = DeserializeJsonOrNull<List<string>>(r.TopReasons),
+                    LastSeen = r.LastSeen,
+                    Narrative = r.Narrative,
+                    Description = r.Description,
+                    IsKnownBot = true
+                }).ToList(),
+                RecentDetections = recentRows.Select(r => new SignatureDetectionRow
+                {
+                    Timestamp = r.Timestamp,
+                    IsBot = r.IsBot,
+                    BotProbability = r.BotProbability,
+                    Confidence = r.Confidence,
+                    RiskBand = r.RiskBand,
+                    StatusCode = r.StatusCode,
+                    Path = r.Path,
+                    Method = r.Method,
+                    ProcessingTimeMs = r.ProcessingTimeMs ?? 0,
+                    Action = r.Action
+                }).ToList()
+            };
+        }
+        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
+        {
+            TripCircuit();
+            _logger.LogError(ex, "Failed to get endpoint detail from PostgreSQL for {Method} {Path}", method, path);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get endpoint detail from PostgreSQL for {Method} {Path}", method, path);
+            throw;
+        }
+    }
+
     /// <summary>
     /// Maps a TimeSpan bucket size to the nearest PostgreSQL date_trunc unit.
     /// </summary>
@@ -1005,6 +1229,29 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
         public int BotCount { get; set; }
         public int HumanCount { get; set; }
         public int TotalCount { get; set; }
+    }
+
+    private class EndpointStatsRow
+    {
+        public string Method { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
+        public int TotalCount { get; set; }
+        public int BotCount { get; set; }
+        public int UniqueSignatures { get; set; }
+        public double? AvgProcessingTimeMs { get; set; }
+        public double? AvgThreatScore { get; set; }
+        public string? TopAction { get; set; }
+        public string? DominantRiskBand { get; set; }
+        public DateTime LastSeen { get; set; }
+    }
+
+    private class EndpointDetailSummaryRow
+    {
+        public int TotalCount { get; set; }
+        public int BotCount { get; set; }
+        public int UniqueSignatures { get; set; }
+        public double? AvgProcessingTimeMs { get; set; }
+        public double? AvgThreatScore { get; set; }
     }
 
     private class SummaryRow
