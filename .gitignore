@@ -440,3 +440,4 @@ fabric.properties
 
 csp-smoke/
 /*.env
+BenchmarkDotNet.Artifacts/
