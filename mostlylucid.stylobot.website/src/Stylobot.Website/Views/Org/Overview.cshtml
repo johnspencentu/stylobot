@@ -17,6 +17,10 @@
         <h1 class="text-3xl font-semibold mt-1">@Model.Org.Name</h1>
         <div class="text-sm text-base-content/70 mt-1">/@Model.Org.Slug</div>
       </div>
+      <nav class="flex gap-2">
+        <a class="btn btn-ghost btn-sm" href="/portal/org/@Model.Org.Slug/team">Team</a>
+        <a class="btn btn-ghost btn-sm" href="/portal/org/@Model.Org.Slug/audit">Audit log</a>
+      </nav>
     </div>
 
     @if (trialError is not null)

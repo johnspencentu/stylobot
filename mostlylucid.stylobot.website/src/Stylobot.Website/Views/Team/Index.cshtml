@@ -1,0 +1,99 @@
+@using Stylobot.Website.Portal.Data
+@model Stylobot.Website.Portal.TeamIndexViewModel
+@{
+    ViewData["Title"] = $"Team — {Model.Org.Name}";
+    var canAdmin = Model.Me.Role >= OrgRole.Admin;
+    var isOwner = Model.Me.Role >= OrgRole.Owner;
+    var success = TempData["TeamSuccess"]?.ToString();
+    var error = TempData["TeamError"]?.ToString();
+}
+
+<section class="min-h-[70vh] px-6 py-16">
+  <div class="max-w-5xl mx-auto">
+    <a class="btn btn-ghost btn-sm mb-4" href="/portal/org/@Model.Org.Slug">← @Model.Org.Name</a>
+    <h1 class="text-3xl font-semibold">Team</h1>
+    <p class="text-base-content/70 mt-2">
+      Invite teammates, manage roles, and remove members. Invitees accept automatically the
+      first time they sign into Keycloak with the invited email address.
+    </p>
+
+    @if (success is not null) { <div class="alert alert-success mt-6"><span>@success</span></div> }
+    @if (error is not null)   { <div class="alert alert-warning mt-6"><span>@error</span></div> }
+
+    @if (canAdmin)
+    {
+      <div class="card bg-base-200 p-6 mt-6">
+        <h2 class="text-lg font-semibold mb-4">Invite a teammate</h2>
+        <form method="post" asp-controller="Team" asp-action="Invite" asp-route-slug="@Model.Org.Slug" class="flex flex-wrap gap-3 items-end">
+          <div class="form-control grow">
+            <label class="label"><span class="label-text">Email</span></label>
+            <input name="email" type="email" required class="input input-bordered" placeholder="teammate@example.com" />
+          </div>
+          <div class="form-control">
+            <label class="label"><span class="label-text">Role</span></label>
+            <select name="role" class="select select-bordered">
+              <option value="Viewer">Viewer</option>
+              <option value="Developer" selected>Developer</option>
+              <option value="Admin">Admin</option>
+              @if (isOwner) { <option value="Owner">Owner</option> }
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit">Send invite</button>
+        </form>
+      </div>
+    }
+
+    <h2 class="text-lg font-semibold mt-10 mb-3">Members</h2>
+    <div class="overflow-x-auto">
+      <table class="table">
+        <thead>
+          <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          @foreach (var m in Model.Members)
+          {
+            var pending = !m.IsActive;
+            var isSelf = m.Id == Model.Me.Id;
+            <tr>
+              <td>@m.Email</td>
+              <td>@(m.DisplayName ?? "—")</td>
+              <td>
+                @if (canAdmin && !isSelf)
+                {
+                  <form method="post" asp-controller="Team" asp-action="ChangeRole" asp-route-slug="@Model.Org.Slug" asp-route-memberId="@m.Id" class="inline">
+                    <select name="role" class="select select-sm select-bordered" onchange="this.form.submit()">
+                      <option value="Viewer"    selected="@(m.Role == OrgRole.Viewer)">Viewer</option>
+                      <option value="Developer" selected="@(m.Role == OrgRole.Developer)">Developer</option>
+                      <option value="Admin"     selected="@(m.Role == OrgRole.Admin)">Admin</option>
+                      @if (isOwner) { <option value="Owner" selected="@(m.Role == OrgRole.Owner)">Owner</option> }
+                    </select>
+                  </form>
+                }
+                else
+                {
+                  <span class="badge badge-outline">@m.Role</span>
+                }
+              </td>
+              <td>
+                @if (pending) { <span class="badge badge-warning">Pending</span> }
+                else          { <span class="badge badge-ghost">Active</span> }
+              </td>
+              <td class="text-right">
+                @if (canAdmin && !isSelf)
+                {
+                  <form method="post" asp-controller="Team" asp-action="Remove" asp-route-slug="@Model.Org.Slug" asp-route-memberId="@m.Id" class="inline">
+                    <button class="btn btn-ghost btn-xs text-error" type="submit" onclick="return confirm('Remove @m.Email from this org?');">Remove</button>
+                  </form>
+                }
+                else if (isSelf)
+                {
+                  <span class="text-xs text-base-content/60">You</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
