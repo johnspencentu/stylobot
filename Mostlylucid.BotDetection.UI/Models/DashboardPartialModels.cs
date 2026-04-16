@@ -308,6 +308,34 @@ public sealed class DashboardShellModel
     public required UserAgentsListModel UserAgents { get; init; }
     public required TopBotsListModel TopBots { get; init; }
     public required SessionsListModel Sessions { get; init; }
+
+    /// <summary>License entitlement card model. Always present (renders the muted OSS line in the unconfigured case).</summary>
+    public required LicenseCardModel License { get; init; }
+
+    /// <summary>
+    ///     Configuration editor model. Optional — only set when the active tab is "configuration"
+    ///     so we don't pay the embedded-manifest enumeration cost on every dashboard render.
+    /// </summary>
+    public ConfigurationEditorModel? Configuration { get; init; }
+}
+
+/// <summary>
+///     View model for the FOSS Monaco YAML config editor on the Configuration tab.
+///     The detector list is server-rendered for the no-JS fallback; Monaco itself is
+///     lazy-loaded from a CDN only after the tab opens.
+/// </summary>
+public sealed class ConfigurationEditorModel
+{
+    public required string BasePath { get; init; }
+
+    /// <summary>All editable detector manifests (slug + display metadata + override flag).</summary>
+    public required IReadOnlyList<Mostlylucid.BotDetection.Orchestration.Manifests.DetectorManifestSummary> Detectors { get; init; }
+
+    /// <summary>
+    ///     True when the active license is paid (Active or Trial). Hides the per-target
+    ///     upsell rail. Read off the LicenseCardModel that's already on the shell.
+    /// </summary>
+    public required bool IsCommercialLicensed { get; init; }
 }
 
 /// <summary>

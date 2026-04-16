@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Models;
@@ -212,6 +213,11 @@ try
     // Geo routing - enriches requests with country code from IP (cached per IP)
     // Must run BEFORE bot detection so country data is available for detection + dashboard
     app.UseGeoRouting();
+
+    // License entitlement: warn-never-lock host check against BotDetection:Licensing:Domains.
+    // No-op when no domains configured. Stashes mismatch counters for the dashboard's
+    // license card; never affects request flow.
+    app.UseDomainEntitlement();
 
     // Bot Detection middleware - runs on every request
     app.UseBotDetection();

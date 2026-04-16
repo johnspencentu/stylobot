@@ -7,7 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Dashboard;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.UI.Configuration;
 using Mostlylucid.BotDetection.UI.Models;
@@ -62,7 +64,10 @@ public class StyloBotDashboardMiddleware
         "api/useragents",
         "api/topbots",
         "api/sessions",
-        "api/sessions/recent"
+        "api/sessions/recent",
+        "api/license",
+        "api/config/manifests",
+        "api/config/schema"
     };
 
     private const string CountryDetailPrefix = "api/countries/";
@@ -202,6 +207,22 @@ public class StyloBotDashboardMiddleware
                 await ServeMeApiAsync(context);
                 break;
 
+            case "api/license":
+                await ServeLicenseApiAsync(context);
+                break;
+
+            case "api/config/manifests":
+                await ServeConfigManifestsListAsync(context);
+                break;
+
+            case "api/config/schema":
+                await ServeConfigSchemaAsync(context);
+                break;
+
+            case var p when p.StartsWith("api/config/manifests/", StringComparison.OrdinalIgnoreCase):
+                await ServeConfigManifestApiAsync(context, relativePath["api/config/manifests/".Length..]);
+                break;
+
             case "api/labels":
                 await ServeLabelsListApiAsync(context);
                 break;
@@ -252,6 +273,14 @@ public class StyloBotDashboardMiddleware
 
             case "partials/your-detection":
                 await ServeYourDetectionPartialAsync(context);
+                break;
+
+            case "partials/license":
+                await ServeLicensePartialAsync(context);
+                break;
+
+            case "partials/configuration":
+                await ServeConfigurationPartialAsync(context);
                 break;
 
             case "partials/countries":
@@ -368,6 +397,10 @@ public class StyloBotDashboardMiddleware
             "font-src 'self' data: https://fonts.gstatic.com https://unpkg.com",
             $"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
             $"script-src 'self' 'nonce-{cspNonce}' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com",
+            // worker-src for Monaco's language-service web workers (loaded from CDN as
+            // blob: URLs after the AMD loader rewrites them). Safe to allow on the
+            // dashboard origin since Monaco is the only consumer.
+            "worker-src 'self' blob:",
             "connect-src 'self' ws: wss:");
         context.Response.Headers["Content-Security-Policy"] = dashboardCsp;
 
@@ -414,7 +447,13 @@ public class StyloBotDashboardMiddleware
             Clusters = BuildClustersModel(context),
             UserAgents = BuildUserAgentsModel("all", "requests", "desc", 1, 25, allUserAgents),
             TopBots = BuildTopBotsModel(page: 1, pageSize: 10, sortBy: "default", sortDir: "desc"),
-            Sessions = BuildSessionsModel(context)
+            Sessions = BuildSessionsModel(context),
+            License = BuildLicenseCardModel(context),
+            // Only build the editor model when the operator is on the Configuration tab —
+            // listing all 30+ embedded manifests on every dashboard render is wasteful.
+            Configuration = tab.Equals("configuration", StringComparison.OrdinalIgnoreCase)
+                ? BuildConfigurationModel(context)
+                : null
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -587,7 +626,7 @@ public class StyloBotDashboardMiddleware
     }
 
     /// <summary>
-    ///     <c>GET /api/labels?since=…&amp;limit=…</c> — bulk export for offline weight-tuning.
+    ///     <c>GET /api/labels?since=…&amp;limit=…</c> - bulk export for offline weight-tuning.
     ///     Output is the raw <see cref="SignatureLabel"/> list; pair with <c>/api/signatures</c>
     ///     to get each signature's detection context.
     /// </summary>
@@ -611,7 +650,7 @@ public class StyloBotDashboardMiddleware
     }
 
     /// <summary>
-    ///     <c>GET /api/labels/counts</c> — count per label kind for the dashboard badge.
+    ///     <c>GET /api/labels/counts</c> - count per label kind for the dashboard badge.
     /// </summary>
     private async Task ServeLabelsCountsApiAsync(HttpContext context)
     {
@@ -627,7 +666,7 @@ public class StyloBotDashboardMiddleware
 
     /// <summary>
     ///     Resolve the labeler identity from request context. Falls back to "anonymous" when
-    ///     no auth is configured — operators running on a private dashboard with no OIDC
+    ///     no auth is configured - operators running on a private dashboard with no OIDC
     ///     still get useful single-operator corpora.
     /// </summary>
     private static string ResolveLabeler(HttpContext context)
@@ -1568,6 +1607,332 @@ public class StyloBotDashboardMiddleware
         await context.Response.WriteAsync(html);
     }
 
+    /// <summary>
+    ///     <c>GET /api/license</c> - JSON payload with parsed claims + live entitlement stats.
+    ///     Used by external tooling and tests; the dashboard itself loads <c>/partials/license</c>.
+    /// </summary>
+    private async Task ServeLicenseApiAsync(HttpContext context)
+    {
+        var model = BuildLicenseCardModel(context);
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, new
+        {
+            status = model.Status.ToString(),
+            stats = model.Stats,
+            claims = model.Claims,
+            daysUntilExpiry = model.DaysUntilExpiry,
+            daysUntilGraceEnds = model.DaysUntilGraceEnds
+        }, CamelCaseJson);
+    }
+
+    /// <summary>Render the license card partial (HTMX target - refreshes itself every 60s).</summary>
+    private async Task ServeLicensePartialAsync(HttpContext context)
+    {
+        var model = BuildLicenseCardModel(context);
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_LicenseCard.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
+    /// <summary>
+    ///     Build the license card view model by combining the runtime
+    ///     <see cref="DomainEntitlementValidator"/> stats with the parsed JWT (when present).
+    ///     Logic lives in <see cref="LicenseCardModelBuilder"/> so the controller-hosted
+    ///     dashboard renders the same status calculation.
+    /// </summary>
+    private LicenseCardModel BuildLicenseCardModel(HttpContext context) =>
+        LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
+
+    /// <summary>Render the Configuration tab partial. Lazy-loads Monaco from CDN once it boots.</summary>
+    private async Task ServeConfigurationPartialAsync(HttpContext context)
+    {
+        var model = BuildConfigurationModel(context);
+        if (model is null)
+        {
+            // No editor service registered — show a friendly empty state instead of a 500.
+            context.Response.ContentType = "text/html";
+            await context.Response.WriteAsync("<div class=\"text-sm text-base-content/60 p-4\">Config editor unavailable in this build.</div>");
+            return;
+        }
+
+        // Re-emit a CSP nonce that the inline Monaco bootstrap script can use. The shell
+        // already set one, but partials served standalone (HTMX) may not have inherited it.
+        if (!context.Items.ContainsKey("CspNonce"))
+        {
+            context.Items["CspNonce"] = Convert.ToBase64String(
+                System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+        }
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_ConfigurationEditor.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
+    /// <summary>
+    ///     Build the Configuration tab model. Returns null when the editor service isn't
+    ///     registered (defensive — should always be present once <c>AddBotDetection()</c>
+    ///     has run, but the dashboard may be hosted in trimmed configurations).
+    /// </summary>
+    private ConfigurationEditorModel? BuildConfigurationModel(HttpContext context)
+    {
+        var editor = context.RequestServices.GetService<ConfigEditorService>();
+        if (editor is null) return null;
+
+        // Reuse the shared license-status logic so the upsell rail's gating matches what
+        // the License card on Overview is showing — no risk of inconsistency.
+        var license = LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
+        var commercial = license.Status is LicenseStatusKind.Active or LicenseStatusKind.Trial;
+
+        return new ConfigurationEditorModel
+        {
+            BasePath = _options.BasePath.TrimEnd('/'),
+            Detectors = editor.ListManifests(),
+            IsCommercialLicensed = commercial
+        };
+    }
+
+    // ====================================================================================
+    // Configuration editor endpoints (FOSS YAML editor)
+    // The ConfigEditorService does the heavy lifting (path safety, YAML parse validation,
+    // atomic write). These methods only translate between HTTP and the service result enum.
+    // ====================================================================================
+
+    /// <summary><c>GET /api/config/manifests</c> — list every editable detector + override status.</summary>
+    private async Task ServeConfigManifestsListAsync(HttpContext context)
+    {
+        var editor = context.RequestServices.GetService<ConfigEditorService>();
+        if (editor is null) { context.Response.StatusCode = 503; return; }
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body,
+            new { detectors = editor.ListManifests() }, CamelCaseJson);
+    }
+
+    /// <summary><c>GET /api/config/schema</c> — JSON Schema for Monaco's YAML model binding.</summary>
+    private async Task ServeConfigSchemaAsync(HttpContext context)
+    {
+        context.Response.ContentType = "application/json";
+        // Hand-written schema covering the high-traffic 80% of manifest fields. Monaco
+        // will mark unknown keys as warnings, not errors — fine for the long tail
+        // (Triggers / Emits / Listens). Full schema is a follow-up.
+        await context.Response.WriteAsync(DetectorManifestJsonSchema);
+    }
+
+    /// <summary>
+    ///     Method-dispatched route for <c>/api/config/manifests/{slug}</c>:
+    ///     GET = read, PUT = save override, DELETE = revert to embedded.
+    /// </summary>
+    private async Task ServeConfigManifestApiAsync(HttpContext context, string slug)
+    {
+        var editor = context.RequestServices.GetService<ConfigEditorService>();
+        if (editor is null) { context.Response.StatusCode = 503; return; }
+
+        switch (context.Request.Method)
+        {
+            case "GET":
+                await ServeConfigManifestGetAsync(context, editor, slug);
+                break;
+            case "PUT":
+                await ServeConfigManifestPutAsync(context, editor, slug);
+                break;
+            case "DELETE":
+                await ServeConfigManifestDeleteAsync(context, editor, slug);
+                break;
+            default:
+                context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
+                context.Response.Headers["Allow"] = "GET, PUT, DELETE";
+                break;
+        }
+    }
+
+    private async Task ServeConfigManifestGetAsync(HttpContext context, ConfigEditorService editor, string slug)
+    {
+        var doc = editor.GetManifest(slug);
+        if (doc is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, doc, CamelCaseJson);
+    }
+
+    private async Task ServeConfigManifestPutAsync(HttpContext context, ConfigEditorService editor, string slug)
+    {
+        // Body is either text/plain YAML or JSON {"yaml":"…"} — accept both because the
+        // browser sends JSON via fetch() while curl users tend to send raw YAML.
+        string yaml;
+        try
+        {
+            using var reader = new StreamReader(context.Request.Body);
+            var body = await reader.ReadToEndAsync();
+
+            if ((context.Request.ContentType ?? "").Contains("application/json", StringComparison.OrdinalIgnoreCase))
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (!doc.RootElement.TryGetProperty("yaml", out var yamlEl) || yamlEl.ValueKind != JsonValueKind.String)
+                {
+                    context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    await context.Response.WriteAsync("{\"ok\":false,\"error\":\"missing 'yaml' string field\"}");
+                    return;
+                }
+                yaml = yamlEl.GetString() ?? string.Empty;
+            }
+            else
+            {
+                yaml = body;
+            }
+        }
+        catch (Exception ex)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await JsonSerializer.SerializeAsync(context.Response.Body,
+                new { ok = false, error = ex.Message }, CamelCaseJson);
+            return;
+        }
+
+        var result = editor.SaveOverride(slug, yaml);
+        context.Response.StatusCode = MapSaveOutcomeToStatus(result.Outcome);
+        context.Response.ContentType = "application/json";
+
+        if (result.Ok)
+        {
+            await JsonSerializer.SerializeAsync(context.Response.Body, new
+            {
+                ok = true,
+                path = result.Path,
+                writtenAtUtc = result.WrittenAtUtc
+            }, CamelCaseJson);
+        }
+        else
+        {
+            await JsonSerializer.SerializeAsync(context.Response.Body, new
+            {
+                ok = false,
+                outcome = result.Outcome.ToString(),
+                error = result.Error,
+                line = result.Line,
+                column = result.Column
+            }, CamelCaseJson);
+        }
+    }
+
+    private async Task ServeConfigManifestDeleteAsync(HttpContext context, ConfigEditorService editor, string slug)
+    {
+        var outcome = editor.DeleteOverride(slug);
+        context.Response.StatusCode = outcome switch
+        {
+            DeleteOutcome.Ok => StatusCodes.Status200OK,
+            DeleteOutcome.NotFound => StatusCodes.Status404NotFound,
+            DeleteOutcome.InvalidSlug or DeleteOutcome.PathEscape => StatusCodes.Status403Forbidden,
+            DeleteOutcome.IoError => StatusCodes.Status500InternalServerError,
+            _ => StatusCodes.Status500InternalServerError
+        };
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body,
+            new { ok = outcome == DeleteOutcome.Ok, outcome = outcome.ToString() }, CamelCaseJson);
+    }
+
+    private static int MapSaveOutcomeToStatus(SaveOutcome outcome) => outcome switch
+    {
+        SaveOutcome.Ok => StatusCodes.Status200OK,
+        SaveOutcome.YamlInvalid => StatusCodes.Status400BadRequest,
+        SaveOutcome.UnknownDetector => StatusCodes.Status404NotFound,
+        SaveOutcome.InvalidSlug or SaveOutcome.PathEscape => StatusCodes.Status403Forbidden,
+        SaveOutcome.TooLarge => StatusCodes.Status413RequestEntityTooLarge,
+        SaveOutcome.IoError => StatusCodes.Status500InternalServerError,
+        _ => StatusCodes.Status500InternalServerError
+    };
+
+    /// <summary>
+    ///     Hand-written JSON Schema covering the high-traffic 80% of manifest fields. Monaco's
+    ///     YAML language service binds this via <c>monaco-yaml</c> and offers completion +
+    ///     squiggly underlines. Unknown keys (Triggers/Emits/Listens/Escalation) are accepted
+    ///     because <c>additionalProperties</c> defaults to true.
+    /// </summary>
+    private const string DetectorManifestJsonSchema = """
+    {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$id": "https://stylobot.net/schema/detector-manifest.json",
+      "title": "StyloBot Detector Manifest",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "description": "Detector class name (matches the C# IContributingDetector implementation)." },
+        "priority": { "type": "integer", "description": "Lower runs earlier. Wave-0 detectors use ≤20.", "minimum": 0 },
+        "enabled": { "type": "boolean", "description": "Disable a detector entirely without removing it." },
+        "description": { "type": "string" },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "sink": { "type": "string" },
+            "coordinator": { "type": "string" },
+            "atom": { "type": "string" }
+          }
+        },
+        "taxonomy": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["sensor", "extractor", "proposer", "constrainer", "ranker"] },
+            "determinism": { "type": "string", "enum": ["deterministic", "probabilistic"] },
+            "persistence": { "type": "string", "enum": ["ephemeral", "escalatable", "direct_write"] }
+          }
+        },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "defaults": {
+          "type": "object",
+          "description": "All tunable values live here — no magic numbers in C#.",
+          "properties": {
+            "weights": {
+              "type": "object",
+              "properties": {
+                "base": { "type": "number" },
+                "bot_signal": { "type": "number" },
+                "human_signal": { "type": "number" },
+                "verified": { "type": "number" },
+                "early_exit": { "type": "number" }
+              }
+            },
+            "confidence": {
+              "type": "object",
+              "properties": {
+                "neutral": { "type": "number", "minimum": -1, "maximum": 1 },
+                "bot_detected": { "type": "number", "minimum": -1, "maximum": 1 },
+                "human_indicated": { "type": "number", "minimum": -1, "maximum": 1 },
+                "strong_signal": { "type": "number", "minimum": -1, "maximum": 1 },
+                "high_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+                "low_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+                "escalation_threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "timing": {
+              "type": "object",
+              "properties": {
+                "timeout_ms": { "type": "integer", "minimum": 0 },
+                "cache_refresh_sec": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "features": {
+              "type": "object",
+              "properties": {
+                "detailed_logging": { "type": "boolean" },
+                "enable_cache": { "type": "boolean" },
+                "can_early_exit": { "type": "boolean" },
+                "can_escalate": { "type": "boolean" }
+              }
+            },
+            "parameters": {
+              "type": "object",
+              "description": "Detector-specific knobs. See each manifest for the exact set."
+            }
+          }
+        }
+      }
+    }
+    """;
+
     /// <summary>Render the countries list partial with server-side sort and pagination.</summary>
     private async Task ServeCountriesPartialAsync(HttpContext context)
     {
@@ -1920,6 +2285,10 @@ public class StyloBotDashboardMiddleware
             "font-src 'self' data: https://fonts.gstatic.com https://unpkg.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
             $"script-src 'self' 'nonce-{cspNonce}' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com",
+            // worker-src for Monaco's language-service web workers (loaded from CDN as
+            // blob: URLs after the AMD loader rewrites them). Safe to allow on the
+            // dashboard origin since Monaco is the only consumer.
+            "worker-src 'self' blob:",
             "connect-src 'self' ws: wss:");
         context.Response.Headers["Content-Security-Policy"] = dashboardCsp;
 

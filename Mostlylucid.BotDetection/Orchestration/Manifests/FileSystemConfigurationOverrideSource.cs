@@ -9,7 +9,7 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 ///     Watches a directory of YAML / JSON config files on the local filesystem and emits
 ///     <see cref="ConfigurationChangeNotification"/>s whenever any of them changes. Paired
 ///     with <see cref="ConfigurationWatcher"/>, this gives FOSS-tier installs hot-reload of
-///     detector manifests and overrides without restarting the app — edit a file, save,
+///     detector manifests and overrides without restarting the app - edit a file, save,
 ///     within ~500ms the new config is live.
 ///
 ///     The default watched directory is <c>{ContentRoot}/stylobot-config/</c>. Subdirectories
@@ -17,7 +17,7 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 ///     <see cref="DetectorManifestLoader.LoadFromDirectory"/> on the shared singleton loader,
 ///     so the next cache-miss inside the provider sees the new values.
 ///
-///     This source does NOT supply per-request overrides — <see cref="TryGetParameterAsync"/>
+///     This source does NOT supply per-request overrides - <see cref="TryGetParameterAsync"/>
 ///     returns <c>null</c> always. Its only job is to push change notifications into the watcher
 ///     so the provider's cache invalidates. Per-request overrides (per-endpoint, per-user) remain
 ///     a commercial concern handled by <c>ControlPlaneConfigurationSource</c> (or similar) in
@@ -37,14 +37,19 @@ public sealed class FileSystemConfigurationOverrideSource : IConfigurationOverri
 
     public FileSystemConfigurationOverrideSource(
         DetectorManifestLoader manifestLoader,
-        IHostEnvironment hostEnvironment,
+        IHostEnvironment? hostEnvironment,
         ILogger<FileSystemConfigurationOverrideSource> logger,
         string? overrideRoot = null)
     {
         _manifestLoader = manifestLoader;
         _logger = logger;
+        // Fall back to the process base directory when no IHostEnvironment is in DI -
+        // this keeps unit-test fixtures (plain ServiceCollection without a host) able to
+        // resolve the singleton without having to fake the environment. Real ASP.NET hosts
+        // always supply IHostEnvironment so the customer-facing path is unchanged.
+        var contentRoot = hostEnvironment?.ContentRootPath ?? AppContext.BaseDirectory;
         _rootPath = overrideRoot
-            ?? Path.Combine(hostEnvironment.ContentRootPath, DefaultConfigDirName);
+            ?? Path.Combine(contentRoot, DefaultConfigDirName);
     }
 
     public int Priority => 50;   // Between commercial overrides (10) and YAML manifest defaults (100).
@@ -53,7 +58,7 @@ public sealed class FileSystemConfigurationOverrideSource : IConfigurationOverri
     public string RootPath => _rootPath;
 
     /// <summary>
-    ///     Not a per-request override source — this implementation exists purely to emit
+    ///     Not a per-request override source - this implementation exists purely to emit
     ///     change notifications. Always returns null so the provider falls through to
     ///     appsettings / YAML / code defaults.
     /// </summary>
@@ -87,7 +92,7 @@ public sealed class FileSystemConfigurationOverrideSource : IConfigurationOverri
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to create StyloBot config directory — hot-reload disabled");
+                _logger.LogWarning(ex, "Failed to create StyloBot config directory - hot-reload disabled");
                 return Task.CompletedTask;
             }
         }
@@ -142,7 +147,7 @@ public sealed class FileSystemConfigurationOverrideSource : IConfigurationOverri
             !string.Equals(ext, ".json", StringComparison.OrdinalIgnoreCase))
             return;
 
-        // Debounce — editors often write file-atomically (temp file + rename) and fire
+        // Debounce - editors often write file-atomically (temp file + rename) and fire
         // multiple events per save. Collapse into a single reload if events land within 200ms.
         var now = DateTime.UtcNow;
         if ((now - _lastReload).TotalMilliseconds < 200) return;
@@ -193,14 +198,14 @@ public sealed class FileSystemConfigurationOverrideSource : IConfigurationOverri
     private const string DefaultReadme = @"# stylobot-config
 
 Local configuration overrides for StyloBot. Files in this directory are reloaded
-automatically — edit, save, and the detection pipeline picks up the change within
+automatically - edit, save, and the detection pipeline picks up the change within
 a second. No restart required.
 
 ## Layout
 
-- `detectors/*.detector.yaml` — per-detector weight / confidence / parameter overrides.
+- `detectors/*.detector.yaml` - per-detector weight / confidence / parameter overrides.
   Values merge on top of the defaults bundled in the StyloBot assembly.
-- `overrides/*.yaml` — free-form overrides for multi-detector configuration.
+- `overrides/*.yaml` - free-form overrides for multi-detector configuration.
 
 ## Editing
 

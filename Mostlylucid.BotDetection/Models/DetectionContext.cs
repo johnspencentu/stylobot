@@ -1000,4 +1000,18 @@ public static class SignalKeys
 
     /// <summary>Boolean: true if intent analysis was performed</summary>
     public const string IntentAnalyzed = "intent.analyzed";
+
+    // ==========================================
+    // License entitlement signals
+    // Set by DomainEntitlementMiddleware (warn-never-lock; never affects request flow)
+    // ==========================================
+
+    /// <summary>Boolean: true when the request host did not match any licensed domain.</summary>
+    public const string LicenseDomainMismatch = "license.domain_mismatch";
+
+    /// <summary>String: the mismatch classification - "mismatch", "mismatch_cloud_pool", or "no_host".</summary>
+    public const string LicenseDomainMismatchKind = "license.domain_mismatch_kind";
+
+    /// <summary>String: the normalized request host that triggered the mismatch.</summary>
+    public const string LicenseRequestHost = "license.request_host";
 }

@@ -127,6 +127,11 @@
         <!-- Summary stats - always visible -->
         @await Html.PartialAsync("~/Views/Dashboard/_SummaryStats.cshtml", Model.Summary)
 
+        <!-- License entitlement card. Renders the muted OSS line when unconfigured, full card when paid. -->
+        <div class="my-4">
+            @await Html.PartialAsync("~/Views/Dashboard/_LicenseCard.cshtml", Model.License)
+        </div>
+
         <!-- Your Detection - full width, above tabs -->
         <div class="my-4">
             @await Html.PartialAsync("~/Views/Dashboard/_YourDetection.cshtml", Model.YourDetection)
@@ -141,6 +146,7 @@
             <a href="@TabUrl("sessions")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("sessions")">Sessions</a>
             <a href="@TabUrl("clusters")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("clusters")">Clusters</a>
             <a href="@TabUrl("useragents")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("useragents")">User Agents</a>
+            <a href="@TabUrl("configuration")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("configuration")">Configuration</a>
         </div>
 
         @if (tab == "overview")
@@ -213,6 +219,11 @@
         else if (tab == "useragents")
         {
             @await Html.PartialAsync("~/Views/Dashboard/_UserAgentsList.cshtml", Model.UserAgents)
+        }
+        else if (tab == "configuration" && Model.Configuration is not null)
+        {
+            ViewBag.CspNonce = Model.CspNonce;
+            @await Html.PartialAsync("~/Views/Dashboard/_ConfigurationEditor.cshtml", Model.Configuration)
         }
 
     </main>

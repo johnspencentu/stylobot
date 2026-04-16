@@ -115,6 +115,14 @@ public class BotDetectionOptions
     public BackgroundEnrichmentOptions BackgroundEnrichment { get; set; } = new();
 
     /// <summary>
+    ///     Licensing options. Control plane reads <c>Licensing.Domains</c> to populate the
+    ///     <c>DomainEntitlementValidator</c> at startup; an empty list = OSS / unconfigured =
+    ///     pass-through (no enforcement, no warnings, dashboard shows the muted "no license" line).
+    ///     See <c>stylobot-commercial/docs/licensing-simplified.md</c>.
+    /// </summary>
+    public LicensingOptions Licensing { get; set; } = new();
+
+    /// <summary>
     ///     When true, detections from local/private IPs are excluded from SignalR broadcasts
     ///     and the live feed. Prevents self-detection from contaminating production data.
     ///     Default: true (set to false for local development/testing).
@@ -3020,7 +3028,7 @@ public class VersionAgeOptions
 
         // macOS (by version number)
         // NOTE: Chrome 90+ and Safari 15+ froze the macOS UA string at "Mac OS X 10_15_7"
-        // for ALL macOS versions. So "Mac OS X 10_15" in the UA does NOT mean Catalina —
+        // for ALL macOS versions. So "Mac OS X 10_15" in the UA does NOT mean Catalina -
         // it's the capped/frozen value reported by modern browsers on any macOS version.
         ["Mac OS X 14"] = "current", // Sonoma
         ["Mac OS X 13"] = "current", // Ventura
@@ -3292,6 +3300,31 @@ public class BdfReplayOptions
     ///     Prevents excessively large BDF files from consuming resources.
     /// </summary>
     public int MaxRequestsPerReplay { get; set; } = 100;
+}
+
+/// <summary>
+///     License-related configuration.
+///     Bound from <c>BotDetection:Licensing</c> in appsettings/env vars.
+/// </summary>
+public sealed class LicensingOptions
+{
+    /// <summary>
+    ///     Licensed domains for this install. Each entry is either an eTLD+1 (covers all
+    ///     subdomains, e.g., <c>acme.com</c> matches <c>api.acme.com</c>) or an exact host
+    ///     prefixed with <c>=</c> (e.g., <c>=admin.acme.com</c> matches only that host).
+    ///     Empty list = no enforcement: validator runs in pass-through mode and the dashboard
+    ///     shows the OSS/unconfigured state. See <c>stylobot-commercial/docs/licensing-simplified.md</c>.
+    /// </summary>
+    public List<string> Domains { get; set; } = [];
+
+    /// <summary>
+    ///     The signed JWT (Ed25519) the customer pasted into config / env. When set, the
+    ///     dashboard license card decodes the payload to show issuer, tier, expiry, etc.
+    ///     The runtime never blocks on signature validity - bad sig → treat as OSS, log info.
+    ///     Optional; if unset and <see cref="Domains"/> is non-empty, enforcement still runs
+    ///     (you can pre-configure domains without a token, useful for the gateway side).
+    /// </summary>
+    public string? Token { get; set; }
 }
 
 /// <summary>

@@ -12,6 +12,7 @@ using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Detectors;
 // LlmDetector removed - now in Mostlylucid.BotDetection.Llm.Ollama/LlamaSharp packages
 using Mostlylucid.BotDetection.Events;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Events.Listeners;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Models;
@@ -277,6 +278,10 @@ public static class ServiceCollectionExtensions
         // Register API key store (config-backed, can be overridden for DB-backed)
         services.TryAddSingleton<IApiKeyStore, InMemoryApiKeyStore>();
 
+        // Domain entitlement validator (licensed-domain enforcement, warn-never-lock).
+        // No-op when BotDetection:Licensing:Domains is empty (OSS / unconfigured default).
+        services.AddDomainEntitlement();
+
         // Register bot list update background service
         services.AddHostedService<BotListUpdateService>();
 
@@ -297,12 +302,12 @@ public static class ServiceCollectionExtensions
         // No-op when no override sources are registered (FOSS default).
         services.AddHostedService<ConfigurationWatcher>();
 
-        // Fleet telemetry dispatcher — fans out detection reports to IFleetReporter
+        // Fleet telemetry dispatcher - fans out detection reports to IFleetReporter
         // implementations (commercial plugin registers the control plane reporter).
         // No-op when no reporters are registered (FOSS default).
         services.TryAddSingleton<Orchestration.Telemetry.FleetReportDispatcher>();
 
-        // Real-time detection event publisher — default no-op. Commercial Redis cluster
+        // Real-time detection event publisher - default no-op. Commercial Redis cluster
         // package replaces this with a pub/sub fan-out so a separate Stylobot-UI
         // container can render live events without being in the request path.
         services.TryAddSingleton<Orchestration.Telemetry.IDetectionEventPublisher,
@@ -312,12 +317,23 @@ public static class ServiceCollectionExtensions
         // invalidate the DetectorConfigProvider cache on change. Hosted service starts
         // the watcher; registered as IConfigurationOverrideSource so ConfigurationWatcher
         // subscribes to its change stream. Creates the directory (with a README) on first
-        // start — no effect if the operator deletes it later.
-        services.TryAddSingleton<Orchestration.Manifests.FileSystemConfigurationOverrideSource>();
+        // start - no effect if the operator deletes it later.
+        // Lambda registration so IHostEnvironment is *optional* - unit-test fixtures that
+        // build a plain ServiceCollection without a host can still resolve the singleton.
+        // The override source falls back to AppContext.BaseDirectory when env is null.
+        services.TryAddSingleton(sp => new Orchestration.Manifests.FileSystemConfigurationOverrideSource(
+            sp.GetRequiredService<Orchestration.Manifests.DetectorManifestLoader>(),
+            sp.GetService<Microsoft.Extensions.Hosting.IHostEnvironment>(),
+            sp.GetRequiredService<ILogger<Orchestration.Manifests.FileSystemConfigurationOverrideSource>>()));
         services.AddSingleton<Orchestration.Manifests.IConfigurationOverrideSource>(sp =>
             sp.GetRequiredService<Orchestration.Manifests.FileSystemConfigurationOverrideSource>());
         services.AddHostedService(sp =>
             sp.GetRequiredService<Orchestration.Manifests.FileSystemConfigurationOverrideSource>());
+
+        // Editor service used by the dashboard's Configuration tab to list/read/write
+        // detector manifest overrides. Reads embedded manifests from this assembly + writes
+        // to the same directory the override source watches.
+        services.TryAddSingleton<Orchestration.Manifests.ConfigEditorService>();
 
         // Register individual detectors
         // Each detector is responsible for one detection strategy

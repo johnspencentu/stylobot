@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.HttpOverrides;
 using Mostlylucid.BotDetection.ClientSide;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Middleware;
@@ -290,14 +291,14 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<SeoService>();
 builder.Services.AddSingleton<IMarkdownDocsService, MarkdownDocsService>();
 
-// Customer portal — OIDC relying-party against Keycloak + Postgres orgs/licenses/audit.
+// Customer portal - OIDC relying-party against Keycloak + Postgres orgs/licenses/audit.
 // Controlled by the "Portal" config section; disabled entirely when Portal:Enabled=false.
 // See docs/portal-architecture.md.
 builder.Services.AddStyloBotPortal(builder.Configuration);
 
 var app = builder.Build();
 
-// Apply portal migrations on startup when configured — no-op if portal is disabled.
+// Apply portal migrations on startup when configured - no-op if portal is disabled.
 await app.Services.ApplyPortalMigrationsAsync();
 
 // Start Vite watch in development
@@ -403,13 +404,18 @@ app.UseRouting();
 
 // Authentication + authorization must run BEFORE the bot detection / dashboard middlewares
 // because StyloBotDashboardMiddleware invokes endpoints directly (skipping downstream
-// middleware) — if auth isn't already on the pipeline by then, [Authorize] endpoints
+// middleware) - if auth isn't already on the pipeline by then, [Authorize] endpoints
 // throw "middleware not found that supports authorization".
 app.UseAuthentication();
 app.UseAuthorization();
 
 // GeoDetection middleware
 app.UseGeoRouting();
+
+// License entitlement: warn-never-lock host check against BotDetection:Licensing:Domains.
+// No-op when no domains configured. Stashes mismatch counters for the dashboard's
+// license card; never affects request flow.
+app.UseDomainEntitlement();
 
 // Bot Detection middleware - analyzes all requests
 app.UseBotDetection();

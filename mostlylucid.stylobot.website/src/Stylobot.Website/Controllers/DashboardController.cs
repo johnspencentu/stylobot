@@ -118,7 +118,8 @@ public class DashboardController : Controller
                 Page = 1,
                 PageSize = 25,
                 TotalCount = 0
-            }
+            },
+            License = LicenseCardModelBuilder.Build(HttpContext, basePath)
         };
 
         return View(model);
