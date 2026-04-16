@@ -152,13 +152,18 @@ public sealed class LicenseIssuer
 
     private static PayloadLimits BuildLimits(string tier)
     {
-        var limits = StyloBotLimits.ForTier(tier);
-        // StyloFlow's LicenseToken uses MaxMoleculeSlots / MaxWorkUnitsPerMinute / MaxNodes.
-        // Map our gateway-instance limit onto both MaxNodes (cluster size) and MaxMoleculeSlots.
+        var quotas = StyloBotLimits.ForTier(tier);
+        // StyloFlow.Licensing.LicenseToken uses MaxNodes / MaxMoleculeSlots / MaxWorkUnitsPerMinute
+        // as its wire contract — those are StyloFlow's fields, not ours, and we have to fill them.
+        // Our tier model doesn't cap nodes or slots (capability-only; see docs/licensing-tiers.md),
+        // so we send null/high values there. The one field that genuinely matters for us is
+        // MaxWorkUnitsPerMinute → customer's burst-rate-limit ceiling for fair-use throttling.
         return new PayloadLimits(
-            MaxNodes: limits.MaxGatewayInstances == int.MaxValue ? null : limits.MaxGatewayInstances,
-            MaxMoleculeSlots: limits.MaxGatewayInstances == int.MaxValue ? 10_000 : limits.MaxGatewayInstances,
-            MaxWorkUnitsPerMinute: limits.WorkUnitsPerMinute == int.MaxValue ? 1_000_000 : limits.WorkUnitsPerMinute);
+            MaxNodes: null,                                              // no cap
+            MaxMoleculeSlots: 1_000_000,                                 // functionally unlimited
+            MaxWorkUnitsPerMinute: quotas.BurstWorkUnitsPerMinute == 0   // 0 in our model means
+                ? 1_000_000                                              // "no ceiling" — convert
+                : quotas.BurstWorkUnitsPerMinute);                       // for StyloFlow
     }
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
