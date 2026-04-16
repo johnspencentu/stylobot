@@ -57,18 +57,41 @@
           }
         </div>
         <div class="flex gap-2">
-          @if (activeLicense is null && !everHadTrial && canAdmin)
-          {
-            <form method="post" asp-controller="Org" asp-action="RequestTrial" asp-route-slug="@Model.Org.Slug">
-              <button class="btn btn-primary" type="submit">Request 30-day trial</button>
-            </form>
-          }
-          else if (activeLicense is not null)
+          @if (activeLicense is not null)
           {
             <a class="btn btn-outline" href="/portal/org/@Model.Org.Slug/licenses/@activeLicense.Id/download">Download token</a>
           }
         </div>
       </div>
+
+      @if (activeLicense is null && !everHadTrial && canAdmin)
+      {
+        <div class="divider my-4"></div>
+        <form method="post" asp-controller="Org" asp-action="RequestTrial" asp-route-slug="@Model.Org.Slug" class="flex flex-wrap gap-3 items-end">
+          <div class="form-control grow max-w-lg">
+            <label class="label py-1"><span class="label-text">
+              Your primary domain
+              <span class="text-base-content/50 text-xs">(e.g. <code>acme.com</code>)</span>
+            </span></label>
+            <input
+              name="primaryDomain"
+              required
+              type="text"
+              class="input input-bordered"
+              placeholder="acme.com"
+              pattern="^[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" />
+            <label class="label py-1"><span class="label-text-alt text-base-content/60">
+              Subdomains (<code>api.acme.com</code>, <code>www.acme.com</code>, …) are covered automatically.
+              <code>localhost</code> &amp; <code>*.test</code> always work for development without listing.
+            </span></label>
+          </div>
+          <button class="btn btn-primary" type="submit">Request 30-day trial</button>
+        </form>
+        <p class="text-xs text-base-content/50 mt-2">
+          Shared platform hostnames (azurewebsites.net, vercel.app, herokuapp.com, etc.) aren't
+          valid as your primary — use your company domain. You can add additional hosts later.
+        </p>
+      }
     </div>
 
     <!-- LICENSE LIST -->

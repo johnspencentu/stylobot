@@ -93,6 +93,15 @@ public sealed class License
     /// </summary>
     public string? HardwareFingerprint { get; set; }
 
+    /// <summary>
+    ///     Domains licensed by this token. eTLD+1 entries grant subdomain wildcards
+    ///     (e.g., <c>acme.com</c> covers all <c>*.acme.com</c>); entries prefixed
+    ///     with <c>=</c> are exact-host only (e.g., <c>=admin.acme.com</c>).
+    ///     Empty for legacy licenses (no enforcement) and OSS tokens; non-empty
+    ///     for issued trials + paid licenses per licensing-simplified.md.
+    /// </summary>
+    public List<string> Domains { get; set; } = new();
+
     /// <summary>JWT <c>jti</c> — unique per token, used for revocation lookups.</summary>
     public required string TokenJti { get; set; }
 

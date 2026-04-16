@@ -53,8 +53,9 @@ public sealed class PortalDbContext : DbContext
             e.Property(x => x.TokenJti).HasMaxLength(64).IsRequired();
             e.HasIndex(x => x.TokenJti).IsUnique();
             e.Property(x => x.HardwareFingerprint).HasMaxLength(64);
-            // Store feature flags as a JSON array column (native jsonb in Npgsql).
+            // Store feature flags + licensed domains as JSON array columns (native jsonb in Npgsql).
             e.Property(x => x.Features).HasColumnType("jsonb");
+            e.Property(x => x.Domains).HasColumnType("jsonb");
             // Token body can be several KB — text column is fine.
             e.Property(x => x.SignedToken).HasColumnType("text").IsRequired();
             e.HasIndex(x => new { x.OrganizationId, x.RevokedAt });

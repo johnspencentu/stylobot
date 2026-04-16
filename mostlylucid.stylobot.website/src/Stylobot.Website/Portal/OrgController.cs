@@ -40,7 +40,8 @@ public sealed class OrgController : Controller
 
     [HttpPost("trial")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RequestTrial(string slug, string? hardwareFingerprint, CancellationToken ct)
+    public async Task<IActionResult> RequestTrial(
+        string slug, string? hardwareFingerprint, string? primaryDomain, CancellationToken ct)
     {
         var ctx = await LoadAsync(slug, ct);
         if (ctx is null) return NotFound();
@@ -49,11 +50,19 @@ public sealed class OrgController : Controller
         var sub = User.FindFirst("sub")!.Value;
         var email = User.FindFirst("email")?.Value;
 
+        // Primary domain is the license entitlement boundary — see licensing-simplified.md.
+        // Parse comma / newline-separated input so operators can enter one or several
+        // (e.g., "acme.com, acme.io" for multi-brand). Trial starts with Startup-tier
+        // entitlement (1 primary domain); additional domains can be added in the
+        // license-management UI later.
+        var domains = ParseDomains(primaryDomain);
+
         var result = await _issuer.IssueTrialAsync(
             ctx.Org,
             actorSub: sub,
             actorEmail: email,
             hardwareFingerprint: string.IsNullOrWhiteSpace(hardwareFingerprint) ? null : hardwareFingerprint.Trim(),
+            domains: domains,
             ct);
 
         if (!result.Succeeded)
@@ -65,6 +74,15 @@ public sealed class OrgController : Controller
         }
 
         return RedirectToAction(nameof(LicenseIssued), new { slug, id = result.License!.Id });
+    }
+
+    private static IReadOnlyList<string> ParseDomains(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return Array.Empty<string>();
+        return raw
+            .Split(new[] { ',', '\n', '\r', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     [HttpGet("licenses/{id:guid}/issued")]
