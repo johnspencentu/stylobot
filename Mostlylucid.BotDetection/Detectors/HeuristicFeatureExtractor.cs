@@ -47,6 +47,12 @@ public static class HeuristicFeatureExtractor
         // === Basic Request Metadata ===
         ExtractRequestMetadata(context, features);
 
+        // === Transport Protocol Context ===
+        // Critical: tells the model whether this is a document, API, SignalR, WebSocket, etc.
+        // Without this, the model penalizes normal API/streaming behavior (missing headers,
+        // high velocity, no cookies) as if it were a suspicious page request.
+        ExtractTransportContext(evidence, features);
+
         // === Detector Results (named by actual detector) ===
         ExtractDetectorResults(evidence, features);
 
@@ -184,6 +190,43 @@ public static class HeuristicFeatureExtractor
         if (accept == "*/*") features["accept:wildcard"] = 1f;
         if (accept.Contains("text/html")) features["accept:html"] = 1f;
         if (accept.Contains("application/json")) features["accept:json"] = 1f;
+    }
+
+    /// <summary>
+    ///     Extracts transport protocol context from signals written by TransportProtocolContributor.
+    ///     This is essential for the model to distinguish document/page requests (where missing
+    ///     Accept-Language is suspicious) from API/SignalR/WebSocket traffic (where it's normal).
+    /// </summary>
+    private static void ExtractTransportContext(AggregatedEvidence evidence, Dictionary<string, float> features)
+    {
+        var signals = evidence.Signals;
+
+        // Core transport type — WebSocket upgrade, SSE, gRPC
+        if (signals.TryGetValue(SignalKeys.TransportIsUpgrade, out var upgradeVal) && upgradeVal is true)
+            features["transport:is_upgrade"] = 1f;
+
+        // Streaming transport — WebSocket, SSE, SignalR long-polling
+        if (signals.TryGetValue(SignalKeys.TransportIsStreaming, out var streamVal) && streamVal is true)
+            features["transport:is_streaming"] = 1f;
+
+        // SignalR specifically — negotiate, WebSocket, SSE, long-polling
+        if (signals.TryGetValue(SignalKeys.TransportIsSignalR, out var signalrVal) && signalrVal is true)
+            features["transport:is_signalr"] = 1f;
+
+        // Protocol class — one-hot encode the major categories
+        if (signals.TryGetValue(SignalKeys.TransportProtocolClass, out var classVal) && classVal is string protocolClass)
+        {
+            var cls = protocolClass.ToLowerInvariant();
+            if (cls == "api") features["transport:class_api"] = 1f;
+            else if (cls == "signalr") features["transport:class_signalr"] = 1f;
+            else if (cls == "grpc") features["transport:class_grpc"] = 1f;
+            else if (cls == "document") features["transport:class_document"] = 1f;
+            else if (cls == "static") features["transport:class_static"] = 1f;
+        }
+
+        // SSE transport
+        if (signals.TryGetValue(SignalKeys.TransportSse, out var sseVal) && sseVal is true)
+            features["transport:is_sse"] = 1f;
     }
 
     /// <summary>

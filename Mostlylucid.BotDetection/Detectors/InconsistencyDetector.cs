@@ -51,7 +51,18 @@ public partial class InconsistencyDetector : IDetector
             var secFetchSite = headers["Sec-Fetch-Site"].FirstOrDefault();
             var hasFetchMetadata = !string.IsNullOrEmpty(secFetchSite);
             var hasApiKey = context.Items.ContainsKey("BotDetection.ApiKeyContext");
-            var isProgrammatic = hasFetchMetadata || hasApiKey;
+
+            // WebSocket upgrades and streaming transports legitimately omit Accept-Language,
+            // cookies, and other browser headers — per RFC 6455 and HTTP spec.
+            var isWebSocketUpgrade = string.Equals(
+                headers.Upgrade.ToString(), "websocket", StringComparison.OrdinalIgnoreCase);
+            var acceptHeader = headers.Accept.ToString();
+            var isApiRequest = acceptHeader.Contains("application/json", StringComparison.OrdinalIgnoreCase)
+                               || (headers.ContentType.ToString()
+                                   .Contains("application/json", StringComparison.OrdinalIgnoreCase)
+                                   && HttpMethods.IsPost(context.Request.Method));
+
+            var isProgrammatic = hasFetchMetadata || hasApiKey || isWebSocketUpgrade || isApiRequest;
 
             // Parse UA to extract claims
             var uaClaims = ParseUserAgentClaims(userAgent);
@@ -89,8 +100,9 @@ public partial class InconsistencyDetector : IDetector
             }
 
             // === Check 3: Browser claims vs headers ===
+            // Skip for WebSocket upgrades — Sec-Fetch-Mode and sec-ch-ua are not sent on WS handshakes
             if (uaClaims.ClaimsChrome && !headers.ContainsKey("Sec-Fetch-Mode") &&
-                !headers.ContainsKey("sec-ch-ua"))
+                !headers.ContainsKey("sec-ch-ua") && !isWebSocketUpgrade)
                 // Modern Chrome always sends these headers
                 if (uaClaims.ChromeVersion >= 73)
                 {
@@ -136,8 +148,10 @@ public partial class InconsistencyDetector : IDetector
             }
 
             // === Check 6: HTTP/2 claims but using HTTP/1.1 features ===
+            // Skip for WebSocket — Connection: Upgrade is required by RFC 6455
             var connection = headers.Connection.ToString().ToLowerInvariant();
-            if (connection == "keep-alive" && uaClaims.ClaimsChrome && uaClaims.ChromeVersion >= 90)
+            if (connection == "keep-alive" && uaClaims.ClaimsChrome && uaClaims.ChromeVersion >= 90
+                && !isWebSocketUpgrade)
             {
                 // Modern Chrome uses HTTP/2+ by default, doesn't need Connection header
                 // (This is a minor signal)

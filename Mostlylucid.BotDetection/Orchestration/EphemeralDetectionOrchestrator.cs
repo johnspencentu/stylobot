@@ -51,6 +51,7 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
     private readonly ILearningEventBus? _learningBus;
     private readonly ILogger<EphemeralDetectionOrchestrator> _logger;
     private readonly OrchestratorOptions _options;
+    private readonly BotDetectionOptions _fullOptions;
     private readonly IPolicyEvaluator? _policyEvaluator;
     private readonly IPolicyRegistry? _policyRegistry;
 
@@ -63,6 +64,7 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
         IPolicyEvaluator? policyEvaluator = null)
     {
         _logger = logger;
+        _fullOptions = options.Value;
         _options = options.Value.Orchestrator;
         _detectors = detectors;
         _learningBus = learningBus;
@@ -310,7 +312,7 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
                 if (_policyEvaluator != null)
                 {
                     var evalState = BuildState(httpContext, signals, contributorTracker, aggregator, requestId,
-                        stopwatch.Elapsed);
+                        stopwatch.Elapsed, _fullOptions);
                     var evalResult = _policyEvaluator.Evaluate(policy, evalState);
 
                     if (!evalResult.ShouldContinue)
@@ -374,7 +376,7 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
                 stopwatch.ElapsedMilliseconds, requestId);
         }
 
-        var result = aggregator.ToAggregatedEvidence(policy.Name);
+        var result = aggregator.ToAggregatedEvidence(policy.Name, options: _fullOptions);
         var actualProcessingTimeMs = stopwatch.Elapsed.TotalMilliseconds;
 
         var wasEarlyExit = finalAction.HasValue &&
@@ -492,7 +494,7 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
 
         if (quorumResult.Reached || quorumResult.CompletedCount > 0)
         {
-            var currentEvidence = aggregator.ToAggregatedEvidence();
+            var currentEvidence = aggregator.ToAggregatedEvidence(options: _fullOptions);
             var avgScore = currentEvidence.BotProbability;
 
             // Check for definitive verdict
@@ -632,7 +634,8 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
                 tracker,
                 aggregator,
                 requestId,
-                pipelineStopwatch.Elapsed);
+                pipelineStopwatch.Elapsed,
+                _fullOptions);
 
             var contributions = await detector.ContributeAsync(state, cts.Token);
             stopwatch.Stop();
@@ -729,9 +732,10 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
         ContributorTracker<IReadOnlyList<DetectionContribution>> tracker,
         DetectionLedger aggregator,
         string requestId,
-        TimeSpan elapsed)
+        TimeSpan elapsed,
+        BotDetectionOptions? options = null)
     {
-        var aggregated = aggregator.ToAggregatedEvidence();
+        var aggregated = aggregator.ToAggregatedEvidence(options: options);
         var completedResults = tracker.GetCompletedResults();
 
         return new BlackboardState

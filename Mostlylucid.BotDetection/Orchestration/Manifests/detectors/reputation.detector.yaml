@@ -153,6 +153,10 @@ defaults:
     # Support scaling (higher support = stronger bias)
     support_scaling_factor: 0.1
     max_support_multiplier: 2.0
+    # Browser attestation downgrade: when Sec-Fetch-Site: same-origin is present,
+    # cap ConfirmedBad contribution instead of verified abort.
+    browser_attestation_max_confidence: 0.35
+    browser_attestation_weight: 0.7
     # Pattern matching options
     match_normalized_ua: true
     match_ip_range: true

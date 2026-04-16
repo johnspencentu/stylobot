@@ -199,8 +199,8 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
                 {
                     DetectorName = Name,
                     Category = $"Reputation:{category}",
-                    ConfidenceDelta = Math.Min(reputation.BotScore, 0.15),
-                    Weight = 0.3,
+                    ConfidenceDelta = Math.Min(reputation.BotScore, GetParam("browser_attestation_max_confidence", 0.35)),
+                    Weight = GetParam("browser_attestation_weight", 0.7),
                     Reason = $"{reason} (downgraded — browser attestation present)"
                 };
             }
@@ -226,7 +226,7 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
         var effectiveWeight = Math.Abs(weight) * ReputationWeightMultiplier;
         if (hasBrowserAttestation && weight > 0)
         {
-            effectiveWeight = Math.Min(effectiveWeight, 0.3);
+            effectiveWeight = Math.Min(effectiveWeight, GetParam("browser_attestation_weight", 0.7));
             reason += " (downgraded — browser attestation present)";
         }
 

@@ -159,6 +159,22 @@ public class BotDetectionOptions
     public double MinConfidenceToBlock { get; set; } = 0.8;
 
     /// <summary>
+    ///     Minimum bot probability when AI/LLM detectors have not run.
+    ///     Prevents false negatives from pulling the score too low before the full pipeline completes.
+    ///     Valid range: 0.0 to 0.5
+    /// </summary>
+    public double NonAiMinProbability { get; set; } = 0.05;
+
+    /// <summary>
+    ///     Maximum bot probability when AI/LLM detectors have not run.
+    ///     Controls how confident the system can be without AI confirmation.
+    ///     The previous default of 0.80 left only 0.10 headroom above the default BotThreshold (0.70),
+    ///     causing oscillation when per-request signal variance nudged scores across the boundary.
+    ///     Valid range: 0.5 to 1.0
+    /// </summary>
+    public double NonAiMaxProbability { get; set; } = 0.90;
+
+    /// <summary>
     ///     Allow verified search engine bots (Googlebot, Bingbot, etc.) through even when blocking.
     ///     Recommended: true, unless you have specific SEO requirements.
     /// </summary>

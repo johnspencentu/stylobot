@@ -167,8 +167,16 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
             // Check for programmatic request attestation — if present, downweight
             // response history signals since auth failures and rate limits may have
             // been caused by bot detection itself (feedback loop), not the server.
+            // Also check transport protocol class: API/gRPC/SignalR clients legitimately
+            // hit 404s (version mismatch), auth failures (token expiry), and rate limits.
             var isProgrammatic = state.Signals.TryGetValue(SignalKeys.ProgrammaticRequest, out var progVal)
                                  && progVal is true;
+            if (!isProgrammatic)
+            {
+                var protocolClass = state.Signals.TryGetValue(SignalKeys.TransportProtocolClass, out var pcVal)
+                    ? pcVal as string : null;
+                isProgrammatic = protocolClass is "api" or "grpc" or "signalr";
+            }
 
             // Analyze historical behavior patterns
             // Honeypot hits are ALWAYS significant — no attestation can excuse accessing /.env

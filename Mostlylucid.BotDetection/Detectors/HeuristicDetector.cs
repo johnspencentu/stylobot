@@ -139,6 +139,19 @@ public class HeuristicDetector : IDetector, IDisposable
         ["accept:html"] = -0.3f,
         ["accept:json"] = 0.0f,
 
+        // Transport protocol context — set by TransportProtocolContributor.
+        // These features tell the model what KIND of request this is so it stops penalizing
+        // normal API/streaming behavior (missing Accept-Language, high velocity, no cookies).
+        ["transport:is_upgrade"] = -0.7f, // WebSocket upgrades legitimately omit browser headers
+        ["transport:is_streaming"] = -0.8f, // Streaming transports have different header profiles
+        ["transport:is_signalr"] = -0.9f, // SignalR is browser-initiated; very strong human signal
+        ["transport:is_sse"] = -0.6f, // Server-Sent Events are legitimate streaming
+        ["transport:class_api"] = -0.5f, // API endpoints have different header expectations
+        ["transport:class_signalr"] = -0.8f, // SignalR protocol class
+        ["transport:class_grpc"] = -0.6f, // gRPC is always programmatic, not suspicious
+        ["transport:class_document"] = 0.0f, // Document requests — neutral (default behavior)
+        ["transport:class_static"] = -0.1f, // Static assets — slightly human-like
+
         // Client-side fingerprint - STRONG human indicator when present
         ["fp:received"] = -0.7f, // Fingerprint received = strong human signal
         ["fp:legitimate"] = -0.8f, // Legitimate fingerprint = very strong human signal

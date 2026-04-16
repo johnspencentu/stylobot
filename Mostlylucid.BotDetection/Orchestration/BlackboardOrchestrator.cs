@@ -382,7 +382,8 @@ public class BlackboardOrchestrator
                         aggregator,
                         requestId,
                         stopwatch.Elapsed,
-                        aiRan);
+                        aiRan,
+                        _fullOptions);
 
                     // Find detectors that can run in this wave — no LINQ allocation
                     var readyDetectorsList = new List<IContributingDetector>();
@@ -451,7 +452,8 @@ public class BlackboardOrchestrator
                             aggregator,
                             requestId,
                             stopwatch.Elapsed,
-                            aiRan);
+                            aiRan,
+                            _fullOptions);
 
                         var evalResult = _policyEvaluator.Evaluate(policy, evalState);
 
@@ -504,7 +506,8 @@ public class BlackboardOrchestrator
                                         var aiState = BuildState(
                                             httpContext, signals, completedKeys,
                                             failedKeys, aggregator, requestId,
-                                            stopwatch.Elapsed);
+                                            stopwatch.Elapsed,
+                                            options: _fullOptions);
 
                                         // Execute AI detectors
                                         await ExecuteWaveAsync(
@@ -572,7 +575,7 @@ public class BlackboardOrchestrator
                     stopwatch.ElapsedMilliseconds, requestId);
             }
 
-            var result = aggregator.ToAggregatedEvidence(policy.Name, aiRan: aiRan, premergedSignals: signals);
+            var result = aggregator.ToAggregatedEvidence(policy.Name, aiRan: aiRan, premergedSignals: signals, options: _fullOptions);
 
             // Always use stopwatch for actual wall-clock time (more accurate than sum of contributions)
             var actualProcessingTimeMs = stopwatch.Elapsed.TotalMilliseconds;
@@ -868,14 +871,19 @@ public class BlackboardOrchestrator
         DetectionLedger aggregator,
         string requestId,
         TimeSpan elapsed,
-        bool aiRan = false)
+        bool aiRan = false,
+        BotDetectionOptions? options = null)
     {
         // Read BotProbability and Confidence directly from the ledger
         // instead of calling ToAggregatedEvidence() which allocates heavily.
         // Apply the same clamping logic as DetectionLedgerExtensions.
         var botProbability = aggregator.BotProbability;
         if (!aiRan)
-            botProbability = Math.Clamp(botProbability, 0.05, 0.80);
+        {
+            var minProb = options?.NonAiMinProbability ?? 0.05;
+            var maxProb = options?.NonAiMaxProbability ?? 0.90;
+            botProbability = Math.Clamp(botProbability, minProb, maxProb);
+        }
 
         // SignalWriter: give detectors direct write access to the shared signal dict,
         // so they can call state.WriteSignal() instead of allocating ImmutableDictionary per contribution.

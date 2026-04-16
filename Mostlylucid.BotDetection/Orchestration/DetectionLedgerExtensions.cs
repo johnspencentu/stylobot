@@ -18,17 +18,21 @@ public static class DetectionLedgerExtensions
         PolicyAction? policyAction = null,
         string? actionPolicyName = null,
         bool aiRan = false,
-        IReadOnlyDictionary<string, object>? premergedSignals = null)
+        IReadOnlyDictionary<string, object>? premergedSignals = null,
+        BotDetectionOptions? options = null)
     {
         var botProbability = ledger.BotProbability;
         var confidence = ledger.Confidence;
 
         // Clamp probability when AI hasn't run.
-        // Floor of 0.05 allows strong human evidence to express near-zero scores;
-        // ceiling of 0.80 prevents high-confidence bot verdicts without AI confirmation.
+        // Floor prevents strong human evidence from hitting exactly zero;
+        // ceiling prevents high-confidence bot verdicts without AI confirmation.
+        // Configurable via BotDetection:NonAiMinProbability / NonAiMaxProbability.
         if (!aiRan)
         {
-            botProbability = Math.Clamp(botProbability, 0.05, 0.80);
+            var minProb = options?.NonAiMinProbability ?? 0.05;
+            var maxProb = options?.NonAiMaxProbability ?? 0.90;
+            botProbability = Math.Clamp(botProbability, minProb, maxProb);
         }
 
         // Compute coverage-based confidence

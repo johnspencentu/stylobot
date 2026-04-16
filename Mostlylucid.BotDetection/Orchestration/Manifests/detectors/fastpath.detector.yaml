@@ -141,6 +141,11 @@ defaults:
     # Bot score thresholds
     allow_max_bot_score: 0.1  # Must be very low to allow
     abort_min_bot_score: 0.9  # Must be very high to abort
+    # Browser attestation downgrade: when Sec-Fetch-Site: same-origin is present,
+    # cap the ConfirmedBad contribution instead of instant abort.
+    # Set lower to trust browser attestation more; higher to maintain conviction.
+    browser_attestation_max_confidence: 0.4
+    browser_attestation_weight: 0.8
 
 tags:
   - fast-path

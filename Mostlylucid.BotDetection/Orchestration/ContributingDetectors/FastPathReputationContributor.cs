@@ -225,8 +225,8 @@ public class FastPathReputationContributor : ConfiguredContributorBase
                     $"Reputation bias ({matchType} seen {matchedPattern.Support:F0} times as bot, downgraded — browser attestation present)")
                 with
                 {
-                    ConfidenceDelta = Math.Min(matchedPattern.BotScore, 0.2),
-                    Weight = 0.5
+                    ConfidenceDelta = Math.Min(matchedPattern.BotScore, GetParam("browser_attestation_max_confidence", 0.4)),
+                    Weight = GetParam("browser_attestation_weight", 0.8)
                 };
             return new[] { mildContribution };
         }

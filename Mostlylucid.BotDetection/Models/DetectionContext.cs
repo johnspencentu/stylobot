@@ -921,6 +921,44 @@ public static class SignalKeys
     public const string StreamAbuseChecked = "stream.abuse_checked";
 
     // ==========================================
+    // Session vector signals
+    // Set by SessionVectorContributor for Markov-chain-based session analysis
+    // ==========================================
+
+    /// <summary>Int: number of requests in the current in-progress session</summary>
+    public const string SessionRequestCount = "session.request_count";
+
+    /// <summary>Int: number of completed session snapshots in history</summary>
+    public const string SessionHistoryCount = "session.history_count";
+
+    /// <summary>String: current request's Markov state (e.g., "PageView", "ApiCall")</summary>
+    public const string SessionCurrentState = "session.current_state";
+
+    /// <summary>Boolean: true if a session boundary was just detected (retrogressive)</summary>
+    public const string SessionBoundaryDetected = "session.boundary_detected";
+
+    /// <summary>Float: maturity score of the just-completed session (0-1)</summary>
+    public const string SessionCompletedMaturity = "session.completed_maturity";
+
+    /// <summary>Int: request count of the just-completed session</summary>
+    public const string SessionCompletedRequestCount = "session.completed_request_count";
+
+    /// <summary>String: dominant Markov state of the completed session</summary>
+    public const string SessionDominantState = "session.dominant_state";
+
+    /// <summary>Float: maturity of the current session's vector (0-1)</summary>
+    public const string SessionVectorMaturity = "session.vector_maturity";
+
+    /// <summary>Float: cosine similarity of current session vs own history (0-1)</summary>
+    public const string SessionSelfSimilarity = "session.self_similarity";
+
+    /// <summary>Float: L2 magnitude of velocity vector between last two sessions</summary>
+    public const string SessionVelocityMagnitude = "session.velocity_magnitude";
+
+    /// <summary>Float[]: velocity vector between last two completed sessions</summary>
+    public const string SessionVelocityVector = "session.velocity_vector";
+
+    // ==========================================
     // Intent / Threat scoring signals
     // Set by IntentContributor from session activity analysis
     // ==========================================

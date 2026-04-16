@@ -45,7 +45,11 @@ public class HeaderContributor : ConfiguredContributorBase
 
         // WebSocket upgrade requests (RFC 6455) legitimately omit Accept, Accept-Language,
         // and Accept-Encoding headers. Don't penalize these missing headers on upgrades.
-        var isWebSocketUpgrade = IsWebSocketUpgrade(state.HttpContext.Request);
+        // Prefer the TransportIsUpgrade signal from TransportProtocolContributor (Priority 5),
+        // fall back to local detection if not yet available.
+        var isWebSocketUpgrade = state.GetSignal<bool?>(SignalKeys.TransportIsUpgrade) ?? false;
+        if (!isWebSocketUpgrade)
+            isWebSocketUpgrade = IsWebSocketUpgrade(state.HttpContext.Request);
         state.WriteSignal("header.is_websocket_upgrade", isWebSocketUpgrade);
 
         // Sec-Fetch-* headers (Fetch Metadata Request Headers, W3C spec).

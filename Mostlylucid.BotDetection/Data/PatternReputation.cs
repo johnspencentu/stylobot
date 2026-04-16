@@ -153,6 +153,20 @@ public class ReputationOptions
     public double SupportDecayTauHours { get; set; } = 6;
 
     /// <summary>
+    ///     Score decay tau override for ConfirmedBad patterns (in hours).
+    ///     ConfirmedBad patterns earned their status through strong evidence (score >= 0.9, support >= 50).
+    ///     They should decay slower than Suspect/Neutral to prevent oscillation.
+    ///     Default: 12 hours (vs 3 hours for other states)
+    /// </summary>
+    public double ConfirmedBadScoreDecayTauHours { get; set; } = 12;
+
+    /// <summary>
+    ///     Support decay tau override for ConfirmedBad patterns (in hours).
+    ///     Default: 24 hours (vs 6 hours for other states)
+    /// </summary>
+    public double ConfirmedBadSupportDecayTauHours { get; set; } = 24;
+
+    /// <summary>
     ///     Prior to decay toward when no new evidence arrives.
     ///     0.5 = neutral, <0.5 = bias toward human, >0.5 = bias toward bot.
     ///     Default: 0.5
@@ -184,10 +198,12 @@ public class ReputationOptions
 
     /// <summary>
     ///     BotScore threshold to demote from ConfirmedBad to Suspect.
-    ///     (Must be lower than PromoteToBadScore for hysteresis)
-    ///     Default: 0.7
+    ///     Must be lower than PromoteToBadScore for hysteresis.
+    ///     The gap between promote (0.9) and demote determines oscillation resistance:
+    ///     wider gap = more stable state, harder to flip between confirmed/suspect.
+    ///     Default: 0.5 (0.4 gap from promote threshold of 0.9)
     /// </summary>
-    public double DemoteFromBadScore { get; set; } = 0.7;
+    public double DemoteFromBadScore { get; set; } = 0.5;
 
     /// <summary>
     ///     Minimum support to demote from ConfirmedBad.
@@ -350,15 +366,22 @@ public class PatternReputationUpdater
         // Scale factor: 0.5 (confidence=0) to 1.0 (confidence=1.0)
         var confidenceScale = 0.5 + reputation.Confidence * 0.5;
 
+        // ConfirmedBad patterns use longer decay tau — they earned their status through
+        // strong evidence (score >= 0.9, support >= 50) and shouldn't lose it easily.
+        // This prevents the decay→demotion→re-evaluation→oscillation cycle.
+        var isConfirmedBad = reputation.State == ReputationState.ConfirmedBad;
+        var baseScoreTau = isConfirmedBad ? _options.ConfirmedBadScoreDecayTauHours : _options.ScoreDecayTauHours;
+        var baseSupportTau = isConfirmedBad ? _options.ConfirmedBadSupportDecayTauHours : _options.SupportDecayTauHours;
+
         // Score decay toward prior
         // new_score = old_score + (prior - old_score) * (1 - e^(-Δt/τ_eff))
-        var effectiveScoreTau = _options.ScoreDecayTauHours * confidenceScale;
+        var effectiveScoreTau = baseScoreTau * confidenceScale;
         var scoreDecayFactor = 1 - Math.Exp(-hoursSinceLastSeen / effectiveScoreTau);
         var newScore = reputation.BotScore + (_options.Prior - reputation.BotScore) * scoreDecayFactor;
 
         // Support decay (also confidence-modulated)
         // new_support = old_support * e^(-Δt/τ_eff)
-        var effectiveSupportTau = _options.SupportDecayTauHours * confidenceScale;
+        var effectiveSupportTau = baseSupportTau * confidenceScale;
         var supportDecayFactor = Math.Exp(-hoursSinceLastSeen / effectiveSupportTau);
         var newSupport = reputation.Support * supportDecayFactor;
 

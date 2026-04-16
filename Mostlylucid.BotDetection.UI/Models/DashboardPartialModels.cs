@@ -70,6 +70,7 @@ public sealed class CountriesListModel
 public sealed class ClustersListModel
 {
     public required IReadOnlyList<ClusterViewModel> Clusters { get; init; }
+    public ClusterDiagnosticsViewModel? Diagnostics { get; init; }
     public required string BasePath { get; init; }
     public string SortField { get; init; } = "members";
     public string SortDir { get; init; } = "desc";
@@ -95,6 +96,65 @@ public sealed class ClusterViewModel
     public double TemporalDensity { get; init; }
     public string? DominantIntent { get; init; }
     public double AverageThreatScore { get; init; }
+}
+
+/// <summary>
+///     View model for cluster engine diagnostics.
+/// </summary>
+public sealed class ClusterDiagnosticsViewModel
+{
+    public string? Algorithm { get; init; }
+    public string? Status { get; init; }
+    public DateTime? LastRunAt { get; init; }
+    public int InputBehaviorCount { get; init; }
+    public int EdgeCount { get; init; }
+    public double GraphDensity { get; init; }
+    public int RawCommunityCount { get; init; }
+    public int ClusterCount { get; init; }
+    public int HumanClusterCount { get; init; }
+    public int MachineClusterCount { get; init; }
+    public int MixedClusterCount { get; init; }
+    public double SimilarityThreshold { get; init; }
+    public int MinClusterSize { get; init; }
+    public IReadOnlyList<KeyValuePair<string, double>> TopWeights { get; init; } = [];
+}
+
+/// <summary>
+///     View model for the endpoints list partial.
+/// </summary>
+public sealed class EndpointsListModel
+{
+    public required IReadOnlyList<DashboardEndpointStats> Endpoints { get; init; }
+    public required string BasePath { get; init; }
+    public string SortField { get; init; } = "total";
+    public string SortDir { get; init; } = "desc";
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public int TotalCount { get; init; }
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalCount / PageSize));
+}
+
+/// <summary>
+///     View model for the endpoint detail panel.
+/// </summary>
+public sealed class EndpointDetailModel
+{
+    public required string Method { get; init; }
+    public required string Path { get; init; }
+    public required string BasePath { get; init; }
+    public bool Found { get; init; }
+    public int TotalCount { get; init; }
+    public int BotCount { get; init; }
+    public int HumanCount { get; init; }
+    public double BotRate { get; init; }
+    public int UniqueSignatures { get; init; }
+    public double AvgProcessingTimeMs { get; init; }
+    public double AvgThreatScore { get; init; }
+    public Dictionary<string, int> TopActions { get; init; } = new();
+    public Dictionary<string, int> TopCountries { get; init; } = new();
+    public Dictionary<string, int> RiskBands { get; init; } = new();
+    public List<DashboardTopBotEntry> TopBots { get; init; } = [];
+    public List<SignatureDetectionRow> RecentDetections { get; init; } = [];
 }
 
 /// <summary>
@@ -243,7 +303,85 @@ public sealed class DashboardShellModel
     public required VisitorListModel Visitors { get; init; }
     public required YourDetectionModel YourDetection { get; init; }
     public required CountriesListModel Countries { get; init; }
+    public required EndpointsListModel Endpoints { get; init; }
     public required ClustersListModel Clusters { get; init; }
     public required UserAgentsListModel UserAgents { get; init; }
     public required TopBotsListModel TopBots { get; init; }
+    public required SessionsListModel Sessions { get; init; }
+}
+
+/// <summary>
+///     View model for the sessions list partial.
+///     Sessions are the primary activity unit — each represents a compressed
+///     behavioral snapshot with Markov chain transitions.
+/// </summary>
+public sealed class SessionsListModel
+{
+    public required IReadOnlyList<SessionListEntry> Sessions { get; init; }
+    public required string BasePath { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public int TotalCount { get; init; }
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalCount / PageSize));
+    public string? Filter { get; init; }
+}
+
+/// <summary>
+///     A single session entry for the sessions list.
+/// </summary>
+public sealed record SessionListEntry
+{
+    public long Id { get; init; }
+    public required string Signature { get; init; }
+    public required DateTime StartedAt { get; init; }
+    public required DateTime EndedAt { get; init; }
+    public double DurationMinutes => Math.Round((EndedAt - StartedAt).TotalMinutes, 1);
+    public required int RequestCount { get; init; }
+    public required string DominantState { get; init; }
+    public required bool IsBot { get; init; }
+    public required double AvgBotProbability { get; init; }
+    public required string RiskBand { get; init; }
+    public string? Action { get; init; }
+    public string? BotName { get; init; }
+    public string? CountryCode { get; init; }
+    public int ErrorCount { get; init; }
+    public float TimingEntropy { get; init; }
+    public float Maturity { get; init; }
+
+    /// <summary>Markov transitions as "State->State": count</summary>
+    public Dictionary<string, int>? TransitionCounts { get; init; }
+
+    /// <summary>Top 3 transitions by count for compact display</summary>
+    public IEnumerable<KeyValuePair<string, int>> TopTransitions =>
+        TransitionCounts?.OrderByDescending(kv => kv.Value).Take(3)
+        ?? Enumerable.Empty<KeyValuePair<string, int>>();
+}
+
+/// <summary>
+///     View model for the session detail panel (loaded via HTMX).
+///     Shows behavioral radar chart, Markov chain transitions, paths, timing.
+/// </summary>
+public sealed class SessionDetailModel
+{
+    public long Id { get; init; }
+    public required string Signature { get; init; }
+    public required string BasePath { get; init; }
+    public required string CspNonce { get; init; }
+    public required DateTime StartedAt { get; init; }
+    public required DateTime EndedAt { get; init; }
+    public double DurationMinutes => Math.Round((EndedAt - StartedAt).TotalMinutes, 1);
+    public required int RequestCount { get; init; }
+    public required string DominantState { get; init; }
+    public required bool IsBot { get; init; }
+    public required double AvgBotProbability { get; init; }
+    public required string RiskBand { get; init; }
+    public int ErrorCount { get; init; }
+    public float TimingEntropy { get; init; }
+    public float Maturity { get; init; }
+
+    /// <summary>Markov transition counts: "State->State" => count</summary>
+    public Dictionary<string, int>? TransitionCounts { get; init; }
+
+    /// <summary>Templatized paths visited</summary>
+    public List<string>? Paths { get; init; }
 }

@@ -482,6 +482,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, MultiLayerCorrelationContributor>();
         // Behavioral waveform analysis - analyzes patterns across multiple requests
         services.AddSingleton<IContributingDetector, BehavioralWaveformContributor>();
+        // Session vector analysis - Markov chain compression for inter-session anomaly detection
+        services.TryAddSingleton<Analysis.SessionStore>();
+        services.AddSingleton<IContributingDetector, SessionVectorContributor>();
+        // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
+        services.TryAddSingleton<Data.ISessionStore, Data.SqliteSessionStore>();
+        services.AddHostedService<Data.SessionPersistenceService>();
         // Markov chain path learning and drift detection
         services.TryAddSingleton<Markov.MarkovTracker>();
         services.TryAddSingleton<Clustering.AdaptiveSimilarityWeighter>();

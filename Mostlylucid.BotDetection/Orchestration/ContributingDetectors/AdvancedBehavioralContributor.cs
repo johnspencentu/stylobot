@@ -64,19 +64,23 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
             // Record this request for pattern analysis
             _analyzer.RecordRequest(clientIp, currentPath, currentTime);
 
-            // Detect streaming transports — these need special handling to avoid false positives.
-            // SignalR hub reconnections are normal (same URL, bursty), but we still want timing analysis
-            // to catch machine-gun reconnects at exact intervals.
-            var isWebSocket = context.Request.Headers.TryGetValue("Upgrade", out var upgradeHeader)
-                              && upgradeHeader.ToString().Contains("websocket", StringComparison.OrdinalIgnoreCase);
-            var isSse = context.Request.Headers.TryGetValue("Accept", out var acceptHeader)
-                        && acceptHeader.ToString().Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
-            var query = context.Request.QueryString.Value ?? "";
-            var path = context.Request.Path.Value ?? "";
-            var isSignalR = (path.EndsWith("/negotiate", StringComparison.OrdinalIgnoreCase)
-                             && query.Contains("negotiateVersion", StringComparison.OrdinalIgnoreCase))
-                            || query.Contains("id=", StringComparison.OrdinalIgnoreCase);
-            var isStreaming = isWebSocket || isSse || isSignalR;
+            // Read transport classification from TransportProtocolContributor (Priority 5, runs first).
+            // Falls back to local header detection if the signal hasn't been written yet.
+            var isStreaming = state.GetSignal<bool?>(SignalKeys.TransportIsStreaming) ?? false;
+            if (!isStreaming)
+            {
+                // Fallback: TransportProtocolContributor may not have run yet in this wave
+                var isWebSocket = context.Request.Headers.TryGetValue("Upgrade", out var upgradeHeader)
+                                  && upgradeHeader.ToString().Contains("websocket", StringComparison.OrdinalIgnoreCase);
+                var isSse = context.Request.Headers.TryGetValue("Accept", out var acceptHeader)
+                            && acceptHeader.ToString().Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
+                var query = context.Request.QueryString.Value ?? "";
+                var pathVal = context.Request.Path.Value ?? "";
+                var isSignalR = (pathVal.EndsWith("/negotiate", StringComparison.OrdinalIgnoreCase)
+                                 && query.Contains("negotiateVersion", StringComparison.OrdinalIgnoreCase))
+                                || query.Contains("id=", StringComparison.OrdinalIgnoreCase);
+                isStreaming = isWebSocket || isSse || isSignalR;
+            }
 
             // Only analyze if we have enough data
             var minRequests = _options.Behavioral.MinRequestsForPatternAnalysis;

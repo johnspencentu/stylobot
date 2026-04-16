@@ -1,0 +1,165 @@
+@using Mostlylucid.BotDetection.UI.Models
+@model SessionsListModel
+@{
+    var bp = Model.BasePath;
+    string PageUrl(int page) => $"{bp}/partials/sessions?page={page}&pageSize={Model.PageSize}&filter={Model.Filter}";
+    static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
+    static string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
+
+    static string RiskColor(string risk) => risk switch {
+        "VeryHigh" => "badge-error",
+        "High" => "badge-warning",
+        "Medium" => "badge-info",
+        "Low" => "badge-success",
+        "VeryLow" => "badge-ghost",
+        _ => "badge-ghost"
+    };
+
+    static string StateIcon(string state) => state switch {
+        "PageView" => "&#x1F4C4;",
+        "ApiCall" => "&#x26A1;",
+        "WebSocket" => "&#x1F50C;",
+        "SignalR" => "&#x1F4E1;",
+        "StaticAsset" => "&#x1F4E6;",
+        "Search" => "&#x1F50D;",
+        "NotFound" => "&#x274C;",
+        "AuthAttempt" => "&#x1F512;",
+        "FormSubmit" => "&#x1F4DD;",
+        "ServerSentEvent" => "&#x1F4E8;",
+        _ => "&#x2753;"
+    };
+
+    static string FormatDuration(double minutes) => minutes switch {
+        < 1 => $"{minutes * 60:F0}s",
+        < 60 => $"{minutes:F1}m",
+        _ => $"{minutes / 60:F1}h"
+    };
+
+    static string EntropyLabel(float entropy) => entropy switch {
+        < 0.5f => "very regular",
+        < 1.5f => "regular",
+        < 2.5f => "moderate",
+        < 3.5f => "varied",
+        _ => "chaotic"
+    };
+}
+<div id="sessions-list"
+     data-sb-widget="sessions"
+     data-sb-depends="signature,summary"
+     class="card bg-base-200 transition-all duration-200">
+    <div class="card-body p-3">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-bold text-base-content">Sessions</h3>
+            <div class="flex gap-1">
+                <button class="btn btn-xs @(Model.Filter == null ? "btn-primary" : "btn-ghost")"
+                        hx-get="@bp/partials/sessions?filter=all" hx-target="#sessions-list" hx-swap="outerHTML transition:true">
+                    All
+                </button>
+                <button class="btn btn-xs @(Model.Filter == "bot" ? "btn-error" : "btn-ghost")"
+                        hx-get="@bp/partials/sessions?filter=bot" hx-target="#sessions-list" hx-swap="outerHTML transition:true">
+                    Bots
+                </button>
+                <button class="btn btn-xs @(Model.Filter == "human" ? "btn-success" : "btn-ghost")"
+                        hx-get="@bp/partials/sessions?filter=human" hx-target="#sessions-list" hx-swap="outerHTML transition:true">
+                    Humans
+                </button>
+            </div>
+        </div>
+
+        @if (Model.Sessions.Count == 0)
+        {
+            <div class="text-xs text-base-content/40 py-8 text-center">
+                <p>No sessions recorded yet.</p>
+                <p class="mt-1">Sessions are created when a visitor's activity gap exceeds 30 minutes.</p>
+            </div>
+        }
+        else
+        {
+            <div class="space-y-2">
+                @foreach (var s in Model.Sessions)
+                {
+                    <div class="bg-base-100 rounded-lg p-3 hover:bg-base-300/50 transition-colors cursor-pointer border border-base-300/50"
+                         hx-get="@bp/partials/session-detail?id=@s.Id&sig=@Uri.EscapeDataString(s.Signature)"
+                         hx-target="#session-detail-panel"
+                         hx-swap="innerHTML transition:true">
+
+                        @* Header row: identity + timing *@
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-2">
+                                @if (HasFlag(s.CountryCode))
+                                {
+                                    <img src="@FlagUrl(s.CountryCode!)" alt="@s.CountryCode" class="w-4 h-3 rounded-sm" loading="lazy" />
+                                }
+                                <span class="text-xs font-semibold text-base-content truncate max-w-48"
+                                      title="@s.Signature">
+                                    @(s.BotName ?? s.Signature[..Math.Min(12, s.Signature.Length)])
+                                </span>
+                                <span class="badge badge-xs @(s.IsBot ? "badge-error" : "badge-success")">
+                                    @(s.IsBot ? "Bot" : "Human")
+                                </span>
+                                <span class="badge badge-xs @RiskColor(s.RiskBand)">@s.RiskBand</span>
+                            </div>
+                            <div class="text-[10px] text-base-content/40 text-right">
+                                <div>@s.StartedAt.ToString("HH:mm") - @s.EndedAt.ToString("HH:mm")</div>
+                                <div>@FormatDuration(s.DurationMinutes)</div>
+                            </div>
+                        </div>
+
+                        @* Stats row *@
+                        <div class="flex items-center gap-3 text-[10px] text-base-content/60">
+                            <span title="Requests">@s.RequestCount req</span>
+                            <span title="Dominant behavior">@Html.Raw(StateIcon(s.DominantState)) @s.DominantState</span>
+                            <span title="Timing entropy: @EntropyLabel(s.TimingEntropy)">
+                                H=@s.TimingEntropy.ToString("F1")
+                            </span>
+                            @if (s.ErrorCount > 0)
+                            {
+                                <span class="text-error" title="@s.ErrorCount errors">@s.ErrorCount err</span>
+                            }
+                            <span title="Bot probability">@((s.AvgBotProbability * 100).ToString("F0"))%</span>
+                            @if (s.Action != null)
+                            {
+                                <span class="badge badge-xs badge-outline">@s.Action</span>
+                            }
+                        </div>
+
+                        @* Markov chain preview — top transitions *@
+                        @if (s.TransitionCounts != null && s.TransitionCounts.Count > 0)
+                        {
+                            <div class="flex gap-1 mt-1 flex-wrap">
+                                @foreach (var t in s.TopTransitions)
+                                {
+                                    var parts = t.Key.Split("->");
+                                    <span class="badge badge-xs badge-ghost text-[9px]"
+                                          title="@t.Key: @t.Value times">
+                                        @parts[0][..Math.Min(4, parts[0].Length)]&rarr;@parts[1][..Math.Min(4, parts[1].Length)]
+                                        <span class="ml-0.5 opacity-60">@t.Value</span>
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Pagination *@
+            @if (Model.TotalPages > 1)
+            {
+                <div class="flex justify-center mt-3">
+                    <div class="join">
+                        @for (var p = 1; p <= Math.Min(Model.TotalPages, 10); p++)
+                        {
+                            <button class="join-item btn btn-xs @(p == Model.Page ? "btn-active" : "")"
+                                    hx-get="@PageUrl(p)" hx-target="#sessions-list" hx-swap="outerHTML transition:true">
+                                @p
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@* Session detail panel — populated by HTMX on session click *@
+<div id="session-detail-panel" class="mt-2"></div>

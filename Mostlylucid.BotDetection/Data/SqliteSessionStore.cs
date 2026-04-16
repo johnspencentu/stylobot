@@ -1,0 +1,584 @@
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Mostlylucid.BotDetection.Models;
+
+namespace Mostlylucid.BotDetection.Data;
+
+/// <summary>
+///     SQLite-backed session store. Zero external dependencies — just a file on disk.
+///     Sessions are the unit of storage, not individual requests.
+///     Vector search uses brute-force cosine similarity (fast enough for <100K sessions).
+///     For larger deployments, the commercial PostgreSQL + pgvector implementation
+///     provides native HNSW indexing for sub-millisecond vector queries.
+/// </summary>
+public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
+{
+    private readonly string _connectionString;
+    private readonly ILogger<SqliteSessionStore> _logger;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private bool _initialized;
+
+    public SqliteSessionStore(
+        ILogger<SqliteSessionStore> logger,
+        IOptions<BotDetectionOptions> options)
+    {
+        _logger = logger;
+        var basePath = Path.GetDirectoryName(
+            options.Value.DatabasePath ?? Path.Combine(AppContext.BaseDirectory, "botdetection.db"))
+            ?? AppContext.BaseDirectory;
+        Directory.CreateDirectory(basePath);
+        var dbPath = Path.Combine(basePath, "sessions.db");
+        _connectionString = $"Data Source={dbPath};Cache=Shared";
+    }
+
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+        if (_initialized) return;
+
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            PRAGMA cache_size=-8000;
+
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                signature TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT NOT NULL,
+                request_count INTEGER NOT NULL,
+                vector BLOB,
+                maturity REAL NOT NULL,
+                dominant_state TEXT NOT NULL,
+                is_bot INTEGER NOT NULL,
+                avg_bot_probability REAL NOT NULL,
+                avg_confidence REAL NOT NULL,
+                risk_band TEXT NOT NULL,
+                action TEXT,
+                bot_name TEXT,
+                bot_type TEXT,
+                country_code TEXT,
+                top_reasons_json TEXT,
+                transition_counts_json TEXT,
+                paths_json TEXT,
+                avg_processing_time_ms REAL,
+                error_count INTEGER DEFAULT 0,
+                timing_entropy REAL DEFAULT 0,
+                narrative TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sessions_signature ON sessions(signature, ended_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_sessions_ended ON sessions(ended_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_sessions_is_bot ON sessions(is_bot, ended_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_sessions_country ON sessions(country_code);
+
+            CREATE TABLE IF NOT EXISTS signatures (
+                signature_id TEXT PRIMARY KEY,
+                session_count INTEGER NOT NULL DEFAULT 0,
+                total_request_count INTEGER NOT NULL DEFAULT 0,
+                first_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                is_bot INTEGER NOT NULL DEFAULT 0,
+                bot_probability REAL NOT NULL DEFAULT 0,
+                confidence REAL NOT NULL DEFAULT 0,
+                risk_band TEXT NOT NULL DEFAULT 'Low',
+                bot_name TEXT,
+                bot_type TEXT,
+                action TEXT,
+                country_code TEXT,
+                root_vector BLOB,
+                root_vector_maturity REAL DEFAULT 0,
+                narrative TEXT,
+                top_reasons_json TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_signatures_bot ON signatures(is_bot, session_count DESC);
+            CREATE INDEX IF NOT EXISTS idx_signatures_last_seen ON signatures(last_seen DESC);
+
+            CREATE TABLE IF NOT EXISTS buckets (
+                bucket_time TEXT NOT NULL PRIMARY KEY,
+                total_count INTEGER NOT NULL DEFAULT 0,
+                bot_count INTEGER NOT NULL DEFAULT 0,
+                human_count INTEGER NOT NULL DEFAULT 0,
+                unique_signatures INTEGER NOT NULL DEFAULT 0,
+                sessions_started INTEGER NOT NULL DEFAULT 0,
+                avg_processing_time_ms REAL NOT NULL DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_buckets_time ON buckets(bucket_time DESC);
+        """;
+        await cmd.ExecuteNonQueryAsync(ct);
+
+        _initialized = true;
+        _logger.LogInformation("SQLite session store initialized at {ConnectionString}", _connectionString);
+    }
+
+    // === Write path ===
+
+    public async Task AddSessionAsync(PersistedSession session, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO sessions (
+                    signature, started_at, ended_at, request_count, vector, maturity,
+                    dominant_state, is_bot, avg_bot_probability, avg_confidence, risk_band,
+                    action, bot_name, bot_type, country_code, top_reasons_json,
+                    transition_counts_json, paths_json, avg_processing_time_ms,
+                    error_count, timing_entropy, narrative
+                ) VALUES (
+                    @sig, @started, @ended, @reqCount, @vector, @maturity,
+                    @domState, @isBot, @avgProb, @avgConf, @risk,
+                    @action, @botName, @botType, @country, @reasons,
+                    @transitions, @paths, @avgTime,
+                    @errors, @entropy, @narrative
+                )
+            """;
+            cmd.Parameters.AddWithValue("@sig", session.Signature);
+            cmd.Parameters.AddWithValue("@started", session.StartedAt.ToString("O"));
+            cmd.Parameters.AddWithValue("@ended", session.EndedAt.ToString("O"));
+            cmd.Parameters.AddWithValue("@reqCount", session.RequestCount);
+            cmd.Parameters.AddWithValue("@vector", session.Vector);
+            cmd.Parameters.AddWithValue("@maturity", session.Maturity);
+            cmd.Parameters.AddWithValue("@domState", session.DominantState);
+            cmd.Parameters.AddWithValue("@isBot", session.IsBot ? 1 : 0);
+            cmd.Parameters.AddWithValue("@avgProb", session.AvgBotProbability);
+            cmd.Parameters.AddWithValue("@avgConf", session.AvgConfidence);
+            cmd.Parameters.AddWithValue("@risk", session.RiskBand);
+            cmd.Parameters.AddWithValue("@action", (object?)session.Action ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@botName", (object?)session.BotName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@botType", (object?)session.BotType ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@country", (object?)session.CountryCode ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@reasons", (object?)session.TopReasonsJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@transitions", (object?)session.TransitionCountsJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@paths", (object?)session.PathsJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@avgTime", session.AvgProcessingTimeMs);
+            cmd.Parameters.AddWithValue("@errors", session.ErrorCount);
+            cmd.Parameters.AddWithValue("@entropy", session.TimingEntropy);
+            cmd.Parameters.AddWithValue("@narrative", (object?)session.Narrative ?? DBNull.Value);
+
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task UpsertSignatureAsync(PersistedSignature signature, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO signatures (
+                    signature_id, session_count, total_request_count, first_seen, last_seen,
+                    is_bot, bot_probability, confidence, risk_band,
+                    bot_name, bot_type, action, country_code,
+                    root_vector, root_vector_maturity, narrative, top_reasons_json
+                ) VALUES (
+                    @id, @sessions, @requests, @first, @last,
+                    @isBot, @prob, @conf, @risk,
+                    @botName, @botType, @action, @country,
+                    @rootVec, @rootMat, @narrative, @reasons
+                )
+                ON CONFLICT(signature_id) DO UPDATE SET
+                    session_count = session_count + @sessions,
+                    total_request_count = total_request_count + @requests,
+                    last_seen = @last,
+                    is_bot = @isBot,
+                    bot_probability = @prob,
+                    confidence = @conf,
+                    risk_band = @risk,
+                    bot_name = COALESCE(@botName, bot_name),
+                    bot_type = COALESCE(@botType, bot_type),
+                    action = COALESCE(@action, action),
+                    country_code = COALESCE(@country, country_code),
+                    root_vector = COALESCE(@rootVec, root_vector),
+                    root_vector_maturity = CASE WHEN @rootMat > root_vector_maturity THEN @rootMat ELSE root_vector_maturity END,
+                    narrative = COALESCE(@narrative, narrative),
+                    top_reasons_json = COALESCE(@reasons, top_reasons_json)
+            """;
+            cmd.Parameters.AddWithValue("@id", signature.SignatureId);
+            cmd.Parameters.AddWithValue("@sessions", signature.SessionCount);
+            cmd.Parameters.AddWithValue("@requests", signature.TotalRequestCount);
+            cmd.Parameters.AddWithValue("@first", signature.FirstSeen.ToString("O"));
+            cmd.Parameters.AddWithValue("@last", signature.LastSeen.ToString("O"));
+            cmd.Parameters.AddWithValue("@isBot", signature.IsBot ? 1 : 0);
+            cmd.Parameters.AddWithValue("@prob", signature.BotProbability);
+            cmd.Parameters.AddWithValue("@conf", signature.Confidence);
+            cmd.Parameters.AddWithValue("@risk", signature.RiskBand);
+            cmd.Parameters.AddWithValue("@botName", (object?)signature.BotName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@botType", (object?)signature.BotType ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@action", (object?)signature.Action ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@country", (object?)signature.CountryCode ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rootVec", (object?)signature.RootVector ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rootMat", signature.RootVectorMaturity);
+            cmd.Parameters.AddWithValue("@narrative", (object?)signature.Narrative ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@reasons", (object?)signature.TopReasonsJson ?? DBNull.Value);
+
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task IncrementBucketAsync(DateTime bucketTime, bool isBot, double processingTimeMs, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        var bucket = new DateTime(bucketTime.Year, bucketTime.Month, bucketTime.Day,
+            bucketTime.Hour, bucketTime.Minute, 0, DateTimeKind.Utc);
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO buckets (bucket_time, total_count, bot_count, human_count, avg_processing_time_ms)
+                VALUES (@time, 1, @bot, @human, @avgTime)
+                ON CONFLICT(bucket_time) DO UPDATE SET
+                    total_count = total_count + 1,
+                    bot_count = bot_count + @bot,
+                    human_count = human_count + @human,
+                    avg_processing_time_ms = (avg_processing_time_ms * total_count + @avgTime) / (total_count + 1)
+            """;
+            cmd.Parameters.AddWithValue("@time", bucket.ToString("O"));
+            cmd.Parameters.AddWithValue("@bot", isBot ? 1 : 0);
+            cmd.Parameters.AddWithValue("@human", isBot ? 0 : 1);
+            cmd.Parameters.AddWithValue("@avgTime", processingTimeMs);
+
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    // === Read path ===
+
+    public async Task<List<PersistedSession>> GetSessionsAsync(string signature, int limit = 20, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM sessions WHERE signature = @sig ORDER BY ended_at DESC LIMIT @limit";
+        cmd.Parameters.AddWithValue("@sig", signature);
+        cmd.Parameters.AddWithValue("@limit", limit);
+        return await ReadSessionsAsync(cmd, ct);
+    }
+
+    public async Task<List<PersistedSession>> GetRecentSessionsAsync(int limit = 50, bool? isBot = null, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+
+        if (isBot.HasValue)
+        {
+            cmd.CommandText = "SELECT * FROM sessions WHERE is_bot = @isBot ORDER BY ended_at DESC LIMIT @limit";
+            cmd.Parameters.AddWithValue("@isBot", isBot.Value ? 1 : 0);
+        }
+        else
+        {
+            cmd.CommandText = "SELECT * FROM sessions ORDER BY ended_at DESC LIMIT @limit";
+        }
+        cmd.Parameters.AddWithValue("@limit", limit);
+        return await ReadSessionsAsync(cmd, ct);
+    }
+
+    public async Task<PersistedSignature?> GetSignatureAsync(string signatureId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM signatures WHERE signature_id = @id";
+        cmd.Parameters.AddWithValue("@id", signatureId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? ReadSignature(reader) : null;
+    }
+
+    public async Task<List<PersistedSignature>> GetTopSignaturesAsync(int limit = 20, bool? isBot = null, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+
+        if (isBot.HasValue)
+        {
+            cmd.CommandText = "SELECT * FROM signatures WHERE is_bot = @isBot ORDER BY session_count DESC LIMIT @limit";
+            cmd.Parameters.AddWithValue("@isBot", isBot.Value ? 1 : 0);
+        }
+        else
+        {
+            cmd.CommandText = "SELECT * FROM signatures ORDER BY session_count DESC LIMIT @limit";
+        }
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var results = new List<PersistedSignature>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            results.Add(ReadSignature(reader));
+        return results;
+    }
+
+    public async Task<DashboardSessionSummary> GetSummaryAsync(CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT
+                COUNT(*) as total_sessions,
+                SUM(CASE WHEN is_bot = 1 THEN 1 ELSE 0 END) as bot_sessions,
+                SUM(CASE WHEN is_bot = 0 THEN 1 ELSE 0 END) as human_sessions,
+                COUNT(DISTINCT signature) as unique_signatures,
+                SUM(request_count) as total_requests,
+                AVG(avg_processing_time_ms) as avg_processing_time,
+                MAX(ended_at) as last_activity
+            FROM sessions
+        """;
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return new DashboardSessionSummary();
+
+        return new DashboardSessionSummary
+        {
+            TotalSessions = reader.GetInt32(0),
+            BotSessions = reader.GetInt32(1),
+            HumanSessions = reader.GetInt32(2),
+            UniqueSignatures = reader.GetInt32(3),
+            TotalRequests = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+            AvgProcessingTimeMs = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
+            LastActivityAt = reader.IsDBNull(6) ? null : DateTime.Parse(reader.GetString(6))
+        };
+    }
+
+    public async Task<List<AggregatedBucket>> GetTimeSeriesAsync(DateTime start, DateTime end, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT bucket_time, total_count, bot_count, human_count,
+                   unique_signatures, sessions_started, avg_processing_time_ms
+            FROM buckets
+            WHERE bucket_time >= @start AND bucket_time <= @end
+            ORDER BY bucket_time ASC
+        """;
+        cmd.Parameters.AddWithValue("@start", start.ToString("O"));
+        cmd.Parameters.AddWithValue("@end", end.ToString("O"));
+
+        var results = new List<AggregatedBucket>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new AggregatedBucket
+            {
+                BucketTime = DateTime.Parse(reader.GetString(0)),
+                TotalCount = reader.GetInt32(1),
+                BotCount = reader.GetInt32(2),
+                HumanCount = reader.GetInt32(3),
+                UniqueSignatures = reader.GetInt32(4),
+                SessionsStarted = reader.GetInt32(5),
+                AvgProcessingTimeMs = reader.GetDouble(6)
+            });
+        }
+        return results;
+    }
+
+    public async Task<List<CountrySessionStats>> GetCountryStatsAsync(int limit = 20, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT country_code,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN is_bot = 1 THEN 1 ELSE 0 END) as bots,
+                   SUM(CASE WHEN is_bot = 0 THEN 1 ELSE 0 END) as humans,
+                   SUM(request_count) as requests
+            FROM sessions
+            WHERE country_code IS NOT NULL
+            GROUP BY country_code
+            ORDER BY total DESC
+            LIMIT @limit
+        """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var results = new List<CountrySessionStats>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new CountrySessionStats
+            {
+                CountryCode = reader.GetString(0),
+                TotalSessions = reader.GetInt32(1),
+                BotSessions = reader.GetInt32(2),
+                HumanSessions = reader.GetInt32(3),
+                TotalRequests = reader.GetInt32(4)
+            });
+        }
+        return results;
+    }
+
+    public async Task<List<(PersistedSession Session, float Similarity)>> FindSimilarSessionsAsync(
+        float[] queryVector, int topK = 10, float minSimilarity = 0.7f, CancellationToken ct = default)
+    {
+        // Brute-force cosine similarity — adequate for <100K sessions.
+        // Commercial PostgreSQL + pgvector provides native HNSW for larger deployments.
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM sessions WHERE vector IS NOT NULL ORDER BY ended_at DESC LIMIT 10000";
+
+        var candidates = new List<(PersistedSession session, float similarity)>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var session = ReadSession(reader);
+            var sessionVector = DeserializeVector(session.Vector);
+            if (sessionVector == null) continue;
+
+            var sim = Analysis.SessionVectorizer.CosineSimilarity(queryVector, sessionVector);
+            if (sim >= minSimilarity)
+                candidates.Add((session, sim));
+        }
+
+        return candidates
+            .OrderByDescending(c => c.similarity)
+            .Take(topK)
+            .ToList();
+    }
+
+    public async Task PruneAsync(TimeSpan retention, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        var cutoff = DateTime.UtcNow.Subtract(retention).ToString("O");
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM sessions WHERE ended_at < @cutoff";
+            cmd.Parameters.AddWithValue("@cutoff", cutoff);
+            var deleted = await cmd.ExecuteNonQueryAsync(ct);
+
+            await using var cmd2 = conn.CreateCommand();
+            cmd2.CommandText = "DELETE FROM buckets WHERE bucket_time < @cutoff";
+            cmd2.Parameters.AddWithValue("@cutoff", cutoff);
+            await cmd2.ExecuteNonQueryAsync(ct);
+
+            if (deleted > 0)
+                _logger.LogInformation("Pruned {Count} sessions older than {Retention}", deleted, retention);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    // === Helpers ===
+
+    private async Task EnsureInitializedAsync(CancellationToken ct)
+    {
+        if (!_initialized) await InitializeAsync(ct);
+    }
+
+    private static async Task<List<PersistedSession>> ReadSessionsAsync(SqliteCommand cmd, CancellationToken ct)
+    {
+        var results = new List<PersistedSession>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            results.Add(ReadSession(reader));
+        return results;
+    }
+
+    private static PersistedSession ReadSession(SqliteDataReader reader) => new()
+    {
+        Id = reader.GetInt64(reader.GetOrdinal("id")),
+        Signature = reader.GetString(reader.GetOrdinal("signature")),
+        StartedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("started_at"))),
+        EndedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("ended_at"))),
+        RequestCount = reader.GetInt32(reader.GetOrdinal("request_count")),
+        Vector = reader.IsDBNull(reader.GetOrdinal("vector")) ? [] : (byte[])reader["vector"],
+        Maturity = reader.GetFloat(reader.GetOrdinal("maturity")),
+        DominantState = reader.GetString(reader.GetOrdinal("dominant_state")),
+        IsBot = reader.GetInt32(reader.GetOrdinal("is_bot")) == 1,
+        AvgBotProbability = reader.GetDouble(reader.GetOrdinal("avg_bot_probability")),
+        AvgConfidence = reader.GetDouble(reader.GetOrdinal("avg_confidence")),
+        RiskBand = reader.GetString(reader.GetOrdinal("risk_band")),
+        Action = reader.IsDBNull(reader.GetOrdinal("action")) ? null : reader.GetString(reader.GetOrdinal("action")),
+        BotName = reader.IsDBNull(reader.GetOrdinal("bot_name")) ? null : reader.GetString(reader.GetOrdinal("bot_name")),
+        BotType = reader.IsDBNull(reader.GetOrdinal("bot_type")) ? null : reader.GetString(reader.GetOrdinal("bot_type")),
+        CountryCode = reader.IsDBNull(reader.GetOrdinal("country_code")) ? null : reader.GetString(reader.GetOrdinal("country_code")),
+        TopReasonsJson = reader.IsDBNull(reader.GetOrdinal("top_reasons_json")) ? null : reader.GetString(reader.GetOrdinal("top_reasons_json")),
+        TransitionCountsJson = reader.IsDBNull(reader.GetOrdinal("transition_counts_json")) ? null : reader.GetString(reader.GetOrdinal("transition_counts_json")),
+        PathsJson = reader.IsDBNull(reader.GetOrdinal("paths_json")) ? null : reader.GetString(reader.GetOrdinal("paths_json")),
+        AvgProcessingTimeMs = reader.IsDBNull(reader.GetOrdinal("avg_processing_time_ms")) ? 0 : reader.GetDouble(reader.GetOrdinal("avg_processing_time_ms")),
+        ErrorCount = reader.IsDBNull(reader.GetOrdinal("error_count")) ? 0 : reader.GetInt32(reader.GetOrdinal("error_count")),
+        TimingEntropy = reader.IsDBNull(reader.GetOrdinal("timing_entropy")) ? 0 : reader.GetFloat(reader.GetOrdinal("timing_entropy")),
+        Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative"))
+    };
+
+    private static PersistedSignature ReadSignature(SqliteDataReader reader) => new()
+    {
+        SignatureId = reader.GetString(reader.GetOrdinal("signature_id")),
+        SessionCount = reader.GetInt32(reader.GetOrdinal("session_count")),
+        TotalRequestCount = reader.GetInt32(reader.GetOrdinal("total_request_count")),
+        FirstSeen = DateTime.Parse(reader.GetString(reader.GetOrdinal("first_seen"))),
+        LastSeen = DateTime.Parse(reader.GetString(reader.GetOrdinal("last_seen"))),
+        IsBot = reader.GetInt32(reader.GetOrdinal("is_bot")) == 1,
+        BotProbability = reader.GetDouble(reader.GetOrdinal("bot_probability")),
+        Confidence = reader.GetDouble(reader.GetOrdinal("confidence")),
+        RiskBand = reader.GetString(reader.GetOrdinal("risk_band")),
+        BotName = reader.IsDBNull(reader.GetOrdinal("bot_name")) ? null : reader.GetString(reader.GetOrdinal("bot_name")),
+        BotType = reader.IsDBNull(reader.GetOrdinal("bot_type")) ? null : reader.GetString(reader.GetOrdinal("bot_type")),
+        Action = reader.IsDBNull(reader.GetOrdinal("action")) ? null : reader.GetString(reader.GetOrdinal("action")),
+        CountryCode = reader.IsDBNull(reader.GetOrdinal("country_code")) ? null : reader.GetString(reader.GetOrdinal("country_code")),
+        RootVector = reader.IsDBNull(reader.GetOrdinal("root_vector")) ? null : (byte[])reader["root_vector"],
+        RootVectorMaturity = reader.IsDBNull(reader.GetOrdinal("root_vector_maturity")) ? 0 : reader.GetFloat(reader.GetOrdinal("root_vector_maturity")),
+        Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative")),
+        TopReasonsJson = reader.IsDBNull(reader.GetOrdinal("top_reasons_json")) ? null : reader.GetString(reader.GetOrdinal("top_reasons_json"))
+    };
+
+    /// <summary>Deserialize a float[] from a BLOB (IEEE 754 little-endian).</summary>
+    private static float[]? DeserializeVector(byte[]? blob)
+    {
+        if (blob == null || blob.Length == 0) return null;
+        var floats = new float[blob.Length / sizeof(float)];
+        Buffer.BlockCopy(blob, 0, floats, 0, blob.Length);
+        return floats;
+    }
+
+    /// <summary>Serialize a float[] to a BLOB (IEEE 754 little-endian).</summary>
+    public static byte[] SerializeVector(float[] vector)
+    {
+        var bytes = new byte[vector.Length * sizeof(float)];
+        Buffer.BlockCopy(vector, 0, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _writeLock.Dispose();
+    }
+}

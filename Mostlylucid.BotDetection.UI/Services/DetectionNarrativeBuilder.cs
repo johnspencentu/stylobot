@@ -46,7 +46,8 @@ public static class DetectionNarrativeBuilder
         ["ResponseStatusBoost"] = "response status analysis",
         ["TransportProtocol"] = "transport protocol analysis",
         ["StreamAbuse"] = "stream abuse detection",
-        ["Intent"] = "session intent analysis"
+        ["Intent"] = "session intent analysis",
+        ["SessionVector"] = "session behavioral vector analysis"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -87,7 +88,8 @@ public static class DetectionNarrativeBuilder
         ["ResponseStatusBoost"] = "Response",
         ["TransportProtocol"] = "Protocol",
         ["StreamAbuse"] = "Protocol",
-        ["Intent"] = "Threat"
+        ["Intent"] = "Threat",
+        ["SessionVector"] = "Behavioral"
     };
 
     private static readonly Dictionary<string, string> BotTypeFriendlyNames = new(StringComparer.OrdinalIgnoreCase)

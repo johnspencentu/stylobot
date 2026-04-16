@@ -57,12 +57,16 @@ public class StyloBotDashboardMiddleware
         "api/timeseries",
         "api/export",
         "api/countries",
+        "api/endpoints",
         "api/clusters",
         "api/useragents",
-        "api/topbots"
+        "api/topbots",
+        "api/sessions",
+        "api/sessions/recent"
     };
 
     private const string CountryDetailPrefix = "api/countries/";
+    private const string EndpointDetailPrefix = "api/endpoints/";
     private const string BdfExportPrefix = "api/bdf/";
 
     private static int _cleanupRunning;
@@ -117,6 +121,7 @@ public class StyloBotDashboardMiddleware
         // that's a detection bug — fix the detection, not the block.
         var isDataApi = DataApiPaths.Contains(relativePath)
                         || relativePath.StartsWith(CountryDetailPrefix, StringComparison.OrdinalIgnoreCase);
+        isDataApi = isDataApi || relativePath.StartsWith(EndpointDetailPrefix, StringComparison.OrdinalIgnoreCase);
         if (isDataApi && context.IsBot())
         {
             var hasValidApiKey = context.Items.TryGetValue("BotDetection.ApiKeyContext", out var keyCtxObj)
@@ -177,6 +182,10 @@ public class StyloBotDashboardMiddleware
                 await ServeCountriesApiAsync(context);
                 break;
 
+            case "api/endpoints":
+                await ServeEndpointsApiAsync(context);
+                break;
+
             case "api/clusters":
                 await ServeClustersApiAsync(context);
                 break;
@@ -193,8 +202,21 @@ public class StyloBotDashboardMiddleware
                 await ServeMeApiAsync(context);
                 break;
 
+            case "api/sessions":
+            case "api/sessions/recent":
+                await ServeSessionsApiAsync(context);
+                break;
+
             case var p when p.StartsWith(CountryDetailPrefix, StringComparison.OrdinalIgnoreCase):
                 await ServeCountryDetailApiAsync(context, p.Substring(CountryDetailPrefix.Length));
+                break;
+
+            case var p when p.StartsWith(EndpointDetailPrefix, StringComparison.OrdinalIgnoreCase):
+                await ServeEndpointDetailApiAsync(context, p.Substring(EndpointDetailPrefix.Length));
+                break;
+
+            case var p when p.StartsWith("api/sessions/signature/", StringComparison.OrdinalIgnoreCase):
+                await ServeSignatureSessionsApiAsync(context, relativePath["api/sessions/signature/".Length..]);
                 break;
 
             case var p when p.StartsWith("api/sparkline/", StringComparison.OrdinalIgnoreCase):
@@ -224,6 +246,10 @@ public class StyloBotDashboardMiddleware
                 await ServeCountriesPartialAsync(context);
                 break;
 
+            case "partials/endpoints":
+                await ServeEndpointsPartialAsync(context);
+                break;
+
             case "partials/clusters":
                 await ServeClustersPartialAsync(context);
                 break;
@@ -236,12 +262,24 @@ public class StyloBotDashboardMiddleware
                 await ServeUserAgentDetailPartialAsync(context);
                 break;
 
+            case "partials/endpoint-detail":
+                await ServeEndpointDetailPartialAsync(context);
+                break;
+
             case "partials/topbots":
                 await ServeTopBotsPartialAsync(context);
                 break;
 
             case "partials/recent":
                 await ServeRecentActivityPartialAsync(context);
+                break;
+
+            case "partials/sessions":
+                await ServeSessionsPartialAsync(context);
+                break;
+
+            case "partials/session-detail":
+                await ServeSessionDetailPartialAsync(context);
                 break;
 
             case "partials/update":
@@ -336,6 +374,10 @@ public class StyloBotDashboardMiddleware
         try { countriesData = await GetCountriesDataAsync(); }
         catch { countriesData = []; }
 
+        List<DashboardEndpointStats> endpointsData;
+        try { endpointsData = await GetEndpointsDataAsync(); }
+        catch { endpointsData = []; }
+
         var allUserAgents = _aggregateCache.Current.UserAgents.Count > 0
             ? _aggregateCache.Current.UserAgents
             : await ComputeUserAgentsFallbackAsync();
@@ -356,9 +398,11 @@ public class StyloBotDashboardMiddleware
             },
             YourDetection = BuildYourDetectionPartialModel(context),
             Countries = BuildCountriesModel("total", "desc", 1, 20, countriesData),
+            Endpoints = BuildEndpointsModel("total", "desc", 1, 20, endpointsData),
             Clusters = BuildClustersModel(context),
             UserAgents = BuildUserAgentsModel("all", "requests", "desc", 1, 25, allUserAgents),
-            TopBots = BuildTopBotsModel(page: 1, pageSize: 10, sortBy: "default", sortDir: "desc")
+            TopBots = BuildTopBotsModel(page: 1, pageSize: 10, sortBy: "default", sortDir: "desc"),
+            Sessions = BuildSessionsModel(context)
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -729,6 +773,55 @@ public class StyloBotDashboardMiddleware
         await JsonSerializer.SerializeAsync(context.Response.Body, detail, CamelCaseJson);
     }
 
+    private async Task ServeEndpointsApiAsync(HttpContext context)
+    {
+        var countStr = context.Request.Query["count"].FirstOrDefault();
+        var count = int.TryParse(countStr, out var c) ? Math.Clamp(c, 1, 100) : 25;
+
+        var startTimeStr = context.Request.Query["start"].FirstOrDefault();
+        var endTimeStr = context.Request.Query["end"].FirstOrDefault();
+        DateTime? startTime = DateTime.TryParse(startTimeStr, out var st) ? st : null;
+        DateTime? endTime = DateTime.TryParse(endTimeStr, out var et) ? et : null;
+
+        List<DashboardEndpointStats> endpoints;
+        if (startTime.HasValue || endTime.HasValue)
+        {
+            endpoints = await _eventStore.GetEndpointStatsAsync(count, startTime, endTime);
+        }
+        else
+        {
+            var cached = _aggregateCache.Current.Endpoints;
+            endpoints = cached.Count > 0 ? cached.Take(count).ToList() : await _eventStore.GetEndpointStatsAsync(count);
+        }
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, endpoints, CamelCaseJson);
+    }
+
+    private async Task ServeEndpointDetailApiAsync(HttpContext context, string encodedKey)
+    {
+        var decoded = Uri.UnescapeDataString(encodedKey);
+        var split = decoded.Split('|', 2, StringSplitOptions.TrimEntries);
+        if (split.Length != 2 || string.IsNullOrWhiteSpace(split[0]) || string.IsNullOrWhiteSpace(split[1]))
+        {
+            context.Response.StatusCode = 400;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("{\"error\":\"Invalid endpoint key\"}");
+            return;
+        }
+
+        var detail = await _eventStore.GetEndpointDetailAsync(split[0], split[1]);
+        if (detail == null)
+        {
+            context.Response.ContentType = "application/json";
+            await JsonSerializer.SerializeAsync(context.Response.Body, new { method = split[0], path = split[1], totalCount = 0 }, CamelCaseJson);
+            return;
+        }
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, detail, CamelCaseJson);
+    }
+
     private async Task ServeClustersApiAsync(HttpContext context)
     {
         var clusterService = context.RequestServices.GetService(typeof(BotClusterService))
@@ -761,6 +854,108 @@ public class StyloBotDashboardMiddleware
         context.Response.ContentType = "application/json";
         await JsonSerializer.SerializeAsync(context.Response.Body, clusters,
             CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     Serves recent sessions from the session store.
+    ///     Sessions are the unit of storage — each contains a compressed behavioral vector,
+    ///     Markov transition counts, and summary stats.
+    /// </summary>
+    private async Task ServeSessionsApiAsync(HttpContext context)
+    {
+        var sessionStore = context.RequestServices.GetService<Mostlylucid.BotDetection.Data.ISessionStore>();
+        if (sessionStore == null)
+        {
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("[]");
+            return;
+        }
+
+        var limit = int.TryParse(context.Request.Query["limit"], out var l) ? Math.Min(l, 100) : 50;
+        var botFilter = context.Request.Query["isBot"].FirstOrDefault();
+        bool? isBot = botFilter switch { "true" => true, "false" => false, _ => null };
+
+        var sessions = await sessionStore.GetRecentSessionsAsync(limit, isBot);
+
+        var result = sessions.Select(s => new
+        {
+            s.Id,
+            s.Signature,
+            s.StartedAt,
+            s.EndedAt,
+            durationMinutes = (s.EndedAt - s.StartedAt).TotalMinutes,
+            s.RequestCount,
+            s.DominantState,
+            s.IsBot,
+            avgBotProbability = Math.Round(s.AvgBotProbability, 3),
+            avgConfidence = Math.Round(s.AvgConfidence, 3),
+            s.RiskBand,
+            s.Action,
+            s.BotName,
+            s.BotType,
+            s.CountryCode,
+            s.ErrorCount,
+            timingEntropy = Math.Round(s.TimingEntropy, 3),
+            topReasons = s.TopReasonsJson != null
+                ? JsonSerializer.Deserialize<List<string>>(s.TopReasonsJson)
+                : null,
+            transitionCounts = s.TransitionCountsJson != null
+                ? JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson)
+                : null,
+            paths = s.PathsJson != null
+                ? JsonSerializer.Deserialize<List<string>>(s.PathsJson)
+                : null,
+            s.Maturity,
+            s.Narrative
+        }).ToList();
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, result, CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     Serves sessions for a specific signature, enabling drill-in from signature detail.
+    /// </summary>
+    private async Task ServeSignatureSessionsApiAsync(HttpContext context, string signature)
+    {
+        var sessionStore = context.RequestServices.GetService<Mostlylucid.BotDetection.Data.ISessionStore>();
+        if (sessionStore == null)
+        {
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("[]");
+            return;
+        }
+
+        var decodedSignature = Uri.UnescapeDataString(signature);
+        var limit = int.TryParse(context.Request.Query["limit"], out var l) ? Math.Min(l, 50) : 20;
+
+        var sessions = await sessionStore.GetSessionsAsync(decodedSignature, limit);
+
+        var result = sessions.Select(s => new
+        {
+            s.Id,
+            s.StartedAt,
+            s.EndedAt,
+            durationMinutes = Math.Round((s.EndedAt - s.StartedAt).TotalMinutes, 1),
+            s.RequestCount,
+            s.DominantState,
+            s.IsBot,
+            avgBotProbability = Math.Round(s.AvgBotProbability, 3),
+            s.RiskBand,
+            s.ErrorCount,
+            timingEntropy = Math.Round(s.TimingEntropy, 3),
+            s.Maturity,
+            // Markov chain for drill-in visualization
+            transitionCounts = s.TransitionCountsJson != null
+                ? JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson)
+                : null,
+            paths = s.PathsJson != null
+                ? JsonSerializer.Deserialize<List<string>>(s.PathsJson)
+                : null
+        }).ToList();
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, result, CamelCaseJson);
     }
 
     /// <summary>Allowed values for sort parameter on top bots API (input validation).</summary>
@@ -1215,6 +1410,22 @@ public class StyloBotDashboardMiddleware
         await context.Response.WriteAsync(html);
     }
 
+    /// <summary>Render the endpoints list partial with server-side sort and pagination.</summary>
+    private async Task ServeEndpointsPartialAsync(HttpContext context)
+    {
+        var sortField = context.Request.Query["sort"].FirstOrDefault() ?? "total";
+        var sortDir = context.Request.Query["dir"].FirstOrDefault() ?? "desc";
+        var page = int.TryParse(context.Request.Query["page"].FirstOrDefault(), out var p) && p > 0 ? p : 1;
+        var pageSize = int.TryParse(context.Request.Query["pageSize"].FirstOrDefault(), out var ps) && ps is > 0 and <= 100 ? ps : 20;
+
+        var model = BuildEndpointsModel(sortField, sortDir, page, pageSize, await GetEndpointsDataAsync());
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_EndpointsList.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
     /// <summary>Render the clusters list partial.</summary>
     private async Task ServeClustersPartialAsync(HttpContext context)
     {
@@ -1242,6 +1453,75 @@ public class StyloBotDashboardMiddleware
     }
 
     /// <summary>Render the recent activity partial with server-side sort and pagination.</summary>
+    private async Task ServeSessionsPartialAsync(HttpContext context)
+    {
+        var filter = context.Request.Query["filter"].FirstOrDefault();
+        var page = int.TryParse(context.Request.Query["page"], out var p) ? p : 1;
+        var pageSize = int.TryParse(context.Request.Query["pageSize"], out var ps) ? ps : 25;
+        var model = BuildSessionsModel(context, page, pageSize, filter);
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_SessionsList.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
+    private async Task ServeSessionDetailPartialAsync(HttpContext context)
+    {
+        var sig = context.Request.Query["sig"].FirstOrDefault();
+        var idStr = context.Request.Query["id"].FirstOrDefault();
+
+        var sessionStore = context.RequestServices.GetService<Mostlylucid.BotDetection.Data.ISessionStore>();
+        if (sessionStore == null || string.IsNullOrEmpty(sig))
+        {
+            context.Response.ContentType = "text/html";
+            await context.Response.WriteAsync("<div class='text-xs text-base-content/40 py-4 text-center'>Session store not available</div>");
+            return;
+        }
+
+        var sessions = await sessionStore.GetSessionsAsync(Uri.UnescapeDataString(sig), 1);
+        if (sessions.Count == 0)
+        {
+            context.Response.ContentType = "text/html";
+            await context.Response.WriteAsync("<div class='text-xs text-base-content/40 py-4 text-center'>Session not found</div>");
+            return;
+        }
+
+        var s = sessions[0];
+        var cspNonce = context.Items.TryGetValue("CspNonce", out var nonceObj) && nonceObj is string nonce && nonce.Length > 0
+            ? nonce
+            : Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+
+        var model = new SessionDetailModel
+        {
+            Id = s.Id,
+            Signature = s.Signature,
+            BasePath = _options.BasePath.TrimEnd('/'),
+            CspNonce = cspNonce,
+            StartedAt = s.StartedAt,
+            EndedAt = s.EndedAt,
+            RequestCount = s.RequestCount,
+            DominantState = s.DominantState,
+            IsBot = s.IsBot,
+            AvgBotProbability = s.AvgBotProbability,
+            RiskBand = s.RiskBand,
+            ErrorCount = s.ErrorCount,
+            TimingEntropy = s.TimingEntropy,
+            Maturity = s.Maturity,
+            TransitionCounts = s.TransitionCountsJson != null
+                ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson)
+                : null,
+            Paths = s.PathsJson != null
+                ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(s.PathsJson)
+                : null
+        };
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_SessionDetail.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
     private async Task ServeRecentActivityPartialAsync(HttpContext context)
     {
         var visitorCache = context.RequestServices.GetRequiredService<VisitorListCache>();
@@ -1329,9 +1609,11 @@ public class StyloBotDashboardMiddleware
                     new SummaryStatsModel { Summary = await _eventStore.GetSummaryAsync(), BasePath = _options.BasePath.TrimEnd('/') }),
                 "visitors" => await RenderVisitorPartialAsync(context),
                 "countries" => await RenderCountryPartialAsync(context),
+                "endpoints" => await RenderEndpointPartialAsync(context),
                 "clusters" => await RenderPartialAsync(context, "/Views/Dashboard/_ClustersList.cshtml", BuildClustersModel(context)),
                 "useragents" => await RenderUaPartialAsync(context),
                 "topbots" => await RenderPartialAsync(context, "/Views/Dashboard/_TopBotsList.cshtml", BuildTopBotsModel()),
+                "sessions" => await RenderPartialAsync(context, "/Views/Dashboard/_SessionsList.cshtml", BuildSessionsModel(context)),
                 "recent" => await RenderRecentActivityPartialAsync(context),
                 "your-detection" => await RenderPartialAsync(context, "/Views/Dashboard/_YourDetection.cshtml", BuildYourDetectionPartialModel(context)),
                 _ => ""
@@ -1394,6 +1676,13 @@ public class StyloBotDashboardMiddleware
         var data = await GetCountriesDataAsync();
         var model = BuildCountriesModel("total", "desc", 1, 20, data);
         return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_CountriesList.cshtml", model, context);
+    }
+
+    private async Task<string> RenderEndpointPartialAsync(HttpContext context)
+    {
+        var data = await GetEndpointsDataAsync();
+        var model = BuildEndpointsModel("total", "desc", 1, 20, data);
+        return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_EndpointsList.cshtml", model, context);
     }
 
     private async Task<string> RenderRecentActivityPartialAsync(HttpContext context)
@@ -1599,14 +1888,123 @@ public class StyloBotDashboardMiddleware
         }
         else
         {
-            model = new SignatureDetailModel
+            // Cache miss — reconstruct from persistent event store.
+            // This handles signatures that have been evicted from SignatureAggregateCache
+            // but still exist in the database (common when recent activity shows old signatures).
+            try
             {
-                SignatureId = decodedSignature,
-                BasePath = basePath,
-                CspNonce = cspNonce,
-                HubPath = _options.HubPath,
-                Found = false
-            };
+                var detections = await _eventStore.GetDetectionsAsync(new DashboardFilter
+                {
+                    SignatureId = decodedSignature,
+                    Limit = 50
+                });
+
+                if (detections.Count > 0)
+                {
+                    var latest = detections[0]; // Most recent detection
+                    var recentDetections = detections.Select(d => new SignatureDetectionRow
+                    {
+                        Timestamp = d.Timestamp,
+                        IsBot = d.IsBot,
+                        BotProbability = d.BotProbability,
+                        Confidence = d.Confidence,
+                        RiskBand = d.RiskBand,
+                        Action = d.Action,
+                        Method = d.Method,
+                        Path = d.Path,
+                        StatusCode = d.StatusCode,
+                        ProcessingTimeMs = d.ProcessingTimeMs
+                    }).ToList();
+
+                    // Extract detector contributions from the latest detection
+                    var latestContributions = latest.DetectorContributions?
+                        .Select(dc => new SignatureDetectorEntry
+                        {
+                            Name = dc.Key,
+                            ConfidenceDelta = dc.Value.ConfidenceDelta,
+                            Contribution = dc.Value.Contribution,
+                            Reason = dc.Value.Reason,
+                            ExecutionTimeMs = dc.Value.ExecutionTimeMs
+                        }).ToList() ?? [];
+
+                    // Build signal categories from latest detection
+                    var signalCategories = new Dictionary<string, Dictionary<string, string>>();
+                    if (latest.ImportantSignals != null)
+                    {
+                        foreach (var kv in latest.ImportantSignals)
+                        {
+                            var dotIndex = kv.Key.IndexOf('.');
+                            var category = dotIndex > 0 ? kv.Key[..dotIndex] : "general";
+                            var key = dotIndex > 0 ? kv.Key[(dotIndex + 1)..] : kv.Key;
+                            if (!signalCategories.TryGetValue(category, out var cat))
+                            {
+                                cat = new Dictionary<string, string>();
+                                signalCategories[category] = cat;
+                            }
+                            cat[key] = kv.Value?.ToString() ?? "";
+                        }
+                    }
+
+                    model = new SignatureDetailModel
+                    {
+                        SignatureId = decodedSignature,
+                        BasePath = basePath,
+                        CspNonce = cspNonce,
+                        HubPath = _options.HubPath,
+                        Found = true,
+                        BotName = latest.BotName,
+                        BotType = latest.BotType,
+                        RiskBand = latest.RiskBand,
+                        BotProbability = latest.BotProbability,
+                        Confidence = latest.Confidence,
+                        HitCount = detections.Count,
+                        Action = latest.Action,
+                        CountryCode = latest.CountryCode,
+                        ProcessingTimeMs = latest.ProcessingTimeMs,
+                        TopReasons = latest.TopReasons?.ToList() ?? [],
+                        LastSeen = latest.Timestamp,
+                        Narrative = latest.Narrative,
+                        Description = latest.Description,
+                        IsBot = latest.IsBot,
+                        ThreatScore = latest.ThreatScore,
+                        ThreatBand = latest.ThreatBand,
+                        SparklineData = detections.Select(d => d.BotProbability).ToList(),
+                        Paths = detections.Where(d => d.Path != null).Select(d => d.Path!).Distinct().ToList(),
+                        UserAgent = null, // Not available from event store (PII-hashed)
+                        Protocol = null,
+                        FirstSeen = detections.Count > 0 ? detections[^1].Timestamp : default,
+                        BotProbabilityHistory = detections.Select(d => d.BotProbability).ToList(),
+                        ConfidenceHistory = detections.Select(d => d.Confidence).ToList(),
+                        ProcessingTimeHistory = detections.Select(d => (double)d.ProcessingTimeMs).ToList(),
+                        RecentDetections = recentDetections,
+                        DetectorContributions = latestContributions,
+                        SignalCategories = signalCategories
+                    };
+                }
+                else
+                {
+                    model = new SignatureDetailModel
+                    {
+                        SignatureId = decodedSignature,
+                        BasePath = basePath,
+                        CspNonce = cspNonce,
+                        HubPath = _options.HubPath,
+                        Found = false
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to reconstruct signature from event store for {Signature}", decodedSignature);
+                model = new SignatureDetailModel
+                {
+                    SignatureId = decodedSignature,
+                    BasePath = basePath,
+                    CspNonce = cspNonce,
+                    HubPath = _options.HubPath,
+                    Found = false
+                };
+            }
         }
 
         context.Response.ContentType = "text/html";
@@ -1661,6 +2059,53 @@ public class StyloBotDashboardMiddleware
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
             "/Views/Dashboard/_UserAgentDetail.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
+    /// <summary>Render the endpoint detail panel partial.</summary>
+    private async Task ServeEndpointDetailPartialAsync(HttpContext context)
+    {
+        var method = context.Request.Query["method"].FirstOrDefault();
+        var path = context.Request.Query["path"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(method) || string.IsNullOrWhiteSpace(path))
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("Missing method or path parameter");
+            return;
+        }
+
+        var detail = await _eventStore.GetEndpointDetailAsync(method, path);
+        var model = detail == null
+            ? new EndpointDetailModel
+            {
+                Method = method,
+                Path = path,
+                BasePath = _options.BasePath.TrimEnd('/'),
+                Found = false
+            }
+            : new EndpointDetailModel
+            {
+                Method = detail.Method,
+                Path = detail.Path,
+                BasePath = _options.BasePath.TrimEnd('/'),
+                Found = true,
+                TotalCount = detail.TotalCount,
+                BotCount = detail.BotCount,
+                HumanCount = detail.HumanCount,
+                BotRate = detail.BotRate,
+                UniqueSignatures = detail.UniqueSignatures,
+                AvgProcessingTimeMs = detail.AvgProcessingTimeMs,
+                AvgThreatScore = detail.AvgThreatScore,
+                TopActions = detail.TopActions,
+                TopCountries = detail.TopCountries,
+                RiskBands = detail.RiskBands,
+                TopBots = detail.TopBots,
+                RecentDetections = detail.RecentDetections
+            };
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_EndpointDetail.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -1736,6 +2181,40 @@ public class StyloBotDashboardMiddleware
         return cached.Count > 0 ? cached : await _eventStore.GetCountryStatsAsync(100);
     }
 
+    private async Task<List<DashboardEndpointStats>> GetEndpointsDataAsync()
+    {
+        var cached = _aggregateCache.Current.Endpoints;
+        return cached.Count > 0 ? cached : await _eventStore.GetEndpointStatsAsync(100);
+    }
+
+    private EndpointsListModel BuildEndpointsModel(string sortField, string sortDir, int page, int pageSize, List<DashboardEndpointStats> all)
+    {
+        IEnumerable<DashboardEndpointStats> sorted = sortField.ToLowerInvariant() switch
+        {
+            "method" => sortDir == "asc" ? all.OrderBy(e => e.Method) : all.OrderByDescending(e => e.Method),
+            "path" => sortDir == "asc" ? all.OrderBy(e => e.Path) : all.OrderByDescending(e => e.Path),
+            "bots" => sortDir == "asc" ? all.OrderBy(e => e.BotCount) : all.OrderByDescending(e => e.BotCount),
+            "botrate" => sortDir == "asc" ? all.OrderBy(e => e.BotRate) : all.OrderByDescending(e => e.BotRate),
+            "latency" => sortDir == "asc" ? all.OrderBy(e => e.AvgProcessingTimeMs) : all.OrderByDescending(e => e.AvgProcessingTimeMs),
+            "threat" => sortDir == "asc" ? all.OrderBy(e => e.AvgThreatScore) : all.OrderByDescending(e => e.AvgThreatScore),
+            "unique" => sortDir == "asc" ? all.OrderBy(e => e.UniqueSignatures) : all.OrderByDescending(e => e.UniqueSignatures),
+            "lastseen" => sortDir == "asc" ? all.OrderBy(e => e.LastSeen) : all.OrderByDescending(e => e.LastSeen),
+            _ => sortDir == "asc" ? all.OrderBy(e => e.TotalCount) : all.OrderByDescending(e => e.TotalCount)
+        };
+
+        var paged = sorted.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return new EndpointsListModel
+        {
+            Endpoints = paged,
+            BasePath = _options.BasePath.TrimEnd('/'),
+            SortField = sortField,
+            SortDir = sortDir,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = all.Count
+        };
+    }
+
     private UserAgentsListModel BuildUserAgentsModel(string filter, string sortField, string sortDir, int page, int pageSize, List<DashboardUserAgentSummary> all)
     {
         // Apply filter
@@ -1798,6 +2277,55 @@ public class StyloBotDashboardMiddleware
         };
     }
 
+    private SessionsListModel BuildSessionsModel(HttpContext context, int page = 1, int pageSize = 25, string? filter = null)
+    {
+        var sessionStore = context.RequestServices.GetService<Mostlylucid.BotDetection.Data.ISessionStore>();
+        if (sessionStore == null)
+        {
+            return new SessionsListModel
+            {
+                Sessions = [],
+                BasePath = _options.BasePath.TrimEnd('/'),
+                Filter = filter
+            };
+        }
+
+        bool? isBot = filter switch { "bot" => true, "human" => false, _ => null };
+        var sessions = sessionStore.GetRecentSessionsAsync(pageSize, isBot).GetAwaiter().GetResult();
+
+        var entries = sessions.Select(s => new SessionListEntry
+        {
+            Id = s.Id,
+            Signature = s.Signature,
+            StartedAt = s.StartedAt,
+            EndedAt = s.EndedAt,
+            RequestCount = s.RequestCount,
+            DominantState = s.DominantState,
+            IsBot = s.IsBot,
+            AvgBotProbability = s.AvgBotProbability,
+            RiskBand = s.RiskBand,
+            Action = s.Action,
+            BotName = s.BotName,
+            CountryCode = s.CountryCode,
+            ErrorCount = s.ErrorCount,
+            TimingEntropy = s.TimingEntropy,
+            Maturity = s.Maturity,
+            TransitionCounts = s.TransitionCountsJson != null
+                ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson)
+                : null
+        }).ToList();
+
+        return new SessionsListModel
+        {
+            Sessions = entries,
+            BasePath = _options.BasePath.TrimEnd('/'),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = entries.Count,
+            Filter = filter
+        };
+    }
+
     private ClustersListModel BuildClustersModel(HttpContext context)
     {
         var clusterService = context.RequestServices.GetService(typeof(BotClusterService))
@@ -1823,7 +2351,33 @@ public class StyloBotDashboardMiddleware
         return new ClustersListModel
         {
             Clusters = clusters,
+            Diagnostics = clusterService == null ? null : BuildClusterDiagnosticsModel(clusterService),
             BasePath = _options.BasePath.TrimEnd('/')
+        };
+    }
+
+    private static ClusterDiagnosticsViewModel BuildClusterDiagnosticsModel(BotClusterService clusterService)
+    {
+        var diagnostics = clusterService.GetDiagnostics();
+        return new ClusterDiagnosticsViewModel
+        {
+            Algorithm = diagnostics.Algorithm,
+            Status = diagnostics.Status,
+            LastRunAt = diagnostics.LastRunAt,
+            InputBehaviorCount = diagnostics.InputBehaviorCount,
+            EdgeCount = diagnostics.EdgeCount,
+            GraphDensity = Math.Round(diagnostics.GraphDensity, 3),
+            RawCommunityCount = diagnostics.RawCommunityCount,
+            ClusterCount = diagnostics.ClusterCount,
+            HumanClusterCount = diagnostics.HumanCount,
+            MachineClusterCount = diagnostics.ProductCount + diagnostics.NetworkCount + diagnostics.EmergentCount,
+            MixedClusterCount = diagnostics.MixedCount,
+            SimilarityThreshold = diagnostics.SimilarityThreshold,
+            MinClusterSize = diagnostics.MinClusterSize,
+            TopWeights = diagnostics.TopWeights
+                .OrderByDescending(w => w.Value)
+                .Take(6)
+                .ToList()
         };
     }
 }
