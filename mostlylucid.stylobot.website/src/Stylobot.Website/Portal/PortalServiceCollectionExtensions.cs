@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Stylobot.Website.Portal.Data;
+using Stylobot.Website.Portal.Licensing;
 
 namespace Stylobot.Website.Portal;
 
@@ -113,6 +114,11 @@ public static class PortalServiceCollectionExtensions
             });
 
         services.AddScoped<PortalProvisioningService>();
+
+        // Licensing: vendor key (singleton, lazy-loaded) + issuer (scoped per request).
+        services.Configure<PortalLicenseOptions>(configuration.GetSection("Portal:License"));
+        services.AddSingleton<VendorKeyProvider>();
+        services.AddScoped<LicenseIssuer>();
 
         services.AddAuthorization(a =>
         {

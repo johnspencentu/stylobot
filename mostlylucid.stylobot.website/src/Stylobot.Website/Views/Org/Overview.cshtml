@@ -1,0 +1,126 @@
+@using Stylobot.Commercial.Abstractions
+@model Stylobot.Website.Portal.OrgOverviewViewModel
+@{
+    ViewData["Title"] = $"{Model.Org.Name} — Portal";
+    var activeLicense = Model.Licenses.FirstOrDefault(l => l.IsActive);
+    var canAdmin = Model.Me.Role >= Stylobot.Website.Portal.Data.OrgRole.Admin;
+    var everHadTrial = Model.Licenses.Any(l => l.IsTrial);
+    var trialError = TempData["TrialError"]?.ToString();
+}
+
+<section class="min-h-[70vh] px-6 py-16">
+  <div class="max-w-5xl mx-auto">
+    <a class="btn btn-ghost btn-sm mb-4" href="/portal">← Your orgs</a>
+    <div class="flex items-baseline justify-between">
+      <div>
+        <div class="text-xs uppercase tracking-widest text-base-content/60">@Model.Me.Role</div>
+        <h1 class="text-3xl font-semibold mt-1">@Model.Org.Name</h1>
+        <div class="text-sm text-base-content/70 mt-1">/@Model.Org.Slug</div>
+      </div>
+    </div>
+
+    @if (trialError is not null)
+    {
+      <div class="alert alert-warning mt-6"><span>@trialError</span></div>
+    }
+
+    <!-- ACTIVE LICENSE CARD -->
+    <div class="card bg-base-200 p-6 mt-8">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="text-xs uppercase tracking-widest text-base-content/60">Current license</div>
+          @if (activeLicense is null)
+          {
+            <h2 class="text-xl font-semibold mt-1">No active license</h2>
+            <p class="text-base-content/80 mt-2">
+              Request a 30-day SME trial to unlock Postgres persistence, Redis pub/sub, the
+              control plane, live config editing, OIDC SSO, and multi-gateway fleet dashboards.
+            </p>
+          }
+          else
+          {
+            <h2 class="text-xl font-semibold mt-1">
+              @activeLicense.Tier.ToUpper() — @(activeLicense.IsTrial ? "Trial" : "Paid")
+            </h2>
+            <div class="text-sm text-base-content/80 mt-2">
+              Expires <strong>@activeLicense.ExpiresAt.ToString("yyyy-MM-dd")</strong>
+              (@((activeLicense.ExpiresAt - DateTime.UtcNow).Days) days remaining)
+              @if (activeLicense.HardwareFingerprint is not null)
+              {
+                <span>· Bound to <code>@activeLicense.HardwareFingerprint[..Math.Min(12, activeLicense.HardwareFingerprint.Length)]…</code></span>
+              }
+            </div>
+          }
+        </div>
+        <div class="flex gap-2">
+          @if (activeLicense is null && !everHadTrial && canAdmin)
+          {
+            <form method="post" asp-controller="Org" asp-action="RequestTrial" asp-route-slug="@Model.Org.Slug">
+              <button class="btn btn-primary" type="submit">Request 30-day trial</button>
+            </form>
+          }
+          else if (activeLicense is not null)
+          {
+            <a class="btn btn-outline" href="/portal/org/@Model.Org.Slug/licenses/@activeLicense.Id/download">Download token</a>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- LICENSE LIST -->
+    <h2 class="text-lg font-semibold mt-10 mb-3">All licenses</h2>
+    @if (!Model.Licenses.Any())
+    {
+      <div class="card bg-base-100 border border-base-300 p-5 text-base-content/60 text-sm">
+        No licenses have been issued for this org yet.
+      </div>
+    }
+    else
+    {
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tier</th><th>Type</th><th>Issued</th><th>Expires</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var l in Model.Licenses)
+            {
+              var status = l.RevokedAt is not null ? "Revoked"
+                         : l.ExpiresAt < DateTime.UtcNow ? "Expired"
+                         : "Active";
+              <tr>
+                <td><span class="badge badge-outline">@l.Tier.ToUpper()</span></td>
+                <td>@(l.IsTrial ? "Trial" : "Paid")</td>
+                <td class="text-xs">@l.IssuedAt.ToString("yyyy-MM-dd")</td>
+                <td class="text-xs">@l.ExpiresAt.ToString("yyyy-MM-dd")</td>
+                <td>
+                  @if (status == "Active") { <span class="badge badge-success">Active</span> }
+                  else if (status == "Expired") { <span class="badge badge-ghost">Expired</span> }
+                  else { <span class="badge badge-error">Revoked</span> }
+                </td>
+                <td class="text-right">
+                  @if (l.IsActive)
+                  {
+                    <a class="btn btn-ghost btn-xs" href="/portal/org/@Model.Org.Slug/licenses/@l.Id/download">Download</a>
+                    @if (canAdmin)
+                    {
+                      <form method="post" asp-controller="Org" asp-action="RevokeLicense" asp-route-slug="@Model.Org.Slug" asp-route-id="@l.Id" class="inline">
+                        <button class="btn btn-ghost btn-xs text-error" type="submit" onclick="return confirm('Revoke this license? Deployed gateways using this token will fall back to OSS on their next heartbeat.');">Revoke</button>
+                      </form>
+                    }
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <div class="mt-10 text-xs text-base-content/60">
+      Team invites, API tokens, and MFA land in Phase 1c. See <code>docs/portal-architecture.md</code>.
+    </div>
+  </div>
+</section>

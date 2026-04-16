@@ -26,6 +26,11 @@
     <ProjectReference Include="..\..\..\Mostlylucid.BotDetection.UI.PostgreSQL\Mostlylucid.BotDetection.UI.PostgreSQL.csproj" />
     <ProjectReference Include="..\..\..\Mostlylucid.GeoDetection\Mostlylucid.GeoDetection.csproj" />
     <ProjectReference Include="..\..\..\Mostlylucid.GeoDetection.Contributor\Mostlylucid.GeoDetection.Contributor.csproj" />
+    <!-- Portal LicenseIssuer: reuses StyloFlow.Licensing's Ed25519 signing and the
+         StyloBot tier/feature constants from the commercial Abstractions so the portal
+         and the control-plane validator speak the same vocabulary. -->
+    <ProjectReference Include="..\..\..\..\styloflow\src\StyloFlow.Licensing\StyloFlow.Licensing.csproj" />
+    <ProjectReference Include="..\..\..\..\stylobot-commercial\src\Stylobot.Commercial.Abstractions\Stylobot.Commercial.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
