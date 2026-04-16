@@ -12,11 +12,11 @@
                 <span class="brand-chip-label"><span class="stylo-text brand-italic">stylo</span><span class="bot-text">bot</span></span>
             </a>
             <h1 class="marketing-title">
-                Bot Detection That Ships <span class="hero-accent-text">Fast</span>
+                Bot Detection That <span class="hero-accent-text">Understands Behavior</span>
             </h1>
             <p class="marketing-lead mb-6">
-                Deploy quickly without maintaining fragile rule sets.
-                Add it to your gateway or middleware, then get transparent scoring, detector evidence, and policy control from day one. <span class="font-semibold hero-accent-text">Every endpoint gets continuous learning.</span>
+                31 detectors. Session-level behavioral vectors. Zero external dependencies.
+                Add it to your gateway or middleware, then get transparent scoring, Markov chain analysis, and policy control from day one. <span class="font-semibold hero-accent-text">Every session gets smarter.</span>
             </p>
             <div class="text-sm text-base-content/70 mb-4">
                 <span class="font-semibold text-base-content">Open source and free (at present).</span> Start with the full core feature set, then scale to enterprise workflows when you need them.
@@ -80,26 +80,26 @@ app.UseBotDetection();</code></pre>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                     </div>
-                    <h3 class="card-title text-base mb-3">Self-Improving AI</h3>
+                    <h3 class="card-title text-base mb-3">Session Behavioral Vectors</h3>
                     <p class="text-base-content/70 mb-4">
-                        Learns from every detection. Adapts to new bot tactics automatically. Gets smarter with every request.
+                        Each visitor session is compressed into a 118-dimension behavioral vector via Markov chain analysis. Inter-session velocity detects bot rotation and account takeover.
                     </p>
                     <ul class="space-y-2 text-sm">
                         <li class="flex items-center gap-2">
                             <div class="w-2 h-2 bg-secondary rounded-full"></div>
-                            <span>Pattern reputation evolves in real-time</span>
+                            <span>Markov chain request transitions</span>
                         </li>
                         <li class="flex items-center gap-2">
                             <div class="w-2 h-2 bg-secondary rounded-full"></div>
-                            <span>Weights adjust based on outcomes</span>
+                            <span>Unified TLS/TCP/H2 fingerprint dimensions</span>
                         </li>
                         <li class="flex items-center gap-2">
                             <div class="w-2 h-2 bg-secondary rounded-full"></div>
-                            <span>Drift detection prevents model decay</span>
+                            <span>Inter-session velocity anomaly detection</span>
                         </li>
                         <li class="flex items-center gap-2">
                             <div class="w-2 h-2 bg-secondary rounded-full"></div>
-                            <span>No retraining required</span>
+                            <span>Lossy snapshot compaction preserves baselines</span>
                         </li>
                     </ul>
                 </div>
@@ -168,19 +168,25 @@ app.UseBotDetection();</code></pre>
                             <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span>No external API calls</span>
+                            <span>No external API calls or databases</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span>All ML runs in-process</span>
+                            <span>All ML and vector search in-process</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span>SQLite for storage (optional)</span>
+                            <span>SQLite sessions — no PostgreSQL needed</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>~100x storage compression via session vectors</span>
                         </div>
                     </div>
                 </div>
@@ -825,7 +831,7 @@ app.UseBotDetection();
             </a>
         </div>
         <div class="text-base-content/60">
-            <p>Open source • MIT License • .NET 8/9</p>
+            <p>Open source • Unlicense • .NET 10 • v5.5</p>
         </div>
     </div>
 </section>
