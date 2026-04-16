@@ -289,8 +289,18 @@ public static class ServiceCollectionExtensions
             return loader;
         });
 
-        // Register detector config provider (resolves YAML + appsettings overrides)
+        // Register detector config provider (resolves YAML + appsettings overrides).
+        // Commercial packages may register IConfigurationOverrideSource implementations
+        // for live per-target config overrides (Postgres + Redis pub/sub).
         services.TryAddSingleton<IDetectorConfigProvider, DetectorConfigProvider>();
+        // Background watcher that invalidates cache when override sources emit changes.
+        // No-op when no override sources are registered (FOSS default).
+        services.AddHostedService<ConfigurationWatcher>();
+
+        // Fleet telemetry dispatcher — fans out detection reports to IFleetReporter
+        // implementations (commercial plugin registers the control plane reporter).
+        // No-op when no reporters are registered (FOSS default).
+        services.TryAddSingleton<Orchestration.Telemetry.FleetReportDispatcher>();
 
         // Register individual detectors
         // Each detector is responsible for one detection strategy

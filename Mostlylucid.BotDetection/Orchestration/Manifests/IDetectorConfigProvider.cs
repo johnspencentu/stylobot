@@ -23,6 +23,24 @@ public interface IDetectorConfigProvider
     T GetParameter<T>(string detectorName, string parameterName, T defaultValue);
 
     /// <summary>
+    /// Get a specific parameter value for a request context — consults
+    /// registered IConfigurationOverrideSource implementations before falling back
+    /// to appsettings/YAML/defaults. Commercial packages use this for per-target overrides.
+    /// </summary>
+    Task<T> GetParameterAsync<T>(
+        string detectorName,
+        string parameterName,
+        ConfigResolutionContext context,
+        T defaultValue,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Invalidate the cache for a detector (call when config changes come in via
+    /// IConfigurationOverrideSource.WatchAsync). Pass null to invalidate everything.
+    /// </summary>
+    void InvalidateCache(string? detectorName = null);
+
+    /// <summary>
     /// Get all detector manifests.
     /// </summary>
     IReadOnlyDictionary<string, DetectorManifest> GetAllManifests();
@@ -39,15 +57,20 @@ public sealed class DetectorConfigProvider : IDetectorConfigProvider
 {
     private readonly DetectorManifestLoader _manifestLoader;
     private readonly IConfiguration _configuration;
+    private readonly IReadOnlyList<IConfigurationOverrideSource> _overrideSources;
     private readonly Dictionary<string, DetectorDefaults> _resolvedDefaults = new();
     private readonly object _lock = new();
 
     public DetectorConfigProvider(
         DetectorManifestLoader manifestLoader,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IEnumerable<IConfigurationOverrideSource>? overrideSources = null)
     {
         _manifestLoader = manifestLoader;
         _configuration = configuration;
+        _overrideSources = overrideSources?
+            .OrderBy(s => s.Priority)
+            .ToList() ?? (IReadOnlyList<IConfigurationOverrideSource>)Array.Empty<IConfigurationOverrideSource>();
     }
 
     public DetectorManifest? GetManifest(string detectorName)
@@ -95,6 +118,44 @@ public sealed class DetectorConfigProvider : IDetectorConfigProvider
         }
 
         return defaultValue;
+    }
+
+    public async Task<T> GetParameterAsync<T>(
+        string detectorName,
+        string parameterName,
+        ConfigResolutionContext context,
+        T defaultValue,
+        CancellationToken ct = default)
+    {
+        // 1. Consult registered override sources in priority order (commercial per-target overrides)
+        foreach (var source in _overrideSources)
+        {
+            try
+            {
+                var value = await source.TryGetParameterAsync(detectorName, parameterName, context, ct);
+                if (value is not null)
+                {
+                    try { return ConvertParameter<T>(value); }
+                    catch { /* type mismatch — try next source */ }
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch { /* source failed — try next */ }
+        }
+
+        // 2. Fall through to synchronous resolution (appsettings → YAML → default)
+        return GetParameter(detectorName, parameterName, defaultValue);
+    }
+
+    public void InvalidateCache(string? detectorName = null)
+    {
+        lock (_lock)
+        {
+            if (detectorName is null)
+                _resolvedDefaults.Clear();
+            else
+                _resolvedDefaults.Remove(detectorName);
+        }
     }
 
     public IReadOnlyDictionary<string, DetectorManifest> GetAllManifests()

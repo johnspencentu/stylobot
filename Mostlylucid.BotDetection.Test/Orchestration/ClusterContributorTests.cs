@@ -101,6 +101,16 @@ public class ClusterContributorTests
             return defaultValue;
         }
 
+        public Task<T> GetParameterAsync<T>(
+            string detectorName,
+            string parameterName,
+            ConfigResolutionContext context,
+            T defaultValue,
+            CancellationToken ct = default)
+            => Task.FromResult(GetParameter(detectorName, parameterName, defaultValue));
+
+        public void InvalidateCache(string? detectorName = null) { }
+
         public IReadOnlyDictionary<string, DetectorManifest> GetAllManifests()
             => new Dictionary<string, DetectorManifest>();
     }
