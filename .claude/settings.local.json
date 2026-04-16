@@ -273,7 +273,9 @@
       "Bash(git rev-list:*)",
       "Bash(/tmp/test-domain-flow.sh)",
       "Bash(npm audit:*)",
-      "Bash(kill -TERM 22365)"
+      "Bash(kill -TERM 22365)",
+      "Bash(mv UNLICENSE:*)",
+      "Bash(md5 README.md)"
     ]
   }
 }

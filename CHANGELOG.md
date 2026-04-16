@@ -5,6 +5,89 @@ All notable changes to StyloBot are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - v5.6
+
+### Added
+
+#### Commercial Plugin Architecture
+- **IConfigurationOverrideSource** - FOSS extension interface for commercial per-target config overrides (per-endpoint, per-user, per-API-key detector tuning)
+- **IFleetReporter** - FOSS extension interface for commercial fleet telemetry reporting across multi-gateway deployments
+- **IDetectionEventPublisher** - extension point for out-of-process dashboard UIs
+- **FileSystemConfigurationOverrideSource** - FOSS hot-reload implementation for YAML-file-based config changes without restart
+- **Signature labeling infrastructure** - groundwork for the upcoming detector weighting pass
+
+#### Customer Portal (stylobot.net)
+- **Keycloak OIDC integration** - portal auth scaffold with organization management
+- **LicenseIssuer** - Ed25519-signed JWT license issuance with trial request, download, rotate, and revoke
+- **Domain-based license entitlement** - DomainEntitlementValidator + cloud-pool host list; signed JWTs include `domains[]` claim
+- **Team invites + audit log** - org member management with full audit trail UI
+- **Personal API tokens** - `/api/v1/orgs/{slug}/licenses/current` for programmatic license access
+- **BurstWorkUnitsPerMinute** mapping to StyloFlow licensing payload
+
+#### Pipeline Coordination (spec)
+- **Distributed-blackboard model** - chained YARP instances (edge - regional - app-side) avoid redundant detector execution via input-hash-per-detector deduplication
+- **Layered action policies** - monotone-escalating policy cascade: `block` at an inner hop cannot be softened by an outer hop's `allow`
+
+#### Dashboard Enhancements
+- **Monaco YAML config editor** - in-dashboard configuration viewer (read-only in FOSS, live-edit in commercial)
+- **FOSS licensing v1 wiring** - license status display in dashboard
+
+### Changed
+
+- Site repositioned as security product (not a tech demo)
+- Detector-weights audit and benchmark artifact cleanup
+- Bumped all dependencies to latest, cleared Dependabot alerts
+
+### Fixed
+
+- Five bugs found running the Phase 1 portal end-to-end
+- Normalized em-dash characters to hyphens for consistent documentation style
+- Synced reputation/decay tests to post-oscillation-fix behavior
+
+---
+
+## [5.5.0] - 2026-03-15
+
+### Added
+
+#### Session Vector Architecture
+- **SessionVectorizer** - per-request Markov chain transitions compressed into 118-dimensional normalized vectors (100 transition probabilities + 10 stationary distribution + 8 temporal features + 8 fingerprint features)
+- **Retrogressive session boundary detection** - sessions defined by inter-request gaps (default 30min), detected when the NEXT request reveals the gap
+- **Inter-session velocity analysis** - L2 magnitude of delta vectors between consecutive sessions detects sudden behavioral shifts (bot rotation, account takeover)
+- **Snapshot compaction** - old session snapshots merge into maturity-weighted root vector, preserving behavioral baseline while discarding per-session detail
+- **Unified fingerprint dimensions** - TLS/TCP/H2 fingerprints are vector dimensions in the same space as behavioral features; fingerprint mutation across sessions appears as velocity
+
+#### SQLite Persistence
+- **SqliteSessionStore** - zero-dependency session persistence (sessions, signatures, 1-minute counter buckets)
+- **SessionPersistenceService** - background service bridging in-memory SessionStore events to SQLite
+- ~100x compression vs per-request storage (200 sessions/day vs 10,000 requests/day)
+
+#### Transport-Aware Detection
+- **TransportProtocolContributor** (Priority 5) - classifies request transport context: document, API, SignalR, gRPC, static, WebSocket, SSE
+- Seven existing detectors now consume transport context to suppress false positives on non-document traffic: HeuristicFeatureExtractor, InconsistencyDetector, MultiLayerCorrelation, ResponseBehavior, AdvancedBehavioral, Header, CacheBehavior
+
+#### Oscillation Prevention
+- **NonAiMaxProbability** (default 0.90) - configurable probability ceiling when AI hasn't run
+- **State-aware reputation decay** - ConfirmedBad uses longer decay tau (12h vs 3h) and wider demotion hysteresis (0.5 vs 0.9) to prevent block/allow flapping
+- **Browser attestation downgrade** - configurable via YAML (`browser_attestation_max_confidence`, `browser_attestation_weight`)
+
+#### Dashboard
+- **Sessions tab** - timeline with Markov chain previews, HTMX drill-in to session detail
+- **Session detail view** - behavioral radar chart (ApexCharts), transition bar visualization, paths visited
+- **Fail2ban-style escalating action policies** for persistent 404 abuse patterns
+
+### Changed
+
+- Dashboard detector count increased to 31 (SessionVector added to Wave 1)
+- Session vector benchmarks added to benchmark suite
+
+### Fixed
+
+- ProcessingTimeMs nullable handling in PostgreSQL event store
+- Nullable double coalescing in PostgreSQL event store
+
+---
+
 ## [5.0.0] - 2026-02-22
 
 ### Added

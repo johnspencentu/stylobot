@@ -12,11 +12,11 @@ by ***mostly*lucid**
 | Tier | Repo | What you get |
 |---|---|---|
 | **FOSS (this repo)** | `stylobot` - Unlicense | All detectors, session vectors, SQLite persistence, local dashboard, YAML-driven config, ASP.NET Core Identity local accounts, local Ollama LLM. **Fully standalone** - no external dependencies, no phone-home, no license required. |
-| **Commercial** | [`stylobot-commercial`](https://github.com/scottgal/stylobot-commercial) | Adds Postgres + Redis persistence, central control plane, live config editor (per-endpoint + per-user + per-API-key overrides), multi-gateway fleet dashboard, pgvector HNSW session similarity, OIDC/SAML SSO, scheduled reports, Kubernetes operator. Tiers: Startup $149/mo, SME $499/mo, Enterprise custom. |
+| **Commercial** | `stylobot-commercial` (private) | Adds Postgres + Redis persistence, central control plane, live config editor (per-endpoint + per-user + per-API-key overrides), multi-gateway fleet dashboard, pgvector HNSW session similarity, OIDC/SAML SSO, scheduled reports, Kubernetes operator. Tiers: Startup $149/mo, SME $499/mo, Enterprise custom. Sign up at [stylobot.net/portal](https://stylobot.net/portal). |
 
 The commercial product plugs in via extension interfaces in FOSS - `IConfigurationOverrideSource` and `IFleetReporter` - that customers never see unless they install the commercial plugin package. **OSS shows all the levers in the dashboard; only commercial allows runtime edits.** FOSS is YAML-file-only by design.
 
-Licenses are Ed25519-signed JWTs issued by the [stylobot.net customer portal](https://stylobot.net/portal). The customer's control plane validates tokens against the vendor public key baked into the release binary - no phone-home required. See [`stylobot-commercial/docs/licensing-tiers.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/licensing-tiers.md).
+Licenses are Ed25519-signed JWTs issued by the [stylobot.net customer portal](https://stylobot.net/portal). The customer's control plane validates tokens against the vendor public key baked into the release binary - no phone-home required. Commercial documentation (tier structure, feature gating, deployment guides) is available to customers via the portal.
 
 ## What's New
 
@@ -89,7 +89,7 @@ If `ADMIN_SECRET` is configured, include header `X-Admin-Secret` for `/admin/*` 
 
 1. Sign up at [stylobot.net/portal](https://stylobot.net/portal) - one 30-day SME trial per organization, no credit card.
 2. Download the signed license JWT, place in `BotDetection:Commercial:LicenseToken` env var.
-3. `docker compose up` the commercial stack (see [`stylobot-commercial/docs/kubernetes-deployment.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/kubernetes-deployment.md) for K8s).
+3. `docker compose up` the commercial stack (K8s deployment docs available via the customer portal).
 4. Create a `StyloBotGateway` CR via `kubectl apply -f …` or point the gateway container at your control plane.
 
 ## Detection Surface - 30+ Detectors
@@ -157,7 +157,7 @@ app.UseStyloBotDashboard();  // Dashboard at /_stylobot/
 - **Protocol-deep fingerprinting** - TLS/TCP/IP/HTTP/2/HTTP/3 fingerprints catch bots that spoof everything else
 - **Temporal behavior resolution** - cross-request, session-vector correlation for stronger bot/human discrimination
 - **Adaptive learning** - Heuristic weights evolve based on detection outcomes
-- **Multi-YARP pipeline coordination** - signed decisions + input-hash-per-detector dedup across edge/regional/app-side YARPs. Detection runs once per unique-input-set; later hops contribute new signals earlier hops couldn't see. See [`stylobot-commercial/docs/pipeline-coordination-spec.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/pipeline-coordination-spec.md).
+- **Multi-YARP pipeline coordination** - signed decisions + input-hash-per-detector dedup across edge/regional/app-side YARPs. Detection runs once per unique-input-set; later hops contribute new signals earlier hops couldn't see.
 - **Operator-first control** - composable action policies (block, throttle, challenge, honeypot, logonly), chain-aware monotone-escalating policy cascade
 - **Powered by `mostlylucid.ephemeral` + `StyloFlow`** - efficient ephemeral state, signal coordination, licensing/metering without heavy per-request latency
 
@@ -197,9 +197,7 @@ Library and component docs:
 
 Architecture:
 - [`detector-weights-audit.md`](Mostlylucid.BotDetection/docs/detector-weights-audit.md) - baseline weight/confidence snapshot for every detector
-- [`stylobot-commercial/docs/cluster-architecture.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/cluster-architecture.md) - multi-gateway topology, state taxonomy, failure modes
-- [`stylobot-commercial/docs/pipeline-coordination-spec.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/pipeline-coordination-spec.md) - multi-YARP distributed-blackboard model
-- [`stylobot-commercial/docs/licensing-tiers.md`](https://github.com/scottgal/stylobot-commercial/blob/main/docs/licensing-tiers.md) - tier structure, feature gating, competitive landscape
+- Commercial docs (cluster architecture, pipeline coordination, licensing tiers) - available to customers via the [portal](https://stylobot.net/portal)
 
 Release notes:
 - [`CHANGELOG.md`](CHANGELOG.md)
