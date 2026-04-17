@@ -283,7 +283,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
     /// <summary>
     ///     Normalize an IP to a range (CIDR block).
     /// </summary>
-    private static string NormalizeIpToRange(string ip)
+    internal static string NormalizeIpToRange(string ip)
     {
         // For IPv4: use /24 (class C)
         // For IPv6: use /48
