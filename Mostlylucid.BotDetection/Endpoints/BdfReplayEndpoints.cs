@@ -36,8 +36,9 @@ public static class BdfReplayEndpoints
         Converters = { new JsonStringEnumConverter() }
     };
 
-    // Rate limiter
+    // Rate limiter (bounded at 10K IPs)
     private static readonly ConcurrentDictionary<string, List<DateTime>> RateLimitWindow = new();
+    private const int MaxRateLimitEntries = 10_000;
 
     /// <summary>
     ///     Detectors that produce degraded/different results when replaying from synthetic context
@@ -286,6 +287,11 @@ public static class BdfReplayEndpoints
     private static bool CheckRateLimit(string clientIp, int maxPerMinute)
     {
         var now = DateTime.UtcNow;
+
+        if (RateLimitWindow.Count > MaxRateLimitEntries)
+            foreach (var key in RateLimitWindow.Keys.Take(MaxRateLimitEntries / 2))
+                RateLimitWindow.TryRemove(key, out _);
+
         var window = RateLimitWindow.GetOrAdd(clientIp, _ => new List<DateTime>());
 
         lock (window)

@@ -52,8 +52,9 @@ public static partial class TrainingDataEndpoints
         SignalKeys.UserAgentBrowser
     ];
 
-    // Sliding window rate limiter: IP -> list of request timestamps
+    // Sliding window rate limiter: bounded at 10K IPs to prevent memory exhaustion from distributed attacks
     private static readonly ConcurrentDictionary<string, List<DateTime>> RateLimitWindow = new();
+    private const int MaxRateLimitEntries = 10_000;
 
     [System.Text.RegularExpressions.GeneratedRegex(
         @"^[0-9a-f\-]{8,}$|^\d{4,}$|^[A-Za-z0-9+/]{20,}={0,2}$",
@@ -176,6 +177,15 @@ public static partial class TrainingDataEndpoints
     private static bool CheckRateLimit(string clientIp, int maxPerMinute)
     {
         var now = DateTime.UtcNow;
+
+        // Bound the rate limit dictionary to prevent memory exhaustion
+        if (RateLimitWindow.Count > MaxRateLimitEntries)
+        {
+            // Evict oldest half
+            foreach (var key in RateLimitWindow.Keys.Take(MaxRateLimitEntries / 2))
+                RateLimitWindow.TryRemove(key, out _);
+        }
+
         var window = RateLimitWindow.GetOrAdd(clientIp, _ => new List<DateTime>());
 
         lock (window)
