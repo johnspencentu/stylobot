@@ -126,10 +126,10 @@
     }
 }
 
-<!-- Development notice -->
-<div class="bg-warning/10 border-b border-warning/30 text-center py-2 px-4">
+<!-- Launch banner -->
+<div class="bg-primary/10 border-b border-primary/20 text-center py-2 px-4">
     <p class="text-xs text-base-content/70">
-        <span class="font-semibold">Active development:</span> StyloBot is free and open source. This site runs the live product to test against real traffic (zero PII stored &mdash; <a asp-controller="Docs" asp-action="Index" class="underline hover:text-primary">see docs</a>). Expect occasional rough edges as detection improves.
+        <span class="font-semibold text-primary">New:</span> StyloBot is now available. Free and open source with commercial tiers from $100/mo. <a href="/pricing" class="underline hover:text-primary font-semibold">See pricing</a> or <a href="/portal" class="underline hover:text-primary font-semibold">start a free trial</a>.
     </p>
 </div>
 
@@ -145,7 +145,7 @@
                     <img src="/img/stylowall.svg" alt="stylo bot mark" class="logo-adaptive" />
                     <span class="brand-chip-label"><span class="stylo-text brand-italic">stylo</span><span class="bot-text">bot</span></span>
                 </a>
-                <p class="text-xs uppercase tracking-widest text-base-content/60 brand-wordmark-sub">Self-hosted bot defense - OSS + commercial</p>
+                <p class="text-xs uppercase tracking-widest text-base-content/60 brand-wordmark-sub">Real-time bot defense for your infrastructure</p>
                 <h1 class="text-3xl lg:text-5xl font-extrabold leading-tight text-base-content">
                     Stop credential stuffing, API abuse, and scraping - <span class="hero-accent-text">before they cost you</span>.
                 </h1>
@@ -173,7 +173,7 @@
                 </div>
                 <div class="space-y-2 text-sm max-w-xl">
                     <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>31 detectors across 4 waves:</strong> protocol, behavioral, fingerprinting, AI escalation. Every hit is explainable - contributing detectors, confidence deltas, reasons.</span></div>
-                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>Session-level behavioral vectors:</strong> 118-dim Markov chains catch attack tooling even when IPs, UAs, and TLS fingerprints rotate.</span></div>
+                    <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>Session behavioral analysis:</strong> catches bots even when they rotate IPs, user agents, and TLS fingerprints between requests.</span></div>
                     <div class="flex items-start gap-2"><span class="signal-positive">•</span><span><strong>Fail2ban-style escalation</strong> with automatic decay. Throttle, challenge, block, honeypot - configurable per-endpoint via the control plane.</span></div>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3 items-start">
