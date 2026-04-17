@@ -82,6 +82,9 @@ public sealed class SqliteFingerprintApprovalStore : IFingerprintApprovalStore, 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private bool _initialized;
 
+    // Read-through cache: avoids SQLite round-trip on every request (approvals rarely change)
+    private readonly Services.BoundedCache<string, ApprovalRecord?> _readCache = new(maxSize: 1_000, defaultTtl: TimeSpan.FromMinutes(5));
+
     public SqliteFingerprintApprovalStore(
         ILogger<SqliteFingerprintApprovalStore> logger,
         IOptions<BotDetectionOptions> options)
@@ -166,6 +169,8 @@ public sealed class SqliteFingerprintApprovalStore : IFingerprintApprovalStore, 
             cmd.Parameters.AddWithValue("@exp", record.ExpiresAt?.ToString("O") ?? (object)DBNull.Value);
             await cmd.ExecuteNonQueryAsync(ct);
 
+            _readCache.Remove(record.Signature); // Invalidate cache on write
+
             _logger.LogInformation("Fingerprint approved: {Signature} by {By} with {DimCount} locked dimensions",
                 record.Signature, record.ApprovedBy, record.LockedDimensions.Count);
 
@@ -179,6 +184,9 @@ public sealed class SqliteFingerprintApprovalStore : IFingerprintApprovalStore, 
 
     public async Task<ApprovalRecord?> GetAsync(string signature, CancellationToken ct = default)
     {
+        // Read-through cache: avoids SQLite round-trip on every request
+        if (_readCache.TryGet(signature, out var cached)) return cached;
+
         await InitializeAsync(ct);
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
@@ -188,9 +196,10 @@ public sealed class SqliteFingerprintApprovalStore : IFingerprintApprovalStore, 
         cmd.Parameters.AddWithValue("@sig", signature);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (!await reader.ReadAsync(ct)) return null;
+        var record = await reader.ReadAsync(ct) ? ReadApproval(reader) : null;
 
-        return ReadApproval(reader);
+        _readCache.Set(signature, record);
+        return record;
     }
 
     public async Task<IReadOnlyList<ApprovalRecord>> ListRecentAsync(int limit = 50, CancellationToken ct = default)
@@ -230,6 +239,7 @@ public sealed class SqliteFingerprintApprovalStore : IFingerprintApprovalStore, 
             cmd.Parameters.AddWithValue("@at", DateTimeOffset.UtcNow.ToString("O"));
             cmd.Parameters.AddWithValue("@by", revokedBy);
             await cmd.ExecuteNonQueryAsync(ct);
+            _readCache.Remove(signature); // Invalidate cache on revoke
 
             _logger.LogInformation("Fingerprint approval revoked: {Signature} by {By}", signature, revokedBy);
         }

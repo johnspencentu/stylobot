@@ -76,6 +76,9 @@ public sealed class SqliteChallengeStore : IChallengeStore, IAsyncDisposable
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private bool _initialized;
 
+    // Read-through cache for verification results (written once, read on every request for that signature)
+    private readonly Services.BoundedCache<string, ChallengeVerificationResult?> _verificationCache = new(maxSize: 1_000, defaultTtl: TimeSpan.FromMinutes(30));
+
     public SqliteChallengeStore(
         ILogger<SqliteChallengeStore> logger,
         IOptions<BotDetectionOptions> options)
@@ -283,6 +286,9 @@ public sealed class SqliteChallengeStore : IChallengeStore, IAsyncDisposable
             _writeLock.Release();
         }
 
+        // Invalidate cache on write so next read picks up the new verification
+        _verificationCache.Set(result.Signature, result);
+
         _logger.LogDebug(
             "Recorded PoW verification for {Signature}: {Duration:F0}ms, {Workers} workers, jitter={Jitter:F3}",
             result.Signature, result.TotalSolveDurationMs, result.ReportedWorkerCount, result.TimingJitter);
@@ -290,6 +296,9 @@ public sealed class SqliteChallengeStore : IChallengeStore, IAsyncDisposable
 
     public ChallengeVerificationResult? GetVerification(string signature)
     {
+        // Read-through cache: verification results are written once, read on every request
+        if (_verificationCache.TryGet(signature, out var cached)) return cached;
+
         EnsureInitialized();
 
         using var conn = new SqliteConnection(_connectionString);
@@ -300,12 +309,16 @@ public sealed class SqliteChallengeStore : IChallengeStore, IAsyncDisposable
         cmd.Parameters.AddWithValue("@sig", signature);
 
         using var reader = cmd.ExecuteReader();
-        if (!reader.Read()) return null;
+        if (!reader.Read())
+        {
+            _verificationCache.Set(signature, null); // Cache the miss too
+            return null;
+        }
 
         var timingsJson = reader.GetString(reader.GetOrdinal("puzzle_timings_json"));
         var timings = JsonSerializer.Deserialize<double[]>(timingsJson) ?? [];
 
-        return new ChallengeVerificationResult
+        var result = new ChallengeVerificationResult
         {
             Signature = reader.GetString(reader.GetOrdinal("signature")),
             TotalSolveDurationMs = reader.GetDouble(reader.GetOrdinal("total_solve_duration_ms")),
@@ -315,6 +328,9 @@ public sealed class SqliteChallengeStore : IChallengeStore, IAsyncDisposable
             TimingJitter = reader.GetDouble(reader.GetOrdinal("timing_jitter")),
             VerifiedAt = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("verified_at")))
         };
+
+        _verificationCache.Set(signature, result);
+        return result;
     }
 
     public ValueTask DisposeAsync()

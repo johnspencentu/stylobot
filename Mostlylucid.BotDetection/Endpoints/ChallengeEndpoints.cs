@@ -130,10 +130,10 @@ public static class ChallengeEndpoints
         var returnUrl = SanitizeReturnUrl(request.ReturnUrl);
 
         // Return JSON for programmatic clients, redirect info for browsers
+        // Token is in the HttpOnly cookie - don't also expose in JSON body (XSS risk)
         return Results.Json(new
         {
             success = true,
-            token,
             returnUrl
         });
     }
