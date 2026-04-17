@@ -102,8 +102,12 @@ public class DriftDetectionHandler : ILearningEventHandler
     private readonly ILogger<DriftDetectionHandler> _logger;
     private readonly FastPathOptions _options;
 
-    // In-memory sample storage (could be backed by persistent store)
+    // Drift sample storage - bounded at MaxPatterns to prevent unbounded growth.
+    // TODO: back with SQLite persistence for cross-restart continuity.
     private readonly ConcurrentDictionary<string, List<DriftSample>> _samples = new();
+
+    private const int MaxPatterns = 10_000;
+    private const int MaxSamplesPerPattern = 50;
 
     public DriftDetectionHandler(
         ILogger<DriftDetectionHandler> logger,
@@ -170,9 +174,48 @@ public class DriftDetectionHandler : ILearningEventHandler
         {
             samples.Add(sample);
 
-            // Trim old samples
+            // Trim old samples (time window + hard cap per pattern)
             var cutoff = DateTimeOffset.UtcNow.AddHours(-_options.DriftWindowHours);
             samples.RemoveAll(s => s.Timestamp < cutoff);
+            if (samples.Count > MaxSamplesPerPattern)
+                samples.RemoveRange(0, samples.Count - MaxSamplesPerPattern);
+        }
+
+        // Bound total pattern count
+        if (_samples.Count > MaxPatterns)
+            PruneStaleSamples();
+    }
+
+    private void PruneStaleSamples()
+    {
+        // Remove patterns with no recent samples
+        var cutoff = DateTimeOffset.UtcNow.AddHours(-_options.DriftWindowHours);
+        foreach (var kvp in _samples)
+        {
+            List<DriftSample> samples;
+            lock (kvp.Value) { samples = kvp.Value; }
+            if (samples.Count == 0 || samples.All(s => s.Timestamp < cutoff))
+                _samples.TryRemove(kvp.Key, out _);
+        }
+
+        // If still over limit, remove oldest patterns
+        if (_samples.Count > MaxPatterns)
+        {
+            var toRemove = _samples.Count - (MaxPatterns * 3 / 4);
+            foreach (var key in _samples.Keys.Take(toRemove))
+                _samples.TryRemove(key, out _);
+        }
+
+        // Same for learned patterns
+        if (_learnedPatterns.Count > MaxPatterns)
+        {
+            var oldest = _learnedPatterns
+                .OrderBy(kvp => kvp.Value.LastSeen)
+                .Take(_learnedPatterns.Count - (MaxPatterns * 3 / 4))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in oldest)
+                _learnedPatterns.TryRemove(key, out _);
         }
     }
 

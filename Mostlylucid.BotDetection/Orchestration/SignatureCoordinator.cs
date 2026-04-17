@@ -162,6 +162,7 @@ internal record SignatureGeoContext
     public string? ContinentCode { get; init; }
     public string? RegionCode { get; init; }
     public bool IsVpn { get; init; }
+    public DateTimeOffset LastSeen { get; init; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>
@@ -266,6 +267,50 @@ public class SignatureCoordinator : IAsyncDisposable
     }
 
     /// <summary>
+    ///     Prune shadow indexes when they grow larger than 2x the cache capacity.
+    ///     The SlidingCacheAtom handles its own LRU eviction, but these indexes
+    ///     aren't notified of evictions, so they need periodic bounding.
+    /// </summary>
+    private void PruneShadowIndexesIfNeeded()
+    {
+        var maxSize = _options.MaxSignaturesInWindow * 2;
+        if (_knownSignatures.Count <= maxSize) return;
+
+        // Prune _knownSignatures by oldest LastSeen
+        var toEvict = _knownSignatures
+            .OrderBy(kvp => kvp.Value.LastSeen)
+            .Take(_knownSignatures.Count - _options.MaxSignaturesInWindow)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in toEvict)
+        {
+            _knownSignatures.TryRemove(key, out _);
+            if (_signatureToFamily.TryRemove(key, out var familyId))
+            {
+                // If family has no more members, remove it
+                if (_families.TryGetValue(familyId, out var family) &&
+                    family.MemberSignatures.Count <= 1)
+                    _families.TryRemove(familyId, out _);
+            }
+        }
+
+        // Prune _ipIndex: remove entries with no remaining signatures
+        foreach (var kvp in _ipIndex)
+        {
+            foreach (var sig in kvp.Value.Keys.ToList())
+                if (!_knownSignatures.ContainsKey(sig))
+                    kvp.Value.TryRemove(sig, out _);
+
+            if (kvp.Value.IsEmpty)
+                _ipIndex.TryRemove(kvp.Key, out _);
+        }
+
+        _logger.LogDebug("Pruned {Count} stale shadow index entries (remaining: {Remaining})",
+            toEvict.Count, _knownSignatures.Count);
+    }
+
+    /// <summary>
     ///     Record a request for a signature. This is called by the per-request orchestrator
     ///     when it completes detection for a request.
     /// </summary>
@@ -319,8 +364,12 @@ public class SignatureCoordinator : IAsyncDisposable
                 Longitude = longitude ?? existing.Longitude,
                 ContinentCode = continentCode ?? existing.ContinentCode,
                 RegionCode = regionCode ?? existing.RegionCode,
-                IsVpn = isVpn || existing.IsVpn
+                IsVpn = isVpn || existing.IsVpn,
+                LastSeen = DateTimeOffset.UtcNow
             });
+
+        // Bound shadow indexes to prevent unbounded growth
+        PruneShadowIndexesIfNeeded();
 
         // Index IP hash -> signature for convergence analysis
         if (!string.IsNullOrEmpty(ipHash))

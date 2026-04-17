@@ -57,6 +57,10 @@ public sealed class MarkovTracker
     {
         var normalizedPath = PathNormalizer.Normalize(rawPath);
 
+        // Evict stale signatures if over limit
+        if (_signatureChains.Count > _options.MaxTrackedSignatures)
+            EvictStaleSignatures();
+
         // Get or create signature chain state
         var state = _signatureChains.GetOrAdd(signature, _ => new SignatureChainState(
             new DecayingTransitionMatrix(
@@ -300,6 +304,26 @@ public sealed class MarkovTracker
             counts[key] /= total;
 
         return counts;
+    }
+
+    private void EvictStaleSignatures()
+    {
+        // Evict signatures with the fewest transitions (least useful data)
+        var toEvict = _signatureChains
+            .OrderBy(kvp => kvp.Value.TransitionCount)
+            .Take(_signatureChains.Count - (_options.MaxTrackedSignatures * 3 / 4))
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in toEvict)
+        {
+            _signatureChains.TryRemove(key, out _);
+            _recentTransitions.TryRemove(key, out _);
+        }
+
+        if (toEvict.Count > 0)
+            _logger.LogDebug("Evicted {Count} stale Markov signatures (active: {Active})",
+                toEvict.Count, _signatureChains.Count);
     }
 
     private sealed class SignatureChainState

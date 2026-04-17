@@ -53,4 +53,7 @@ public class MarkovOptions
 
     /// <summary>Entropy delta threshold (absolute). Default: 1.0</summary>
     public double EntropyDeltaThreshold { get; set; } = 1.0;
+
+    /// <summary>Maximum tracked signatures in memory. Oldest are evicted when exceeded. Default: 10000</summary>
+    public int MaxTrackedSignatures { get; set; } = 10_000;
 }
