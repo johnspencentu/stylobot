@@ -9,7 +9,7 @@ by ***mostly*lucid**
 
 ## Pricing
 
-Flat per-domain pricing. No per-request metering. No surprises. Self-hosted at every tier.
+Flat per-domain pricing. **Unlimited requests.** No per-request metering. No surprises. Self-hosted at every tier.
 
 | | **FOSS** | **Startup** | **Enterprise** |
 |---|---|---|---|
@@ -20,7 +20,7 @@ Flat per-domain pricing. No per-request metering. No surprises. Self-hosted at e
 | **Users** | Unlimited (local accounts) | 5 users | Unlimited |
 | **Endpoint policies** | Unlimited (via config) | 5 live overrides | Unlimited |
 | **Persistence** | SQLite (zero-dependency) | PostgreSQL | PostgreSQL + pgvector |
-| **LLM** | Local Ollama | Local Ollama | Any (OpenAI, Anthropic, Azure) |
+| **LLM (optional)** | Local Ollama | Local Ollama | Any (OpenAI, Anthropic, Azure) |
 | **Add-on: Redis** | - | +$50/mo | Included |
 | **Add-on: Multi-node** | - | +$100/mo | Included |
 | **SSO** | ASP.NET Core Identity | OIDC | OIDC/SAML |
@@ -129,8 +129,9 @@ Active detector list is controlled by `BotDetection:Policies` in each app config
 - **Protocol-level fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 - detect bots even when they spoof headers perfectly
 - **Stream-aware detection**: WebSocket, SSE, SignalR, and gRPC traffic classified early; downstream detectors suppress false positives; dedicated stream abuse detection catches connection churn, payload flooding, and protocol switching
 - **Bot network discovery**: Leiden clustering finds coordinated bot campaigns across thousands of signatures
-- **Session behavioral vectors**: Markov chain transitions compressed into 118-dim vectors with unified fingerprint dimensions - enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
-- **Adaptive AI**: Heuristic model extracts ~130 features per request (including transport context) and learns from feedback
+- **Session behavioral vectors**: Markov chain transitions compressed into 129-dim vectors with unified fingerprint dimensions and per-transition timing anomaly detection - enables inter-session anomaly detection, behavioral clustering, and fingerprint mutation tracking
+- **Real-time inference**: Heuristic model extracts ~130 features per request and produces a verdict in <1ms. No batch processing, no cloud round-trips - detection runs inline in the request pipeline
+- **LLM-enhanced (optional)**: Local or cloud LLMs synthesize bot names, cluster descriptions, and weigh in on edge cases. The LLM never makes detection decisions - it enriches them. Detection works fully without any LLM configured
 - **Geo intelligence**: Country reputation tracking, geographic drift detection, VPN/proxy/Tor/datacenter identification
 - **Verified bot authentication**: DNS-verified identification of Googlebot, Bingbot, and 30+ legitimate crawlers
 - **AI scraper detection**: GPTBot, ClaudeBot, PerplexityBot, Google-Extended and Cloudflare AI signals
