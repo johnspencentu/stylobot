@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Dashboard;
+using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Extensions;
 using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Models;
@@ -233,6 +234,14 @@ public class StyloBotDashboardMiddleware
 
             case var p when p.StartsWith("api/labels/", StringComparison.OrdinalIgnoreCase):
                 await ServeSignatureLabelApiAsync(context, relativePath["api/labels/".Length..]);
+                break;
+
+            case "api/approvals":
+                await ServeApprovalsListApiAsync(context);
+                break;
+
+            case var p when p.StartsWith("api/approvals/", StringComparison.OrdinalIgnoreCase):
+                await ServeFingerprintApprovalApiAsync(context, relativePath["api/approvals/".Length..]);
                 break;
 
             case "api/sessions":
@@ -662,6 +671,176 @@ public class StyloBotDashboardMiddleware
         // Serialise with enum names rather than integers for readability.
         var payload = counts.ToDictionary(k => k.Key.ToString(), v => v.Value);
         await JsonSerializer.SerializeAsync(context.Response.Body, payload, CamelCaseJson);
+    }
+
+    // ==========================================
+    // Fingerprint Approval API
+    // ==========================================
+
+    /// <summary>
+    ///     <c>GET /api/approvals?limit=…</c> - list recent fingerprint approvals.
+    /// </summary>
+    private async Task ServeApprovalsListApiAsync(HttpContext context)
+    {
+        var store = context.RequestServices.GetService(typeof(IFingerprintApprovalStore)) as IFingerprintApprovalStore;
+        if (store is null) { context.Response.StatusCode = 501; await context.Response.WriteAsync("IFingerprintApprovalStore not registered"); return; }
+
+        var limit = int.TryParse(context.Request.Query["limit"].FirstOrDefault(), out var l)
+            ? Math.Clamp(l, 1, 500) : 50;
+
+        var approvals = await store.ListRecentAsync(limit, context.RequestAborted);
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, approvals, CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     <c>GET/POST/DELETE /api/approvals/{signature}</c> - CRUD for fingerprint approvals.
+    ///     POST can use an approval-id token (from X-SB-Approval-Id header) or direct signature.
+    /// </summary>
+    private async Task ServeFingerprintApprovalApiAsync(HttpContext context, string signatureOrAction)
+    {
+        var store = context.RequestServices.GetService(typeof(IFingerprintApprovalStore)) as IFingerprintApprovalStore;
+        if (store is null) { context.Response.StatusCode = 501; await context.Response.WriteAsync("IFingerprintApprovalStore not registered"); return; }
+
+        context.Response.ContentType = "application/json";
+
+        // POST /api/approvals/by-token - approve via one-time token
+        if (signatureOrAction.Equals("by-token", StringComparison.OrdinalIgnoreCase) && HttpMethods.IsPost(context.Request.Method))
+        {
+            await HandleApproveByTokenAsync(context, store);
+            return;
+        }
+
+        var signature = Uri.UnescapeDataString(signatureOrAction).Trim();
+        if (string.IsNullOrWhiteSpace(signature))
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("{\"error\":\"signature is required\"}");
+            return;
+        }
+
+        // GET - fetch approval
+        if (HttpMethods.IsGet(context.Request.Method))
+        {
+            var existing = await store.GetAsync(signature, context.RequestAborted);
+            if (existing is null) { context.Response.StatusCode = 404; return; }
+            await JsonSerializer.SerializeAsync(context.Response.Body, existing, CamelCaseJson);
+            return;
+        }
+
+        // DELETE - revoke approval
+        if (HttpMethods.IsDelete(context.Request.Method))
+        {
+            var revoker = ResolveLabeler(context);
+            await store.RevokeAsync(signature, revoker, context.RequestAborted);
+            context.Response.StatusCode = 204;
+            return;
+        }
+
+        // POST - create/update approval directly by signature
+        if (HttpMethods.IsPost(context.Request.Method))
+        {
+            await HandleApproveDirectAsync(context, store, signature);
+            return;
+        }
+
+        context.Response.StatusCode = 405;
+    }
+
+    private async Task HandleApproveByTokenAsync(HttpContext context, IFingerprintApprovalStore store)
+    {
+        ApprovalByTokenPayload? payload;
+        try
+        {
+            payload = await JsonSerializer.DeserializeAsync<ApprovalByTokenPayload>(
+                context.Request.Body, CamelCaseJson, context.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("{\"error\":\"malformed JSON body\"}");
+            return;
+        }
+
+        if (payload is null || string.IsNullOrWhiteSpace(payload.ApprovalId))
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("{\"error\":\"approvalId is required\"}");
+            return;
+        }
+
+        // Consume the one-time token to get the associated signature
+        var signature = await store.ConsumeApprovalTokenAsync(payload.ApprovalId, context.RequestAborted);
+        if (signature is null)
+        {
+            context.Response.StatusCode = 404;
+            await context.Response.WriteAsync("{\"error\":\"Token not found, expired, or already used\"}");
+            return;
+        }
+
+        var record = new ApprovalRecord
+        {
+            Signature = signature,
+            Justification = payload.Justification?.Trim() ?? "Approved via token",
+            ApprovedBy = ResolveLabeler(context),
+            ApprovedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = payload.ExpiresInDays.HasValue
+                ? DateTimeOffset.UtcNow.AddDays(payload.ExpiresInDays.Value)
+                : null,
+            LockedDimensions = payload.LockedDimensions ?? new Dictionary<string, string>()
+        };
+
+        await store.UpsertAsync(record, context.RequestAborted);
+        _logger.LogInformation("Fingerprint approved via token: {Sig} by {By}", signature[..Math.Min(12, signature.Length)], record.ApprovedBy);
+        await JsonSerializer.SerializeAsync(context.Response.Body, record, CamelCaseJson);
+    }
+
+    private async Task HandleApproveDirectAsync(HttpContext context, IFingerprintApprovalStore store, string signature)
+    {
+        ApprovalDirectPayload? payload;
+        try
+        {
+            payload = await JsonSerializer.DeserializeAsync<ApprovalDirectPayload>(
+                context.Request.Body, CamelCaseJson, context.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("{\"error\":\"malformed JSON body\"}");
+            return;
+        }
+
+        var record = new ApprovalRecord
+        {
+            Signature = signature,
+            Justification = payload?.Justification?.Trim() ?? "Manually approved",
+            ApprovedBy = ResolveLabeler(context),
+            ApprovedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = payload?.ExpiresInDays.HasValue == true
+                ? DateTimeOffset.UtcNow.AddDays(payload.ExpiresInDays!.Value)
+                : null,
+            LockedDimensions = payload?.LockedDimensions ?? new Dictionary<string, string>()
+        };
+
+        await store.UpsertAsync(record, context.RequestAborted);
+        _logger.LogInformation("Fingerprint approved directly: {Sig} by {By}", signature[..Math.Min(12, signature.Length)], record.ApprovedBy);
+        await JsonSerializer.SerializeAsync(context.Response.Body, record, CamelCaseJson);
+    }
+
+    // API payload DTOs for fingerprint approvals
+    private sealed record ApprovalByTokenPayload
+    {
+        public string? ApprovalId { get; init; }
+        public string? Justification { get; init; }
+        public Dictionary<string, string>? LockedDimensions { get; init; }
+        public int? ExpiresInDays { get; init; }
+    }
+
+    private sealed record ApprovalDirectPayload
+    {
+        public string? Justification { get; init; }
+        public Dictionary<string, string>? LockedDimensions { get; init; }
+        public int? ExpiresInDays { get; init; }
     }
 
     /// <summary>
