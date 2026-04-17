@@ -553,7 +553,9 @@ public static class ServiceCollectionExtensions
         // Bot Name Synthesizer (provided by LLM plugin packages)
         // ==========================================
         // Default no-op synthesizer - replaced by Mostlylucid.BotDetection.Llm.* packages
-        services.TryAddSingleton<IBotNameSynthesizer, NoOpBotNameSynthesizer>();
+        // Deterministic naming from signals (immediate, no LLM required).
+        // LLM packages override this with richer AI-generated names when available.
+        services.TryAddSingleton<IBotNameSynthesizer, DeterministicBotNameSynthesizer>();
 
         // ==========================================
         // Signature Description Service (Background)
