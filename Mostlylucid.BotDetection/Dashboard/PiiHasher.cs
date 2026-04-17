@@ -113,10 +113,15 @@ public sealed class PiiHasher
         if (string.IsNullOrEmpty(ip))
             return "unknown";
 
+        // Handle IPv4-mapped IPv6 (::ffff:192.168.0.1) - extract IPv4 portion
+        var effectiveIp = ip;
+        if (ip.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase) && ip.Contains('.'))
+            effectiveIp = ip.Substring("::ffff:".Length);
+
         // Extract subnet (simple implementation for IPv4)
-        var parts = ip.Split('.');
+        var parts = effectiveIp.Split('.');
         if (parts.Length != 4)
-            return HashIp(ip); // Fallback for IPv6 or invalid
+            return HashIp(ip); // Fallback for pure IPv6 or invalid
 
         var subnet = prefixLength switch
         {

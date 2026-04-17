@@ -287,16 +287,25 @@ public class SignatureFeedbackHandler : ILearningEventHandler
     {
         // For IPv4: use /24 (class C)
         // For IPv6: use /48
+        // For IPv4-mapped IPv6 (::ffff:x.x.x.x): extract the IPv4 and use /24
 
-        if (ip.Contains('.'))
+        // Handle IPv4-mapped IPv6 (::ffff:192.168.0.1) - extract IPv4 portion
+        if (ip.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase) && ip.Contains('.'))
         {
-            // IPv4 - take first 3 octets
+            var ipv4Part = ip.Substring("::ffff:".Length);
+            var parts = ipv4Part.Split('.');
+            if (parts.Length >= 3) return $"{parts[0]}.{parts[1]}.{parts[2]}.0/24";
+        }
+
+        if (ip.Contains('.') && !ip.Contains(':'))
+        {
+            // Pure IPv4 - take first 3 octets
             var parts = ip.Split('.');
             if (parts.Length >= 3) return $"{parts[0]}.{parts[1]}.{parts[2]}.0/24";
         }
         else if (ip.Contains(':'))
         {
-            // IPv6 - take first 3 segments
+            // Pure IPv6 - take first 3 segments
             var parts = ip.Split(':');
             if (parts.Length >= 3) return $"{parts[0]}:{parts[1]}:{parts[2]}::/48";
         }
