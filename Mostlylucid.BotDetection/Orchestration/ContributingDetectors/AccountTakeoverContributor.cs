@@ -462,33 +462,18 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
                 SignatureTrackers.TryRemove(kvp.Key, out _);
         }
 
-        // Hard cap on tracked signatures
+        // Hard cap on tracked signatures - evict LRU in one pass (O(N log N) not O(N^2))
         var count = SignatureTrackers.Count;
         if (count > MaxTrackedSignatures)
         {
-            // Evict oldest entries - use a simple approach: remove entries that are oldest
-            var toEvict = count - MaxTrackedSignatures + 100;
-            var oldest = DateTimeOffset.MaxValue;
-            string? oldestKey = null;
+            var toEvictKeys = SignatureTrackers
+                .OrderBy(kvp => kvp.Value.LastSeen ?? DateTimeOffset.MinValue)
+                .Take(count - (MaxTrackedSignatures * 3 / 4))
+                .Select(kvp => kvp.Key)
+                .ToList();
 
-            for (var i = 0; i < toEvict; i++)
-            {
-                oldest = DateTimeOffset.MaxValue;
-                oldestKey = null;
-
-                foreach (var kvp in SignatureTrackers)
-                {
-                    var seen = kvp.Value.LastSeen ?? DateTimeOffset.MinValue;
-                    if (seen < oldest)
-                    {
-                        oldest = seen;
-                        oldestKey = kvp.Key;
-                    }
-                }
-
-                if (oldestKey != null)
-                    SignatureTrackers.TryRemove(oldestKey, out _);
-            }
+            foreach (var key in toEvictKeys)
+                SignatureTrackers.TryRemove(key, out _);
         }
     }
 

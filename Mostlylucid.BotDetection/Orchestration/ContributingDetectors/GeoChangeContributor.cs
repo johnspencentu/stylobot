@@ -25,7 +25,8 @@ public class GeoChangeContributor : ConfiguredContributorBase
     private readonly CountryReputationTracker _countryTracker;
     private readonly ILogger<GeoChangeContributor> _logger;
 
-    // Per-signature country history: signature → (lastCountryCode, countryChanges, firstSeen)
+    // Per-signature country history: bounded at MaxHistoryEntries (default 10K)
+    // with periodic pruning of stale entries. Uses ConcurrentDictionary for atomic AddOrUpdate.
     private static readonly ConcurrentDictionary<string, GeoHistory> SignatureGeoHistory = new();
 
     public GeoChangeContributor(
@@ -204,15 +205,23 @@ public class GeoChangeContributor : ConfiguredContributorBase
 
     private void PruneHistory()
     {
+        // Phase 1: Remove expired entries (>24h since last seen)
         var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
-        var stale = SignatureGeoHistory
-            .Where(kvp => kvp.Value.LastSeen < cutoff)
-            .Select(kvp => kvp.Key)
-            .Take(MaxHistoryEntries / 4)
-            .ToList();
+        foreach (var kvp in SignatureGeoHistory)
+            if (kvp.Value.LastSeen < cutoff)
+                SignatureGeoHistory.TryRemove(kvp.Key, out _);
 
-        foreach (var key in stale)
-            SignatureGeoHistory.TryRemove(key, out _);
+        // Phase 2: If still over limit, evict oldest by LastSeen (LRU)
+        if (SignatureGeoHistory.Count > MaxHistoryEntries)
+        {
+            var toEvict = SignatureGeoHistory
+                .OrderBy(kvp => kvp.Value.LastSeen)
+                .Take(SignatureGeoHistory.Count - (MaxHistoryEntries * 3 / 4))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in toEvict)
+                SignatureGeoHistory.TryRemove(key, out _);
+        }
     }
 
     private record GeoHistory
