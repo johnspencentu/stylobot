@@ -4,147 +4,150 @@
 
 <section class="px-6 py-16">
   <div class="max-w-5xl mx-auto text-center">
-    <div class="text-xs uppercase tracking-widest text-base-content/60">Pricing</div>
+    <div class="text-xs uppercase tracking-widest text-primary font-semibold">Simple, transparent pricing</div>
     <h1 class="text-4xl sm:text-5xl font-semibold mt-2 leading-tight">
-      Start on OSS. Upgrade when scale demands it.
+      $100/month per domain. That's it.
     </h1>
     <p class="mt-4 text-lg text-base-content/80 max-w-3xl mx-auto">
-      The full detection engine - 31 detectors, behavioral session vectors, local dashboard - is
-      OSS under the Unlicense. Pay when you need central control, Postgres durability,
-      multi-gateway fleet management, or enterprise SSO. Every deployment stays self-hosted.
+      No per-request metering. No traffic surprises. No CDN lock-in.
+      Self-hosted at every tier - your traffic never leaves your perimeter.
+      The full detection engine is free and open source forever.
     </p>
+    <div class="mt-6 flex gap-3 justify-center flex-wrap">
+      <a class="btn btn-primary btn-lg" href="/portal">Start 30-day free trial</a>
+      <a class="btn btn-ghost btn-lg" href="https://github.com/scottgal/stylobot">View source code</a>
+    </div>
   </div>
 </section>
 
 <section class="px-6 pb-12">
-  <div class="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
 
-    <!-- OSS -->
+    <!-- FOSS -->
     <div class="card bg-base-200 p-6 flex flex-col">
-      <h2 class="text-lg font-semibold">OSS</h2>
+      <h2 class="text-lg font-semibold">Open Source</h2>
       <div class="mt-2"><span class="text-3xl font-bold">$0</span> <span class="text-base-content/60">forever</span></div>
-      <p class="text-sm text-base-content/70 mt-3">Self-hosted. No license. Fully functional.</p>
+      <p class="text-sm text-base-content/70 mt-3">Fully functional. No license required. No phone-home.</p>
       <ul class="mt-4 space-y-2 text-sm flex-grow">
-        <li>✓ All 31 detectors + session vectors</li>
-        <li>✓ SQLite persistence (zero ops)</li>
-        <li>✓ Local dashboard, static YAML config</li>
-        <li>✓ ASP.NET Core Identity (local accounts)</li>
-        <li>✓ Local Ollama LLM escalation</li>
-        <li class="text-base-content/40">– No central control plane</li>
-        <li class="text-base-content/40">– No fleet dashboard</li>
+        <li>&#10003; All 31 detectors + session vectors</li>
+        <li>&#10003; Sub-millisecond fast path (&lt;1ms)</li>
+        <li>&#10003; SQLite persistence (zero dependencies)</li>
+        <li>&#10003; Local dashboard (read-only)</li>
+        <li>&#10003; YAML config (restart to apply)</li>
+        <li>&#10003; Local Ollama LLM escalation</li>
+        <li>&#10003; Zero PII architecture</li>
+        <li>&#10003; Unlimited users (local accounts)</li>
+        <li class="text-base-content/40">- Dashboard is view-only</li>
+        <li class="text-base-content/40">- Config changes need restart</li>
       </ul>
-      <a class="btn btn-outline mt-6" href="https://github.com/mostlylucid/stylobot">Get the code</a>
+      <a class="btn btn-outline mt-6" href="https://github.com/scottgal/stylobot">Get the code</a>
     </div>
 
     <!-- Startup -->
-    <div class="card bg-primary/10 ring-1 ring-primary p-6 flex flex-col">
-      <div class="text-xs uppercase tracking-widest text-primary">Most popular</div>
-      <h2 class="text-lg font-semibold mt-1">Startup</h2>
-      <div class="mt-2"><span class="text-3xl font-bold">$149</span> <span class="text-base-content/60">/ month</span></div>
-      <p class="text-sm text-base-content/70 mt-3">Small production. Central management unlocks here.</p>
+    <div class="card bg-primary/10 ring-2 ring-primary p-6 flex flex-col relative">
+      <div class="absolute -top-3 left-1/2 -translate-x-1/2 text-xs uppercase tracking-widest bg-primary text-primary-content px-3 py-1 rounded-full font-semibold">Most popular</div>
+      <h2 class="text-lg font-semibold mt-2">Startup</h2>
+      <div class="mt-2">
+        <span class="text-3xl font-bold">$100</span>
+        <span class="text-base-content/60">/ month per domain</span>
+      </div>
+      <p class="text-sm text-base-content/70 mt-1">Unlimited subdomains included.</p>
       <ul class="mt-4 space-y-2 text-sm flex-grow">
-        <li>✓ Everything in OSS</li>
-        <li>✓ Postgres + Redis persistence</li>
-        <li>✓ Control plane + live config editor</li>
-        <li>✓ 3 gateway instances, 3 portal users</li>
-        <li>✓ OIDC SSO (Keycloak/AzureAD/Okta/…)</li>
-        <li>✓ Multi-gateway fleet dashboard</li>
-        <li>✓ OpenAI + Anthropic LLM</li>
-        <li>✓ Email support, 48h business-days</li>
+        <li>&#10003; Everything in Open Source</li>
+        <li>&#10003; PostgreSQL persistence</li>
+        <li>&#10003; <strong>Live config editor</strong> (no restart)</li>
+        <li>&#10003; 5 portal users</li>
+        <li>&#10003; 5 per-endpoint policy overrides</li>
+        <li>&#10003; Dashboard with write access</li>
+        <li>&#10003; OIDC SSO (Keycloak/AzureAD/Okta)</li>
+        <li>&#10003; OpenAI + Anthropic LLM providers</li>
+        <li>&#10003; Email support</li>
       </ul>
-      <a class="btn btn-primary mt-6" href="/portal">Start 30-day SME trial</a>
-    </div>
-
-    <!-- SME -->
-    <div class="card bg-base-200 p-6 flex flex-col">
-      <h2 class="text-lg font-semibold">SME</h2>
-      <div class="mt-2"><span class="text-3xl font-bold">$499</span> <span class="text-base-content/60">/ month</span></div>
-      <p class="text-sm text-base-content/70 mt-3">Growing mid-market. Multi-region, compliance, SSO at scale.</p>
-      <ul class="mt-4 space-y-2 text-sm flex-grow">
-        <li>✓ Everything in Startup</li>
-        <li>✓ pgvector HNSW session similarity</li>
-        <li>✓ 15 gateways, 10 portal users</li>
-        <li>✓ Unlimited overrides</li>
-        <li>✓ Scheduled reports + CSV/JSON export</li>
-        <li>✓ Multi-region, staged rollout, A/B</li>
-        <li>✓ OIDC group/role claim mapping</li>
-        <li>✓ Slack / PagerDuty / webhook alerts</li>
-        <li>✓ 24h business-hours chat + email</li>
-      </ul>
-      <a class="btn btn-outline mt-6" href="/contact">Talk to us</a>
+      <div class="mt-4 space-y-1 text-xs text-base-content/50">
+        <div>Add-on: <strong>Redis backplane</strong> +$50/mo</div>
+        <div>Add-on: <strong>Multi-node / distributed</strong> +$100/mo</div>
+      </div>
+      <a class="btn btn-primary mt-6" href="/portal">Start 30-day free trial</a>
     </div>
 
     <!-- Enterprise -->
     <div class="card bg-base-200 p-6 flex flex-col">
       <h2 class="text-lg font-semibold">Enterprise</h2>
-      <div class="mt-2"><span class="text-3xl font-bold">Custom</span></div>
-      <p class="text-sm text-base-content/70 mt-3">Regulated industries, air-gapped, multi-region mesh.</p>
+      <div class="mt-2"><span class="text-3xl font-bold">From $1,000</span> <span class="text-base-content/60">/ month</span></div>
+      <p class="text-sm text-base-content/70 mt-3">Capability-based. You buy what you need.</p>
       <ul class="mt-4 space-y-2 text-sm flex-grow">
-        <li>✓ Everything in SME</li>
-        <li>✓ Unlimited gateways / users / overrides</li>
-        <li>✓ SAML 2.0 + SCIM provisioning</li>
-        <li>✓ Mesh deployment, cross-cluster</li>
-        <li>✓ Air-gapped license activation</li>
-        <li>✓ Compliance exports (GDPR DSR, legal hold)</li>
-        <li>✓ Private LLM integration</li>
-        <li>✓ White-label available</li>
-        <li>✓ 24/7/365, 99.99%, named engineers</li>
+        <li>&#10003; Everything in Startup</li>
+        <li>&#10003; Unlimited users / endpoints / overrides</li>
+        <li>&#10003; pgvector HNSW session similarity</li>
+        <li>&#10003; Fingerprint approval + locked dimensions</li>
+        <li>&#10003; Fleet dashboard (multi-gateway)</li>
+        <li>&#10003; Kubernetes operator</li>
+        <li>&#10003; SAML 2.0 + SCIM provisioning</li>
+        <li>&#10003; Distributed YARP pipeline coordination</li>
+        <li>&#10003; Scheduled reports + compliance exports</li>
+        <li>&#10003; Private LLM integration</li>
+        <li>&#10003; SLA + dedicated support engineers</li>
       </ul>
-      <a class="btn btn-outline mt-6" href="/contact">Contact sales</a>
+      <a class="btn btn-outline mt-6" href="/contact">Talk to us</a>
     </div>
 
   </div>
 </section>
 
-<!-- Free trial callout -->
+<!-- Why StyloBot vs the alternatives -->
 <section class="px-6 py-12 bg-base-200">
-  <div class="max-w-4xl mx-auto">
-    <h2 class="text-2xl font-semibold">30-day SME trial - no credit card</h2>
-    <p class="mt-3 text-base-content/80">
-      Sign up on the portal, create an org, click "Request trial." You get a signed Ed25519
-      license token with the full SME feature set - Postgres, Redis, pgvector, OIDC, 15 gateways,
-      10 users. After 30 days the token expires; there's a 7-day grace window where premium
-      features keep working with a banner, then premium features lock but <strong>your gateways
-      keep protecting traffic forever</strong> - we never turn off detection.
-    </p>
-    <div class="mt-6 flex gap-3 flex-wrap">
-      <a class="btn btn-primary" href="/portal">Start the trial</a>
-      <a class="btn btn-ghost" href="/trust">Read the security posture first</a>
-    </div>
-  </div>
-</section>
-
-<!-- Competitive context -->
-<section class="px-6 py-12">
-  <div class="max-w-4xl mx-auto">
-    <h2 class="text-2xl font-semibold">Honest about the alternatives</h2>
-    <p class="mt-3 text-base-content/80">
-      We're not the cheapest option on the market - CrowdSec OSS is free too, if you don't need
-      managed blocklists. We're not the most expensive either - DataDome and Cloudflare Bot
-      Management both start above $3,000/mo and don't self-host. StyloBot fits the gap:
-      self-hosted at every tier, priced for the mid-market that most SaaS bot-defense vendors
-      price out of.
-    </p>
-    <div class="overflow-x-auto mt-6">
+  <div class="max-w-5xl mx-auto">
+    <h2 class="text-2xl font-semibold text-center mb-2">How we compare</h2>
+    <p class="text-center text-base-content/60 mb-6 text-sm">We're new - but we're also the only self-hosted full bot management platform at this price point.</p>
+    <div class="overflow-x-auto">
       <table class="table text-sm">
         <thead>
-          <tr><th>Vendor</th><th>Entry</th><th>Mid-market</th><th>Self-host?</th></tr>
+          <tr>
+            <th>Vendor</th>
+            <th>Starting price</th>
+            <th>Mid-market</th>
+            <th>Self-hosted?</th>
+            <th>Open source?</th>
+          </tr>
         </thead>
         <tbody>
-          <tr class="font-semibold">
-            <td>StyloBot</td><td>$0 (OSS)</td><td>$149 – $499/mo</td><td class="text-success">Always</td>
+          <tr class="font-semibold bg-primary/5">
+            <td>StyloBot</td>
+            <td class="text-primary font-bold">$0 (FOSS) / $100/mo</td>
+            <td>$100 - $1,000/mo</td>
+            <td class="text-success font-bold">Always</td>
+            <td class="text-success font-bold">Full engine</td>
           </tr>
-          <tr><td>CrowdSec</td><td>$0 OSS</td><td>$900+/mo blocklists</td><td class="text-success">Yes</td></tr>
-          <tr><td>CHEQ</td><td>$149/mo</td><td>$249+/mo</td><td class="text-error">No</td></tr>
-          <tr><td>DataDome</td><td>$3,830/mo</td><td>$4K – $13K/mo</td><td class="text-error">No</td></tr>
-          <tr><td>Cloudflare Bot Mgmt</td><td>$3,000/mo floor</td><td>$10K+/mo</td><td class="text-error">No (edge-locked)</td></tr>
-          <tr><td>Akamai Bot Manager</td><td>Custom (~$8K for SMB)</td><td>$8K – $25K/mo</td><td class="text-error">No</td></tr>
-          <tr><td>HUMAN (PerimeterX)</td><td>Quote only</td><td>Enterprise-only</td><td class="text-error">No</td></tr>
+          <tr><td>CrowdSec</td><td>$0 OSS</td><td>$900+/mo (blocklists)</td><td class="text-success">Yes</td><td>Partial</td></tr>
+          <tr><td>AWS WAF Bot Control</td><td>$10/mo + per-request</td><td>$100+/mo</td><td class="text-error">No (AWS only)</td><td class="text-error">No</td></tr>
+          <tr><td>CHEQ</td><td>$149/mo</td><td>$999+/mo</td><td class="text-error">No</td><td class="text-error">No</td></tr>
+          <tr><td>DataDome</td><td>$2,990/mo</td><td>$5,990+/mo</td><td class="text-error">No</td><td class="text-error">No</td></tr>
+          <tr><td>Cloudflare Bot Mgmt</td><td>$3,000/mo (Enterprise)</td><td>$5K - $15K/mo</td><td class="text-error">No (CDN lock-in)</td><td class="text-error">No</td></tr>
+          <tr><td>HUMAN Security</td><td>$5,000+/mo</td><td>$10K - $30K/mo</td><td class="text-error">No</td><td class="text-error">No</td></tr>
+          <tr><td>Akamai Bot Manager</td><td>$5,000+/mo</td><td>$10K - $50K/mo</td><td class="text-error">No (CDN lock-in)</td><td class="text-error">No</td></tr>
         </tbody>
       </table>
-      <div class="text-xs text-base-content/50 mt-2">
-        Pricing as of April 2026. Sources: vendor marketplaces, G2, public reviews.
+      <div class="text-xs text-base-content/40 mt-2">
+        Pricing as of April 2026. Sources: vendor pricing pages, G2, public documentation.
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Trial -->
+<section class="px-6 py-12">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-2xl font-semibold">30-day free trial. No credit card.</h2>
+    <p class="mt-3 text-base-content/80 max-w-2xl mx-auto">
+      Full Startup feature set for 30 days. After the trial, commercial features switch to
+      <strong>logging-only mode</strong> - your detection keeps running, your gateways keep
+      protecting traffic. We never turn off protection because of a billing issue.
+    </p>
+    <div class="mt-6 flex gap-3 justify-center flex-wrap">
+      <a class="btn btn-primary btn-lg" href="/portal">Start the trial</a>
+    </div>
+    <div class="mt-4 text-xs text-base-content/50">
+      Ed25519-signed license. No phone-home. Validates locally against the vendor public key.
     </div>
   </div>
 </section>
@@ -156,35 +159,43 @@
 
     <div class="mt-6 space-y-6">
       <div>
-        <h3 class="font-semibold">Is OSS really fully functional?</h3>
+        <h3 class="font-semibold">Is the open source version really fully functional?</h3>
         <p class="text-base-content/80 mt-1 text-sm">
-          Yes. All 31 detectors, session vectors, local dashboard, SQLite persistence,
-          Ollama-backed LLM escalation. The only things not in OSS are central control plane,
-          multi-gateway fleet dashboard, Postgres/Redis persistence, and OIDC SSO.
+          Yes. All 31 detectors, session vectors, per-transition timing analysis, local dashboard,
+          SQLite persistence, Ollama LLM escalation. The commercial version adds PostgreSQL,
+          live config editing, and fleet management - but the detection engine is identical.
         </p>
       </div>
       <div>
-        <h3 class="font-semibold">What happens when my license expires?</h3>
+        <h3 class="font-semibold">What does "$100/month per domain" include?</h3>
         <p class="text-base-content/80 mt-1 text-sm">
-          7-day grace window where everything keeps working with a banner. Then premium
-          features return <code>402 Payment Required</code> but core detection keeps running
-          forever - gateways never stop protecting traffic because of a license lapse.
+          One domain and all its subdomains. <code>example.com</code>, <code>api.example.com</code>,
+          <code>staging.example.com</code> - all covered under one license. No per-request charges,
+          no traffic limits, no bandwidth metering.
         </p>
       </div>
       <div>
-        <h3 class="font-semibold">Can I self-host the customer portal too?</h3>
+        <h3 class="font-semibold">What happens after the trial?</h3>
         <p class="text-base-content/80 mt-1 text-sm">
-          For licensing / trials / billing, no - stylobot.net is the authority because trial
-          tokens need vendor signing. For Enterprise customers with air-gap requirements we
-          support offline license activation against a pre-provisioned keypair - contact sales.
+          Commercial features switch to logging-only mode. The live config editor becomes read-only,
+          PostgreSQL persistence stops writing new events (existing data stays), but
+          <strong>detection never stops</strong>. Your gateways keep protecting traffic using
+          SQLite and YAML config - exactly like the FOSS version.
         </p>
       </div>
       <div>
-        <h3 class="font-semibold">Do you take card payments?</h3>
+        <h3 class="font-semibold">Why is StyloBot so much cheaper than DataDome or Cloudflare?</h3>
         <p class="text-base-content/80 mt-1 text-sm">
-          Stripe integration for Startup/SME monthly + annual lands in a future portal
-          iteration. For now, trials are self-serve; paid plans are invoiced. Contact us to
-          set up billing.
+          Those vendors run SaaS infrastructure at global scale - PoPs, CDN edge nodes, SOC teams.
+          StyloBot runs in <em>your</em> infrastructure. You bring the compute; we bring the
+          detection intelligence. No infrastructure markup, no per-request tax.
+        </p>
+      </div>
+      <div>
+        <h3 class="font-semibold">Can I upgrade mid-month?</h3>
+        <p class="text-base-content/80 mt-1 text-sm">
+          Yes. Upgrade from Startup to Enterprise, add Redis or multi-node - changes are
+          prorated. Your license token is re-issued immediately via the portal.
         </p>
       </div>
     </div>
