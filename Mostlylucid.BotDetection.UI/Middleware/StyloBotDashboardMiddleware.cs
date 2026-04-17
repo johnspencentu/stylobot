@@ -1356,7 +1356,7 @@ public class StyloBotDashboardMiddleware
             // Radar projection for behavioral shape visualization
             radarAxes = s.Vector is { Length: > 0 }
                 ? BotDetection.Analysis.VectorRadarProjection.Project(
-                    BotDetection.Data.SqliteSessionStore.DeserializeVector(s.Vector))
+                    BotDetection.Data.SqliteSessionStore.DeserializeVector(s.Vector)!)
                 : null
         }).ToList();
 
