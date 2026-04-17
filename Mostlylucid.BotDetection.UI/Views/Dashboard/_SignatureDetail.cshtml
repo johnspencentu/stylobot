@@ -214,6 +214,20 @@ else
         </div>
     </div>
 
+    <!-- Sessions (Markov chain behavioral sessions) - loaded via HTMX -->
+    <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+        <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">
+            <i class="bx bx-pulse text-sm" style="color: var(--sb-accent);"></i>
+            Behavioral Sessions
+        </h3>
+        <div id="signature-sessions"
+             hx-get="@bp/partials/signature-sessions?signature=@Uri.EscapeDataString(Model.SignatureId)"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="text-xs text-base-content/40 py-4 text-center">Loading sessions...</div>
+        </div>
+    </div>
+
     <!-- CRITICAL: Endpoints Visited -->
     @if (Model.Paths.Count > 0)
     {

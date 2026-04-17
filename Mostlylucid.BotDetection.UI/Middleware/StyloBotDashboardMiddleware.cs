@@ -332,6 +332,10 @@ public class StyloBotDashboardMiddleware
                 await ServeSessionDetailPartialAsync(context);
                 break;
 
+            case "partials/signature-sessions":
+                await ServeSignatureSessionsPartialAsync(context);
+                break;
+
             case "partials/update":
                 await ServeOobUpdateAsync(context);
                 break;
@@ -2243,6 +2247,103 @@ public class StyloBotDashboardMiddleware
         var html = await _razorViewRenderer.RenderViewToStringAsync(
             "/Views/Dashboard/_SessionDetail.cshtml", model, context);
         await context.Response.WriteAsync(html);
+    }
+
+    /// <summary>
+    ///     Serves inline HTML for signature sessions (loaded via HTMX in signature detail page).
+    ///     Shows session timeline with Markov chain previews and path sequences.
+    /// </summary>
+    private async Task ServeSignatureSessionsPartialAsync(HttpContext context)
+    {
+        var signature = context.Request.Query["signature"].FirstOrDefault() ?? "";
+        var sessionStore = context.RequestServices.GetService<BotDetection.Data.ISessionStore>();
+
+        if (sessionStore is null || string.IsNullOrEmpty(signature))
+        {
+            context.Response.ContentType = "text/html";
+            await context.Response.WriteAsync(
+                "<div class=\"text-xs text-base-content/40 py-4 text-center\">No session data available</div>");
+            return;
+        }
+
+        var sessions = await sessionStore.GetSessionsAsync(Uri.UnescapeDataString(signature), 20);
+
+        context.Response.ContentType = "text/html";
+
+        if (sessions.Count == 0)
+        {
+            await context.Response.WriteAsync(
+                "<div class=\"text-xs text-base-content/40 py-4 text-center\">No sessions recorded yet. Sessions are created when a visitor's activity gap exceeds 30 minutes.</div>");
+            return;
+        }
+
+        var html = new System.Text.StringBuilder();
+        html.Append("<div class=\"overflow-x-auto\"><table class=\"table table-xs w-full\"><thead>");
+        html.Append("<tr class=\"text-[10px] uppercase tracking-wider text-base-content/40\">");
+        html.Append("<th class=\"py-1\">Started</th>");
+        html.Append("<th class=\"py-1\">Duration</th>");
+        html.Append("<th class=\"py-1 text-right\">Requests</th>");
+        html.Append("<th class=\"py-1\">Dominant</th>");
+        html.Append("<th class=\"py-1 text-right\">Bot %</th>");
+        html.Append("<th class=\"py-1\">Risk</th>");
+        html.Append("<th class=\"py-1 text-right\">Entropy</th>");
+        html.Append("<th class=\"py-1 text-right\">Errors</th>");
+        html.Append("<th class=\"py-1\">Paths</th>");
+        html.Append("</tr></thead><tbody>");
+
+        foreach (var s in sessions)
+        {
+            var duration = (s.EndedAt - s.StartedAt).TotalMinutes;
+            var probClass = s.AvgBotProbability >= 0.7 ? "text-error" : s.AvgBotProbability >= 0.4 ? "text-warning" : "text-success";
+            var riskClass = s.RiskBand is "VeryHigh" or "High" ? "text-error" : s.RiskBand is "Elevated" or "Medium" ? "text-warning" : "text-success";
+
+            // Parse paths JSON for preview
+            var pathPreview = "";
+            if (!string.IsNullOrEmpty(s.PathsJson))
+            {
+                try
+                {
+                    var paths = JsonSerializer.Deserialize<List<string>>(s.PathsJson);
+                    if (paths is { Count: > 0 })
+                        pathPreview = string.Join(" > ", paths.Take(4)) + (paths.Count > 4 ? $" (+{paths.Count - 4})" : "");
+                }
+                catch { }
+            }
+
+            html.Append("<tr class=\"hover:bg-base-200/50\">");
+            html.Append($"<td class=\"py-1 text-[10px] text-base-content/50 whitespace-nowrap\">{s.StartedAt:MMM dd HH:mm}</td>");
+            html.Append($"<td class=\"py-1 text-xs text-base-content/60\">{duration:F1}m</td>");
+            html.Append($"<td class=\"py-1 text-right text-xs font-mono\">{s.RequestCount}</td>");
+            html.Append($"<td class=\"py-1 text-[10px] text-base-content/60\">{s.DominantState}</td>");
+            html.Append($"<td class=\"py-1 text-right text-xs font-bold {probClass}\">{s.AvgBotProbability:P0}</td>");
+            html.Append($"<td class=\"py-1 text-[10px] {riskClass}\">{s.RiskBand}</td>");
+            html.Append($"<td class=\"py-1 text-right text-[10px] font-mono text-base-content/50\">{s.TimingEntropy:F2}</td>");
+            html.Append($"<td class=\"py-1 text-right text-xs {(s.ErrorCount > 0 ? "text-error font-bold" : "text-base-content/40")}\">{s.ErrorCount}</td>");
+            html.Append($"<td class=\"py-1 text-[10px] text-base-content/40 max-w-[250px] truncate\" title=\"{System.Net.WebUtility.HtmlEncode(pathPreview)}\">{System.Net.WebUtility.HtmlEncode(pathPreview)}</td>");
+            html.Append("</tr>");
+
+            // Transition preview row (collapsible)
+            if (!string.IsNullOrEmpty(s.TransitionCountsJson))
+            {
+                try
+                {
+                    var transitions = JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson);
+                    if (transitions is { Count: > 0 })
+                    {
+                        var top5 = transitions.OrderByDescending(t => t.Value).Take(5);
+                        var bars = string.Join("", top5.Select(t =>
+                            $"<span class=\"inline-flex items-center gap-0.5 mr-2\"><span class=\"text-base-content/50\">{System.Net.WebUtility.HtmlEncode(t.Key)}</span><span class=\"font-bold\">{t.Value}</span></span>"));
+                        html.Append($"<tr><td colspan=\"9\" class=\"py-0.5 px-4 text-[9px] text-base-content/30 border-b\" style=\"border-color: var(--sb-card-divider);\">{bars}</td></tr>");
+                    }
+                }
+                catch { }
+            }
+        }
+
+        html.Append("</tbody></table></div>");
+        html.Append($"<div class=\"text-[10px] text-base-content/30 mt-2\">{sessions.Count} session(s) recorded</div>");
+
+        await context.Response.WriteAsync(html.ToString());
     }
 
     private async Task ServeRecentActivityPartialAsync(HttpContext context)
