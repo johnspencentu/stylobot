@@ -1,0 +1,176 @@
+# ============================================================
+# Stylobot - Staging Stack (lpt-03, 192.168.0.89)
+# ============================================================
+# Full production-like stack with:
+#   - Gateway (bot detection + YARP reverse proxy)
+#   - Website (dashboard + portal)
+#   - TimescaleDB (event persistence)
+#   - Keycloak (OIDC portal auth)
+#   - Portal DB (org/license persistence)
+#   - LLM via Ollama on 192.168.0.31 (host machine)
+#
+# Ports exposed for CF tunnel:
+#   8080 - Gateway (main entry point)
+#   8081 - Keycloak admin console
+#
+# Usage:
+#   docker compose -f docker-compose.staging.yml up -d
+# ============================================================
+
+services:
+  gateway:
+    image: 192.168.0.89:5000/stylobot-gateway:latest
+    container_name: stylobot-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ASPNETCORE_URLS=http://+:8080
+      - DEFAULT_UPSTREAM=http://website:8080
+      # PostgreSQL persistence
+      - StyloBotDashboard__PostgreSQL__ConnectionString=Host=timescaledb;Database=stylobot;Username=stylobot;Password=staging-password-2026
+      - StyloBotDashboard__PostgreSQL__EnableTimescaleDB=true
+      - StyloBotDashboard__PostgreSQL__AutoInitializeSchema=true
+      - StyloBotDashboard__PostgreSQL__RetentionDays=30
+      # LLM on host machine (192.168.0.31)
+      - BotDetection__AiDetection__Provider=Ollama
+      - BotDetection__AiDetection__OllamaUrl=http://192.168.0.31:11434
+      - BotDetection__AiDetection__OllamaModel=qwen3.5:0.8b
+      # Detection tuning
+      - BotDetection__BotThreshold=0.7
+      - BotDetection__EnableTestMode=false
+      - BotDetection__Cluster__MinClusterSize=3
+      - BotDetection__Cluster__ClusterIntervalSeconds=30
+      # Response headers (opt-in for staging visibility)
+      - BotDetection__ResponseHeaders__Enabled=true
+      - BotDetection__ResponseHeaders__IncludeReasonHeader=true
+      - BotDetection__ResponseHeaders__IncludeApprovalId=true
+      # API keys for testing
+      - BotDetection__ApiKeys__STAGING-BYPASS__Name=Staging Bypass
+      - BotDetection__ApiKeys__STAGING-BYPASS__ActionPolicyName=logonly
+      - BotDetection__ApiKeys__STAGING-BYPASS__Enabled=true
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      website:
+        condition: service_started
+    networks:
+      - stylobot-staging
+
+  website:
+    image: 192.168.0.89:5000/stylobot-site:latest
+    container_name: stylobot-website
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ASPNETCORE_URLS=http://+:8080
+      - BOTDETECTION_TRUST_UPSTREAM=true
+      - STYLOBOT_DASHBOARD_PUBLIC=true
+      # PostgreSQL persistence
+      - StyloBotDashboard__PostgreSQL__ConnectionString=Host=timescaledb;Database=stylobot;Username=stylobot;Password=staging-password-2026
+      - StyloBotDashboard__PostgreSQL__EnableTimescaleDB=true
+      - StyloBotDashboard__PostgreSQL__AutoInitializeSchema=true
+      # Portal auth (Keycloak)
+      - Authentication__Schemes__OpenIdConnect__Authority=http://keycloak:8080/realms/stylobot
+      - Authentication__Schemes__OpenIdConnect__ClientId=stylobot-portal
+    expose:
+      - "8080"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - stylobot-staging
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: stylobot-timescale
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=stylobot
+      - POSTGRES_USER=stylobot
+      - POSTGRES_PASSWORD=staging-password-2026
+      - TIMESCALEDB_TELEMETRY=off
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stylobot -d stylobot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - stylobot-staging
+
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: stylobot-keycloak-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=keycloak
+      - POSTGRES_PASSWORD=staging-password-2026
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - stylobot-staging
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: stylobot-keycloak
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=staging-password-2026
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak/realm-stylobot.json:/opt/keycloak/data/import/realm-stylobot.json:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - stylobot-staging
+
+  portal-db:
+    image: postgres:16-alpine
+    container_name: stylobot-portal-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=portal
+      - POSTGRES_USER=portal
+      - POSTGRES_PASSWORD=staging-password-2026
+    volumes:
+      - portal-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal -d portal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - stylobot-staging
+
+networks:
+  stylobot-staging:
+    driver: bridge
+
+volumes:
+  timescale-data:
+    driver: local
+  keycloak-db-data:
+    driver: local
+  portal-db-data:
+    driver: local
