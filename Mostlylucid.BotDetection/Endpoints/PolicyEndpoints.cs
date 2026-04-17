@@ -66,27 +66,30 @@ public static class PolicyEndpoints
             .WithSummary("Simulate policy transitions for given risk scores/signals")
             .Produces<PolicySimulationResponse>();
 
-        // Register a new policy (runtime)
+        // Register a new policy (runtime) - requires auth
         group.MapPost("/", RegisterPolicy)
             .WithName("RegisterPolicy")
             .WithSummary("Register a new policy at runtime")
             .Produces<PolicyDetailResponse>(StatusCodes.Status201Created)
-            .Produces(StatusCodes.Status400BadRequest);
+            .Produces(StatusCodes.Status400BadRequest)
+            .RequireAuthorization();
 
-        // Update an existing policy
+        // Update an existing policy - requires auth
         group.MapPut("/{name}", UpdatePolicy)
             .WithName("UpdatePolicy")
             .WithSummary("Update an existing policy")
             .Produces<PolicyDetailResponse>()
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .RequireAuthorization();
 
-        // Delete a policy
+        // Delete a policy - requires auth
         group.MapDelete("/{name}", DeletePolicy)
             .WithName("DeletePolicy")
             .WithSummary("Delete a policy (cannot delete built-in policies)")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .RequireAuthorization();
 
         // Get default weights
         group.MapGet("/weights", GetDefaultWeights)
