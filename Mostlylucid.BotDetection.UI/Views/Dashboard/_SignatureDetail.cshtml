@@ -214,6 +214,25 @@ else
         </div>
     </div>
 
+    <!-- Behavioral Shape Radar (vector fingerprint collapsed into interpretable axes) -->
+    <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold text-base-content/70 uppercase">
+                <i class="bx bx-shape-polygon text-sm" style="color: var(--sb-accent);"></i>
+                Behavioral Shape
+            </h3>
+            <div class="flex items-center gap-2">
+                <button id="radar-prev" class="btn btn-ghost btn-xs" disabled>&lsaquo;</button>
+                <span id="radar-session-label" class="text-[10px] text-base-content/40">Loading...</span>
+                <button id="radar-next" class="btn btn-ghost btn-xs" disabled>&rsaquo;</button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div id="behavioral-radar" style="height: 280px;"></div>
+            <div id="radar-details" class="text-xs space-y-1 pt-4"></div>
+        </div>
+    </div>
+
     <!-- Sessions (Markov chain behavioral sessions) - loaded via HTMX -->
     <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
         <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">
@@ -522,6 +541,112 @@ else
         })();
         </script>
     }
+
+    <!-- Behavioral Shape Radar Chart -->
+    <script nonce="@Model.CspNonce">
+    (function() {
+        var bp = '@Html.Raw(Model.BasePath)';
+        var sig = '@Html.Raw(Model.SignatureId.Replace("'", "\\'"))';
+        var radarEl = document.getElementById('behavioral-radar');
+        var detailsEl = document.getElementById('radar-details');
+        var labelEl = document.getElementById('radar-session-label');
+        var prevBtn = document.getElementById('radar-prev');
+        var nextBtn = document.getElementById('radar-next');
+        if (!radarEl || typeof ApexCharts === 'undefined') return;
+
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var fg = isDark ? '#94a3b8' : '#475569';
+        var axisLabels = ['Navigation', 'API Usage', 'Asset Loading', 'Timing Regularity', 'Request Rate', 'Path Diversity', 'Fingerprint', 'Timing Anomaly'];
+        var sessions = [];
+        var currentIdx = 0;
+        var chart = null;
+
+        function renderRadar(axes, label) {
+            var series = [{ name: 'Behavioral Shape', data: axes.map(function(v) { return Math.round(v * 100); }) }];
+            if (!chart) {
+                chart = new ApexCharts(radarEl, {
+                    series: series,
+                    chart: { type: 'radar', height: 280, toolbar: { show: false }, background: 'transparent', fontFamily: 'Inter, sans-serif' },
+                    xaxis: { categories: axisLabels, labels: { style: { colors: Array(8).fill(fg), fontSize: '10px' } } },
+                    yaxis: { show: false, min: 0, max: 100 },
+                    fill: { opacity: 0.25 },
+                    stroke: { width: 2 },
+                    colors: ['#5ba3a3'],
+                    markers: { size: 3 },
+                    plotOptions: { radar: { polygons: { strokeColors: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(15,23,42,0.08)', connectorColors: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(15,23,42,0.08)' } } },
+                    tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: function(v) { return v + '%'; } } },
+                    dataLabels: { enabled: false }
+                });
+                chart.render();
+            } else {
+                chart.updateSeries(series);
+            }
+            if (labelEl) labelEl.textContent = label;
+        }
+
+        function renderDetails(s) {
+            if (!detailsEl || !s) return;
+            // Build detail using DOM methods (no innerHTML with untrusted content)
+            detailsEl.textContent = '';
+            var items = [
+                ['Duration', s.durationMinutes + 'm'],
+                ['Requests', s.requestCount],
+                ['Dominant', s.dominantState],
+                ['Bot Prob', (s.avgBotProbability * 100).toFixed(0) + '%'],
+                ['Maturity', (s.maturity * 100).toFixed(0) + '%'],
+                ['Entropy', s.timingEntropy.toFixed(3)]
+            ];
+            items.forEach(function(item) {
+                var row = document.createElement('div');
+                row.className = 'flex justify-between';
+                var label = document.createElement('span');
+                label.className = 'text-base-content/50';
+                label.textContent = item[0];
+                var value = document.createElement('span');
+                value.className = 'font-mono';
+                value.textContent = item[1];
+                row.appendChild(label);
+                row.appendChild(value);
+                detailsEl.appendChild(row);
+            });
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = currentIdx <= 0;
+            if (nextBtn) nextBtn.disabled = currentIdx >= sessions.length - 1;
+        }
+
+        function showSession(idx) {
+            if (idx < 0 || idx >= sessions.length) return;
+            currentIdx = idx;
+            var s = sessions[idx];
+            if (s.radarAxes) {
+                var label = 'Session ' + (idx + 1) + '/' + sessions.length + ' (' + new Date(s.startedAt).toLocaleDateString() + ')';
+                renderRadar(s.radarAxes, label);
+                renderDetails(s);
+            }
+            updateNav();
+        }
+
+        if (prevBtn) prevBtn.onclick = function() { showSession(currentIdx - 1); };
+        if (nextBtn) nextBtn.onclick = function() { showSession(currentIdx + 1); };
+
+        // Fetch session data with radar projections
+        fetch(bp + '/api/sessions/signature/' + encodeURIComponent(sig))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                sessions = data.filter(function(s) { return s.radarAxes; });
+                if (sessions.length === 0) {
+                    if (labelEl) labelEl.textContent = 'No session vectors yet';
+                    return;
+                }
+                showSession(sessions.length - 1);
+            })
+            .catch(function() {
+                if (labelEl) labelEl.textContent = 'Failed to load';
+            });
+    })();
+    </script>
 
     <!-- SignalR beacon: auto-refresh when this signature is updated -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" nonce="@Model.CspNonce"></script>

@@ -561,7 +561,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     };
 
     /// <summary>Deserialize a float[] from a BLOB (IEEE 754 little-endian).</summary>
-    private static float[]? DeserializeVector(byte[]? blob)
+    /// <summary>Deserialize a BLOB (IEEE 754 little-endian) to float[].</summary>
+    public static float[]? DeserializeVector(byte[]? blob)
     {
         if (blob == null || blob.Length == 0) return null;
         var floats = new float[blob.Length / sizeof(float)];
