@@ -65,15 +65,19 @@ public static class ChallengeEndpoints
         if (challenge is null)
             return Results.Json(new { error = "Challenge not found, expired, or already used" }, statusCode: 404);
 
-        // Verify each puzzle solution
+        // Verify each puzzle solution - match by SeedIndex, not array position
         if (request.Solutions is null || request.Solutions.Length != challenge.PuzzleCount)
             return Results.BadRequest(new { error = $"Expected {challenge.PuzzleCount} solutions" });
 
+        // Sort by SeedIndex and validate each index matches a puzzle
+        var sortedSolutions = request.Solutions.OrderBy(s => s.SeedIndex).ToArray();
         for (var i = 0; i < challenge.PuzzleCount; i++)
         {
-            var puzzle = challenge.Puzzles[i];
-            var solution = request.Solutions[i];
+            var solution = sortedSolutions[i];
+            if (solution.SeedIndex != i)
+                return Results.BadRequest(new { error = $"Missing or duplicate solution for puzzle {i}" });
 
+            var puzzle = challenge.Puzzles[i];
             if (!VerifyPuzzleSolution(puzzle, solution.Nonce))
             {
                 logger?.LogDebug("Puzzle {Index} verification failed for challenge {Id}", i, request.ChallengeId);

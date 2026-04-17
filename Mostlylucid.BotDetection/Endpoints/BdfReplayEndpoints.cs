@@ -170,11 +170,21 @@ public static class BdfReplayEndpoints
             syntheticContext.Request.Host = httpContext.Request.Host;
             syntheticContext.Connection.RemoteIpAddress = IPAddress.Loopback;
 
-            // Apply headers from BDF
+            // Apply headers from BDF (allowlist to prevent injection of internal control headers)
             if (req.Headers != null)
             {
                 foreach (var (key, value) in req.Headers)
+                {
+                    // Block internal StyloBot headers and host manipulation
+                    if (key.StartsWith("X-SB-", StringComparison.OrdinalIgnoreCase) ||
+                        key.StartsWith("X-Bot-", StringComparison.OrdinalIgnoreCase) ||
+                        key.Equals("Host", StringComparison.OrdinalIgnoreCase) ||
+                        key.Equals("X-Forwarded-For", StringComparison.OrdinalIgnoreCase) ||
+                        key.Equals("X-Real-IP", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
                     syntheticContext.Request.Headers[key] = value;
+                }
             }
 
             // Run detection
@@ -190,7 +200,7 @@ public static class BdfReplayEndpoints
                 {
                     RequestIndex = i,
                     Path = req.Path ?? "/",
-                    Error = "Detection failed: " + ex.Message
+                    Error = "Detection failed (see server logs for details)"
                 });
                 continue;
             }
