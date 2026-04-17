@@ -1002,6 +1002,26 @@ public static class SignalKeys
     public const string IntentAnalyzed = "intent.analyzed";
 
     // ==========================================
+    // Challenge verification signals
+    // Set by ChallengeVerificationContributor when a PoW challenge was previously solved
+    // ==========================================
+
+    /// <summary>Boolean: true when a PoW challenge was verified for this signature</summary>
+    public const string ChallengeVerified = "challenge.verified";
+
+    /// <summary>Double: total solve duration in milliseconds</summary>
+    public const string ChallengeSolveDurationMs = "challenge.solve_duration_ms";
+
+    /// <summary>Double: timing jitter (CV of per-puzzle timings)</summary>
+    public const string ChallengeTimingJitter = "challenge.timing_jitter";
+
+    /// <summary>Integer: number of Web Workers reported by the client</summary>
+    public const string ChallengeWorkerCount = "challenge.worker_count";
+
+    /// <summary>Integer: number of puzzles in the challenge</summary>
+    public const string ChallengePuzzleCount = "challenge.puzzle_count";
+
+    // ==========================================
     // License entitlement signals
     // Set by DomainEntitlementMiddleware (warn-never-lock; never affects request flow)
     // ==========================================

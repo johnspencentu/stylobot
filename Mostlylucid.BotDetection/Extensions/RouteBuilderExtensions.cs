@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Mostlylucid.BotDetection.Endpoints;
 using Mostlylucid.BotDetection.Filters;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Models;
@@ -382,6 +383,9 @@ public static class RouteBuilderExtensions
             })
             .WithName("BotDetection_Feedback")
             .WithSummary("Submit detection feedback (false positive/negative)");
+
+        // PoW challenge verification endpoint
+        endpoints.MapChallengeEndpoints();
 
         return endpoints;
     }

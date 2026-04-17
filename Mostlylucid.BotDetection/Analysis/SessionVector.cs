@@ -118,13 +118,14 @@ public static class SessionVectorizer
 
     private const int TemporalFeatureCount = 8;
     private const int FingerprintFeatureCount = 8;
+    private const int TransitionTimingFeatureCount = 3;
 
     /// <summary>
     ///     Total vector dimensions:
     ///     N² Markov transitions + N stationary distribution + temporal + fingerprint
     /// </summary>
     public static int Dimensions =>
-        StateCount * StateCount + StateCount + TemporalFeatureCount + FingerprintFeatureCount;
+        StateCount * StateCount + StateCount + TemporalFeatureCount + FingerprintFeatureCount + TransitionTimingFeatureCount;
 
     /// <summary>
     ///     Encodes a sequence of session requests into a normalized float vector.
@@ -182,7 +183,11 @@ public static class SessionVectorizer
         var fpOffset = temporalOffset + TemporalFeatureCount;
         EncodeFingerprintFeatures(fingerprint ?? FingerprintContext.Empty, vector, fpOffset);
 
-        // === 6. L2-normalize for cosine similarity ===
+        // === 6. Per-transition timing features [N²+N+temporal+fingerprint..] ===
+        var ttOffset = fpOffset + FingerprintFeatureCount;
+        EncodeTransitionTimingFeatures(requests, vector, ttOffset);
+
+        // === 7. L2-normalize for cosine similarity ===
         Normalize(vector);
 
         return vector;
@@ -214,15 +219,24 @@ public static class SessionVectorizer
     /// </summary>
     public static float CosineSimilarity(float[] a, float[] b)
     {
-        if (a.Length != b.Length) return 0f;
+        // Handle dimension mismatch from vector evolution (e.g., 126-dim vs 129-dim):
+        // use the shorter length for dot product, zero-pad implicitly.
+        var len = Math.Min(a.Length, b.Length);
+        if (len == 0) return 0f;
 
         float dot = 0, normA = 0, normB = 0;
-        for (var i = 0; i < a.Length; i++)
+        for (var i = 0; i < len; i++)
         {
             dot += a[i] * b[i];
             normA += a[i] * a[i];
             normB += b[i] * b[i];
         }
+
+        // Include remaining dimensions in norms (zero-padded other vector contributes nothing to dot)
+        for (var i = len; i < a.Length; i++)
+            normA += a[i] * a[i];
+        for (var i = len; i < b.Length; i++)
+            normB += b[i] * b[i];
 
         var denom = MathF.Sqrt(normA) * MathF.Sqrt(normB);
         return denom > 0 ? dot / denom : 0f;
@@ -329,6 +343,91 @@ public static class SessionVectorizer
         }
 
         return (float)entropy;
+    }
+
+    // Per-transition impossible timing thresholds (milliseconds).
+    // If a transition happens faster than this, a human couldn't have caused it
+    // (page hasn't rendered, API response hasn't arrived, etc.)
+    private static readonly Dictionary<(int from, int to), double> ImpossibleTimingThresholds = new()
+    {
+        // PageView -> anything: page needs to render first
+        { ((int)RequestState.PageView, (int)RequestState.PageView), 200 },
+        { ((int)RequestState.PageView, (int)RequestState.ApiCall), 50 },
+        { ((int)RequestState.PageView, (int)RequestState.FormSubmit), 300 },
+        { ((int)RequestState.PageView, (int)RequestState.Search), 200 },
+        // ApiCall -> PageView: needs navigation decision
+        { ((int)RequestState.ApiCall, (int)RequestState.PageView), 100 },
+        // FormSubmit -> anything: form processing visible to user
+        { ((int)RequestState.FormSubmit, (int)RequestState.PageView), 150 },
+    };
+
+    private const double DefaultImpossibleThresholdMs = 30;
+    private const double FastestTransitionBaselineMs = 100;
+
+    private static void EncodeTransitionTimingFeatures(
+        IReadOnlyList<SessionRequest> requests, float[] vector, int offset)
+    {
+        if (requests.Count < 3) return; // Need enough transitions for meaningful stats
+
+        // Build per-transition timing map
+        var transitionTimings = new Dictionary<(int from, int to), List<double>>();
+        var allIntervals = new List<double>();
+
+        for (var i = 1; i < requests.Count; i++)
+        {
+            var fromIdx = (int)requests[i - 1].State;
+            var toIdx = (int)requests[i].State;
+            var intervalMs = (requests[i].Timestamp - requests[i - 1].Timestamp).TotalMilliseconds;
+
+            var key = (fromIdx, toIdx);
+            if (!transitionTimings.TryGetValue(key, out var timings))
+            {
+                timings = new List<double>();
+                transitionTimings[key] = timings;
+            }
+            timings.Add(intervalMs);
+            allIntervals.Add(intervalMs);
+        }
+
+        if (allIntervals.Count == 0) return;
+
+        // [0] Impossible timing ratio: fraction of transitions faster than physical threshold
+        var impossibleCount = 0;
+        var totalTransitions = 0;
+        foreach (var (key, timings) in transitionTimings)
+        {
+            var threshold = ImpossibleTimingThresholds.GetValueOrDefault(key, DefaultImpossibleThresholdMs);
+            foreach (var t in timings)
+            {
+                totalTransitions++;
+                if (t < threshold) impossibleCount++;
+            }
+        }
+
+        vector[offset + 0] = totalTransitions > 0
+            ? Math.Clamp((float)impossibleCount / totalTransitions, 0f, 1f)
+            : 0f;
+
+        // [1] Timing consistency score: weighted avg CV across transition types (inverted: low CV = high score = bot-like)
+        var totalWeight = 0.0;
+        var weightedCvSum = 0.0;
+        foreach (var (_, timings) in transitionTimings)
+        {
+            if (timings.Count < 2) continue;
+            var mean = timings.Average();
+            if (mean <= 0) continue;
+            var stdDev = Math.Sqrt(timings.Select(t => Math.Pow(t - mean, 2)).Average());
+            var cv = stdDev / mean;
+            weightedCvSum += cv * timings.Count;
+            totalWeight += timings.Count;
+        }
+
+        var avgCv = totalWeight > 0 ? weightedCvSum / totalWeight : 1.0;
+        vector[offset + 1] = Math.Clamp(1f - (float)Math.Min(1.0, avgCv), 0f, 1f);
+
+        // [2] Fastest transition z-score: how extreme is the minimum interval vs human baseline
+        var minInterval = allIntervals.Min();
+        vector[offset + 2] = Math.Clamp((float)Math.Max(0, 1.0 - minInterval / FastestTransitionBaselineMs), 0f, 1f);
     }
 
     private static void Normalize(float[] vector)

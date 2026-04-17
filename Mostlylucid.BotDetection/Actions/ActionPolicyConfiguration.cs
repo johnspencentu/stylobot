@@ -338,6 +338,40 @@ public class ActionPolicyConfig : BaseComponentConfig
     public string? ChallengeMessage { get; set; }
 
     // ==========================================
+    // Proof-of-Work Challenge Options
+    // ==========================================
+
+    /// <summary>
+    ///     [PoW] Base micro-puzzle count at minimum risk. Default: 4
+    /// </summary>
+    public int? BasePuzzleCount { get; set; }
+
+    /// <summary>
+    ///     [PoW] Maximum micro-puzzle count at maximum risk. Default: 32
+    /// </summary>
+    public int? MaxPuzzleCount { get; set; }
+
+    /// <summary>
+    ///     [PoW] Base leading zeros per puzzle. Default: 3
+    /// </summary>
+    public int? BaseDifficultyZeros { get; set; }
+
+    /// <summary>
+    ///     [PoW] Maximum leading zeros per puzzle. Default: 5
+    /// </summary>
+    public int? MaxDifficultyZeros { get; set; }
+
+    /// <summary>
+    ///     [PoW] Challenge expiry in seconds. Default: 120
+    /// </summary>
+    public int? ChallengeExpirySeconds { get; set; }
+
+    /// <summary>
+    ///     [PoW] Verification endpoint URL. Default: "/bot-detection/challenge/verify"
+    /// </summary>
+    public string? VerifyEndpoint { get; set; }
+
+    // ==========================================
     // Redirect Policy Options
     // ==========================================
 
@@ -573,6 +607,14 @@ public class ActionPolicyConfig : BaseComponentConfig
         if (CaptchaSecretKey != null) dict["CaptchaSecretKey"] = CaptchaSecretKey;
         if (ChallengeTitle != null) dict["ChallengeTitle"] = ChallengeTitle;
         if (ChallengeMessage != null) dict["ChallengeMessage"] = ChallengeMessage;
+
+        // PoW options
+        if (BasePuzzleCount.HasValue) dict["BasePuzzleCount"] = BasePuzzleCount.Value;
+        if (MaxPuzzleCount.HasValue) dict["MaxPuzzleCount"] = MaxPuzzleCount.Value;
+        if (BaseDifficultyZeros.HasValue) dict["BaseDifficultyZeros"] = BaseDifficultyZeros.Value;
+        if (MaxDifficultyZeros.HasValue) dict["MaxDifficultyZeros"] = MaxDifficultyZeros.Value;
+        if (ChallengeExpirySeconds.HasValue) dict["ChallengeExpirySeconds"] = ChallengeExpirySeconds.Value;
+        if (VerifyEndpoint != null) dict["VerifyEndpoint"] = VerifyEndpoint;
 
         // Redirect options
         if (TargetUrl != null) dict["TargetUrl"] = TargetUrl;

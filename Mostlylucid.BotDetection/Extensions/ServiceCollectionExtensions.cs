@@ -675,6 +675,12 @@ public static class ServiceCollectionExtensions
         // Action Policy System (composable response handling)
         // ==========================================
 
+        // Challenge store (PoW challenge issuance + verification feedback loop)
+        services.TryAddSingleton<IChallengeStore, InMemoryChallengeStore>();
+
+        // Challenge verification contributor (reads PoW solve metadata as detection signal)
+        services.AddSingleton<IContributingDetector, ChallengeVerificationContributor>();
+
         // Register action policy factories (create policies from configuration)
         services.AddSingleton<IActionPolicyFactory, BlockActionPolicyFactory>();
         services.AddSingleton<IActionPolicyFactory, ThrottleActionPolicyFactory>();

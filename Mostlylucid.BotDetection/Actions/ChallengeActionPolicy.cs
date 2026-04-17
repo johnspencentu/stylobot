@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Orchestration;
 
@@ -276,80 +277,259 @@ public class ChallengeActionPolicy : IActionPolicy
         AggregatedEvidence evidence,
         CancellationToken cancellationToken)
     {
-        // Generate a proof-of-work challenge
-        // Client must find a nonce that when hashed with the challenge produces N leading zeros
-        var challenge = Guid.NewGuid().ToString("N");
-        var difficulty = CalculateDifficulty(evidence.BotProbability);
+        var store = context.RequestServices.GetService<IChallengeStore>();
+        if (store is null)
+        {
+            _logger?.LogWarning("IChallengeStore not registered; falling back to redirect challenge");
+            return await HandleRedirectChallenge(context, cancellationToken);
+        }
+
+        // Compute signature for this request (use the stored signature if available)
+        var signature = context.Items.TryGetValue("BotDetection:Signature", out var sig) && sig is string s
+            ? s
+            : context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        // Transport-aware: API/SignalR/gRPC clients get 429 + JSON, not HTML
+        var transportClass = GetSignalString(evidence, "transport.protocol_class");
+        if (transportClass is "api" or "signalr" or "grpc")
+            return await HandleApiChallenge(context, store, signature, evidence, cancellationToken);
+
+        // Blackboard-driven difficulty scaling
+        var (puzzleCount, requiredZeros) = CalculateDifficulty(evidence);
+
+        var expiry = TimeSpan.FromSeconds(_options.ChallengeExpirySeconds);
+        var challenge = store.CreateChallenge(signature, puzzleCount, requiredZeros, expiry);
+
+        // Store token secret for the verify endpoint
+        if (_options.TokenSecret is not null)
+            context.Items["BotDetection:TokenSecret"] = _options.TokenSecret;
 
         context.Response.StatusCode = _options.ChallengeStatusCode;
         context.Response.ContentType = "text/html";
 
-        var encodedChallengeUrl = WebUtility.HtmlEncode(_options.ChallengeUrl);
-        var encodedReturnUrl = WebUtility.HtmlEncode(Uri.EscapeDataString(context.Request.Path + context.Request.QueryString));
-        var html = $@"<!DOCTYPE html>
+        var returnUrl = context.Request.Path + context.Request.QueryString;
+        var verifyUrl = _options.VerifyEndpoint;
+        var seedsJson = System.Text.Json.JsonSerializer.Serialize(
+            challenge.Puzzles.Select((p, i) => new { index = i, seed = Convert.ToBase64String(p.Seed) }));
+
+        var html = GenerateProofOfWorkHtml(challenge.Id, seedsJson, requiredZeros, puzzleCount, verifyUrl, returnUrl);
+        await context.Response.WriteAsync(html, cancellationToken);
+
+        return ActionResult.Blocked(_options.ChallengeStatusCode, $"Proof-of-work challenge ({puzzleCount} puzzles, {requiredZeros} zeros) presented by {Name}");
+    }
+
+    private async Task<ActionResult> HandleApiChallenge(
+        HttpContext context,
+        IChallengeStore store,
+        string signature,
+        AggregatedEvidence evidence,
+        CancellationToken cancellationToken)
+    {
+        var (puzzleCount, requiredZeros) = CalculateDifficulty(evidence);
+        var expiry = TimeSpan.FromSeconds(_options.ChallengeExpirySeconds);
+        var challenge = store.CreateChallenge(signature, puzzleCount, requiredZeros, expiry);
+
+        context.Response.StatusCode = 429;
+        context.Response.ContentType = "application/json";
+        context.Response.Headers["Retry-After"] = _options.ChallengeExpirySeconds.ToString();
+
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            type = "proof-of-work",
+            challengeId = challenge.Id,
+            puzzles = challenge.Puzzles.Select((p, i) => new { index = i, seed = Convert.ToBase64String(p.Seed), requiredZeros = p.RequiredZeros }),
+            verifyUrl = _options.VerifyEndpoint,
+            expiresAt = challenge.ExpiresAt
+        });
+
+        await context.Response.WriteAsync(payload, cancellationToken);
+        return ActionResult.Blocked(429, $"API PoW challenge ({puzzleCount} puzzles) presented by {Name}");
+    }
+
+    /// <summary>
+    ///     Calculates PoW difficulty using blackboard signals, not just BotProbability.
+    /// </summary>
+    private (int puzzleCount, int requiredZeros) CalculateDifficulty(AggregatedEvidence evidence)
+    {
+        var risk = evidence.BotProbability;
+
+        // Base puzzle count: 4 at 0.5, scaling to max at 1.0
+        var basePuzzles = _options.BasePuzzleCount;
+        var maxPuzzles = _options.MaxPuzzleCount;
+        var riskFactor = Math.Clamp((risk - 0.5) * 2, 0, 1);
+        var puzzleCount = basePuzzles + (int)Math.Round(riskFactor * (maxPuzzles - basePuzzles));
+
+        // Base zeros from risk
+        var baseZeros = _options.BaseDifficultyZeros;
+        var maxZeros = _options.MaxDifficultyZeros;
+        var requiredZeros = baseZeros + (int)Math.Round(riskFactor * (maxZeros - baseZeros));
+
+        // Signal-based modifiers: increase puzzle count for high-confidence bot indicators
+        var velocityMag = GetSignalDouble(evidence, "session.velocity_magnitude");
+        if (velocityMag > 0.5) // High behavioral shift between sessions
+            puzzleCount = Math.Min(maxPuzzles, puzzleCount + 4);
+
+        var inCluster = GetSignalString(evidence, "cluster.type");
+        if (inCluster is not null) // In a bot cluster
+            puzzleCount = Math.Min(maxPuzzles, puzzleCount + 8);
+
+        var reputationBiased = GetSignalBool(evidence, "reputation.bias_applied");
+        if (reputationBiased) // Known bad reputation
+            puzzleCount = Math.Min(maxPuzzles, puzzleCount + 4);
+
+        var threatScore = GetSignalDouble(evidence, "intent.threat_score");
+        if (threatScore > 0.5) // High threat
+            requiredZeros = Math.Min(maxZeros, requiredZeros + 1);
+
+        return (puzzleCount, requiredZeros);
+    }
+
+    private static string? GetSignalString(AggregatedEvidence evidence, string key)
+        => evidence.Signals.TryGetValue(key, out var v) && v is string s ? s : null;
+
+    private static double GetSignalDouble(AggregatedEvidence evidence, string key)
+        => evidence.Signals.TryGetValue(key, out var v) && v is double d ? d : 0;
+
+    private static bool GetSignalBool(AggregatedEvidence evidence, string key)
+        => evidence.Signals.TryGetValue(key, out var v) && v is bool b && b;
+
+    private static string GenerateProofOfWorkHtml(
+        string challengeId, string seedsJson, int requiredZeros, int puzzleCount,
+        string verifyUrl, string returnUrl)
+    {
+        var encodedReturnUrl = Uri.EscapeDataString(returnUrl);
+        return $@"<!DOCTYPE html>
 <html>
 <head>
     <title>Verification Required</title>
+    <style>
+        body {{ font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 20px; background: #f8f9fa; color: #333; }}
+        .container {{ max-width: 500px; margin: 80px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center; }}
+        h1 {{ font-size: 1.4em; margin-bottom: 8px; }}
+        .subtitle {{ color: #666; margin-bottom: 24px; }}
+        progress {{ width: 100%; height: 8px; border-radius: 4px; appearance: none; }}
+        progress::-webkit-progress-bar {{ background: #e9ecef; border-radius: 4px; }}
+        progress::-webkit-progress-value {{ background: #228be6; border-radius: 4px; transition: width 0.3s; }}
+        #status {{ color: #666; font-size: 0.9em; margin-top: 12px; }}
+        .success {{ color: #2b8a3e; }}
+    </style>
 </head>
 <body>
-    <div id=""pow-container"" style=""max-width: 600px; margin: 100px auto; text-align: center;"">
+    <div class=""container"">
         <h1>Verification Required</h1>
-        <p>Please wait while we verify your browser...</p>
-        <progress id=""progress"" value=""0"" max=""100"" style=""width: 100%;""></progress>
-        <p id=""status"">Computing proof of work...</p>
+        <p class=""subtitle"">Please wait while we verify your browser...</p>
+        <progress id=""progress"" value=""0"" max=""{puzzleCount}""></progress>
+        <p id=""status"">Solving 0 / {puzzleCount} puzzles...</p>
     </div>
     <script>
-        (async function() {{
-            const challenge = '{challenge}';
-            const difficulty = {difficulty};
-            const target = '0'.repeat(difficulty);
+    (function() {{
+        const challengeId = '{challengeId}';
+        const seeds = {seedsJson};
+        const requiredZeros = {requiredZeros};
+        const verifyUrl = '{verifyUrl}';
+        const returnUrl = '{encodedReturnUrl}';
+        const startTime = performance.now();
+        const puzzleTimings = [];
+        const solutions = [];
+        let solved = 0;
 
-            let nonce = 0;
-            let found = false;
+        // Hex conversion helper for Workers
+        const workerCode = `
+            self.onmessage = async function(e) {{
+                const {{ seedB64, seedIndex, requiredZeros }} = e.data;
+                const seedBytes = Uint8Array.from(atob(seedB64), c => c.charCodeAt(0));
+                const target = '0'.repeat(requiredZeros);
+                const encoder = new TextEncoder();
+                const startMs = performance.now();
+                let nonce = 0;
 
-            while (!found) {{
-                const data = challenge + nonce;
-                const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
-                const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+                while (true) {{
+                    const nonceBytes = encoder.encode(nonce.toString());
+                    const input = new Uint8Array(seedBytes.length + nonceBytes.length);
+                    input.set(seedBytes, 0);
+                    input.set(nonceBytes, seedBytes.length);
 
-                if (hex.startsWith(target)) {{
-                    found = true;
-                    document.getElementById('status').textContent = 'Verified!';
+                    const hash = await crypto.subtle.digest('SHA-256', input);
+                    const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-                    // Submit proof
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '{encodedChallengeUrl}';
-                    form.innerHTML = `
-                        <input type=""hidden"" name=""challenge"" value=""${{challenge}}"" />
-                        <input type=""hidden"" name=""nonce"" value=""${{nonce}}"" />
-                        <input type=""hidden"" name=""returnUrl"" value=""{encodedReturnUrl}"" />
-                    `;
-                    document.body.appendChild(form);
-                    form.submit();
+                    if (hex.startsWith(target)) {{
+                        self.postMessage({{ seedIndex, nonce, solveMs: performance.now() - startMs }});
+                        return;
+                    }}
+                    nonce++;
+                    if (nonce % 5000 === 0) await new Promise(r => setTimeout(r, 0));
                 }}
+            }};
+        `;
 
-                nonce++;
-                if (nonce % 10000 === 0) {{
-                    document.getElementById('progress').value = Math.min(99, nonce / 100000);
-                    await new Promise(r => setTimeout(r, 0)); // Yield to UI
+        const blob = new Blob([workerCode], {{ type: 'application/javascript' }});
+        const workerUrl = URL.createObjectURL(blob);
+        const maxWorkers = Math.min(navigator.hardwareConcurrency || 2, 8);
+        const workerCount = Math.min(maxWorkers, seeds.length);
+
+        // Queue puzzles across workers
+        let nextPuzzle = 0;
+
+        function launchNext(worker) {{
+            if (nextPuzzle >= seeds.length) {{ worker.terminate(); return; }}
+            const s = seeds[nextPuzzle++];
+            worker.postMessage({{ seedB64: s.seed, seedIndex: s.index, requiredZeros }});
+        }}
+
+        for (let w = 0; w < workerCount; w++) {{
+            const worker = new Worker(workerUrl);
+            worker.onmessage = function(e) {{
+                solutions.push({{ seedIndex: e.data.seedIndex, nonce: e.data.nonce }});
+                puzzleTimings.push(e.data.solveMs);
+                solved++;
+                document.getElementById('progress').value = solved;
+                document.getElementById('status').textContent = 'Solving ' + solved + ' / {puzzleCount} puzzles...';
+
+                if (solved === seeds.length) {{
+                    submitSolutions();
+                }} else {{
+                    launchNext(worker);
                 }}
+            }};
+            launchNext(worker);
+        }}
+
+        async function submitSolutions() {{
+            document.getElementById('status').textContent = 'Verified!';
+            document.getElementById('status').className = 'success';
+
+            const totalTimeMs = performance.now() - startTime;
+            const payload = {{
+                challengeId,
+                solutions: solutions.sort((a, b) => a.seedIndex - b.seedIndex),
+                metadata: {{ workerCount, totalTimeMs, puzzleTimingsMs: puzzleTimings }},
+                returnUrl: decodeURIComponent(returnUrl)
+            }};
+
+            try {{
+                const resp = await fetch(verifyUrl, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(payload),
+                    credentials: 'same-origin'
+                }});
+
+                if (resp.ok) {{
+                    const data = await resp.json();
+                    window.location.href = data.returnUrl || '/';
+                }} else {{
+                    document.getElementById('status').textContent = 'Verification failed. Please refresh.';
+                    document.getElementById('status').className = '';
+                }}
+            }} catch (err) {{
+                document.getElementById('status').textContent = 'Network error. Please refresh.';
+                document.getElementById('status').className = '';
             }}
-        }})();
+        }}
+    }})();
     </script>
 </body>
 </html>";
-
-        await context.Response.WriteAsync(html, cancellationToken);
-
-        return ActionResult.Blocked(_options.ChallengeStatusCode, $"Proof-of-work challenge presented by {Name}");
-    }
-
-    private int CalculateDifficulty(double risk)
-    {
-        // Higher risk = higher difficulty (more zeros required)
-        // Risk 0.5 = 3 zeros, Risk 1.0 = 5 zeros
-        return 3 + (int)Math.Round((risk - 0.5) * 4);
     }
 
     private string GenerateChallengeHtml(HttpContext context, AggregatedEvidence evidence)
@@ -487,6 +667,46 @@ public class ChallengeActionOptions
     ///     Default: "Please verify that you are human to continue."
     /// </summary>
     public string ChallengeMessage { get; set; } = "Please verify that you are human to continue.";
+
+    // ==========================================
+    // Proof-of-Work Options
+    // ==========================================
+
+    /// <summary>
+    ///     [PoW] Base number of micro-puzzles at minimum risk (0.5).
+    ///     Default: 4
+    /// </summary>
+    public int BasePuzzleCount { get; set; } = 4;
+
+    /// <summary>
+    ///     [PoW] Maximum number of micro-puzzles at maximum risk (1.0).
+    ///     Default: 32
+    /// </summary>
+    public int MaxPuzzleCount { get; set; } = 32;
+
+    /// <summary>
+    ///     [PoW] Base leading zeros required per puzzle at minimum risk.
+    ///     Default: 3
+    /// </summary>
+    public int BaseDifficultyZeros { get; set; } = 3;
+
+    /// <summary>
+    ///     [PoW] Maximum leading zeros per puzzle at maximum risk.
+    ///     Default: 5
+    /// </summary>
+    public int MaxDifficultyZeros { get; set; } = 5;
+
+    /// <summary>
+    ///     [PoW] Challenge expiry in seconds. Client must solve and submit within this window.
+    ///     Default: 120
+    /// </summary>
+    public int ChallengeExpirySeconds { get; set; } = 120;
+
+    /// <summary>
+    ///     [PoW] Endpoint URL for challenge verification POST.
+    ///     Default: "/bot-detection/challenge/verify"
+    /// </summary>
+    public string VerifyEndpoint { get; set; } = "/bot-detection/challenge/verify";
 }
 
 /// <summary>
@@ -565,6 +785,20 @@ public class ChallengeActionPolicyFactory : IActionPolicyFactory
 
         if (options.TryGetValue("ChallengeMessage", out var message))
             challengeOptions.ChallengeMessage = message?.ToString() ?? challengeOptions.ChallengeMessage;
+
+        // PoW options
+        if (options.TryGetValue("BasePuzzleCount", out var bpc))
+            challengeOptions.BasePuzzleCount = Convert.ToInt32(bpc);
+        if (options.TryGetValue("MaxPuzzleCount", out var mpc))
+            challengeOptions.MaxPuzzleCount = Convert.ToInt32(mpc);
+        if (options.TryGetValue("BaseDifficultyZeros", out var bdz))
+            challengeOptions.BaseDifficultyZeros = Convert.ToInt32(bdz);
+        if (options.TryGetValue("MaxDifficultyZeros", out var mdz))
+            challengeOptions.MaxDifficultyZeros = Convert.ToInt32(mdz);
+        if (options.TryGetValue("ChallengeExpirySeconds", out var ces))
+            challengeOptions.ChallengeExpirySeconds = Convert.ToInt32(ces);
+        if (options.TryGetValue("VerifyEndpoint", out var ve))
+            challengeOptions.VerifyEndpoint = ve?.ToString() ?? challengeOptions.VerifyEndpoint;
 
         return new ChallengeActionPolicy(name, challengeOptions, _challengeHandler, _logger);
     }
