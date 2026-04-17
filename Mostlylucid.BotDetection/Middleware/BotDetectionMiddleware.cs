@@ -541,6 +541,44 @@ public class BotDetectionMiddleware(
             var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
             context.Response.Headers.TryAdd($"{prefix}Result-Json", base64);
         }
+
+        // Reason header: top contributing detector reason (opt-in per policy, PII-free)
+        if (headerConfig.IncludeReasonHeader && aggregated.Contributions.Count > 0)
+        {
+            var topReason = aggregated.Contributions
+                .Where(c => Math.Abs(c.ConfidenceDelta) > 0.01)
+                .OrderByDescending(c => Math.Abs(c.ConfidenceDelta * c.Weight))
+                .FirstOrDefault()?.Reason;
+
+            if (topReason is not null)
+            {
+                // Truncate to 200 chars, no PII (detector reasons are already PII-free)
+                if (topReason.Length > 200) topReason = topReason[..200];
+                context.Response.Headers.TryAdd($"{prefix}Reason", topReason);
+            }
+        }
+
+        // Approval-Id header: for borderline requests that could be manually approved
+        if (headerConfig.IncludeApprovalId
+            && aggregated.BotProbability is >= 0.5 and <= 0.7
+            && !aggregated.Signals.ContainsKey(SignalKeys.ApprovalVerified))
+        {
+            var approvalStore = context.RequestServices.GetService<Data.IFingerprintApprovalStore>();
+            var signature = context.Items.TryGetValue("BotDetection:Signature", out var sig) && sig is string s ? s : null;
+            if (approvalStore is not null && signature is not null)
+            {
+                try
+                {
+                    var token = approvalStore.GenerateApprovalTokenAsync(signature, context.RequestAborted)
+                        .GetAwaiter().GetResult(); // Sync context - SQLite is local and fast
+                    context.Response.Headers.TryAdd($"{prefix}Approval-Id", token);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(ex, "Failed to generate approval token for {Signature}", signature);
+                }
+            }
+        }
     }
 
     #endregion

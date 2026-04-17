@@ -1022,6 +1022,29 @@ public static class SignalKeys
     public const string ChallengePuzzleCount = "challenge.puzzle_count";
 
     // ==========================================
+    // Fingerprint approval signals
+    // Set by FingerprintApprovalContributor when a fingerprint has been manually approved
+    // ==========================================
+
+    /// <summary>Boolean: true when a fingerprint approval exists and was checked</summary>
+    public const string ApprovalVerified = "approval.verified";
+
+    /// <summary>String: approval status - "active", "expired", "revoked", "dimension_mismatch"</summary>
+    public const string ApprovalStatus = "approval.status";
+
+    /// <summary>Boolean: true when all locked dimensions match live signals</summary>
+    public const string ApprovalLockedDimensionsOk = "approval.locked_dimensions_ok";
+
+    /// <summary>String: comma-separated list of locked dimension keys that didn't match</summary>
+    public const string ApprovalDimensionMismatch = "approval.dimension_mismatch";
+
+    /// <summary>String: operator's justification for the approval</summary>
+    public const string ApprovalJustification = "approval.justification";
+
+    /// <summary>String: ISO 8601 expiry timestamp of the approval</summary>
+    public const string ApprovalExpiresAt = "approval.expires_at";
+
+    // ==========================================
     // License entitlement signals
     // Set by DomainEntitlementMiddleware (warn-never-lock; never affects request flow)
     // ==========================================

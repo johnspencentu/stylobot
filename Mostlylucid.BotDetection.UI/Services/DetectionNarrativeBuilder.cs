@@ -48,7 +48,8 @@ public static class DetectionNarrativeBuilder
         ["StreamAbuse"] = "stream abuse detection",
         ["Intent"] = "session intent analysis",
         ["SessionVector"] = "session behavioral vector analysis",
-        ["ChallengeVerification"] = "proof-of-work verification"
+        ["ChallengeVerification"] = "proof-of-work verification",
+        ["FingerprintApproval"] = "fingerprint approval check"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -91,7 +92,8 @@ public static class DetectionNarrativeBuilder
         ["StreamAbuse"] = "Protocol",
         ["Intent"] = "Threat",
         ["SessionVector"] = "Behavioral",
-        ["ChallengeVerification"] = "Challenge"
+        ["ChallengeVerification"] = "Challenge",
+        ["FingerprintApproval"] = "Access Control"
     };
 
     private static readonly Dictionary<string, string> BotTypeFriendlyNames = new(StringComparer.OrdinalIgnoreCase)

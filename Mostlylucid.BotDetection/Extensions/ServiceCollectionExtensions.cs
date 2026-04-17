@@ -678,6 +678,12 @@ public static class ServiceCollectionExtensions
         // Challenge store (PoW challenge issuance + verification feedback loop)
         services.TryAddSingleton<IChallengeStore, InMemoryChallengeStore>();
 
+        // Fingerprint approval store (SQLite-backed, locked dimensions, audit trail)
+        services.TryAddSingleton<IFingerprintApprovalStore, SqliteFingerprintApprovalStore>();
+
+        // Fingerprint approval contributor (checks approval + locked dimensions)
+        services.AddSingleton<IContributingDetector, FingerprintApprovalContributor>();
+
         // Challenge verification contributor (reads PoW solve metadata as detection signal)
         services.AddSingleton<IContributingDetector, ChallengeVerificationContributor>();
 

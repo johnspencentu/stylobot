@@ -3644,6 +3644,20 @@ public class ResponseHeadersOptions
     public bool IncludeThreatScore { get; set; } = true;
 
     /// <summary>
+    ///     Include top detection reason in X-SB-Reason header. PII-free.
+    ///     Useful for API partners to debug why requests were challenged/blocked.
+    ///     Default: false (opt-in)
+    /// </summary>
+    public bool IncludeReasonHeader { get; set; }
+
+    /// <summary>
+    ///     Include X-SB-Approval-Id header for borderline requests (0.5-0.7 probability).
+    ///     The token can be entered in the dashboard to approve the fingerprint.
+    ///     Default: false (opt-in, enterprise feature)
+    /// </summary>
+    public bool IncludeApprovalId { get; set; }
+
+    /// <summary>
     ///     Paths to skip adding headers (e.g., health checks, metrics).
     ///     Uses prefix matching.
     ///     Default: ["/health", "/metrics", "/swagger"]
