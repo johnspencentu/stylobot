@@ -7,16 +7,33 @@ by ***mostly*lucid**
 
 <img src="https://raw.githubusercontent.com/scottgal/stylobot/refs/heads/main/mostlylucid.stylobot.website/src/Stylobot.Website/wwwroot/img/stylowall.svg?raw=true" alt="StyloBot" style="max-width:200px; height:auto;" />
 
-## Two products, one codebase boundary
+## Pricing
 
-| Tier | Repo | What you get |
-|---|---|---|
-| **FOSS (this repo)** | `stylobot` - Unlicense | All detectors, session vectors, SQLite persistence, local dashboard, YAML-driven config, ASP.NET Core Identity local accounts, local Ollama LLM. **Fully standalone** - no external dependencies, no phone-home, no license required. |
-| **Commercial** | `stylobot-commercial` (private) | Adds Postgres + Redis persistence, central control plane, live config editor (per-endpoint + per-user + per-API-key overrides), multi-gateway fleet dashboard, pgvector HNSW session similarity, OIDC/SAML SSO, scheduled reports, Kubernetes operator. Tiers: Startup $149/mo, SME $499/mo, Enterprise custom. Sign up at [stylobot.net/portal](https://stylobot.net/portal). |
+Flat per-domain pricing. No per-request metering. No surprises. Self-hosted at every tier.
 
-The commercial product plugs in via extension interfaces in FOSS - `IConfigurationOverrideSource` and `IFleetReporter` - that customers never see unless they install the commercial plugin package. **OSS shows all the levers in the dashboard; only commercial allows runtime edits.** FOSS is YAML-file-only by design.
+| | **FOSS** | **Startup** | **Enterprise** |
+|---|---|---|---|
+| **Price** | Free forever | **$100/mo per domain** (unlimited subdomains) | From $1,000/mo ([talk to us](https://stylobot.net/portal)) |
+| **Detectors** | All 31 | All 31 | All 31 |
+| **Dashboard** | Read-only | Live config editor | Fleet dashboard |
+| **Config** | YAML files (restart to apply) | Live per-endpoint overrides | Per-endpoint + per-user + per-API-key |
+| **Users** | Unlimited (local accounts) | 5 users | Unlimited |
+| **Endpoint policies** | Unlimited (via config) | 5 live overrides | Unlimited |
+| **Persistence** | SQLite (zero-dependency) | PostgreSQL | PostgreSQL + pgvector |
+| **LLM** | Local Ollama | Local Ollama | Any (OpenAI, Anthropic, Azure) |
+| **Add-on: Redis** | - | +$50/mo | Included |
+| **Add-on: Multi-node** | - | +$100/mo | Included |
+| **SSO** | ASP.NET Core Identity | OIDC | OIDC/SAML |
+| **Support** | Community | Email | SLA + dedicated |
+| **License** | Unlicense (public domain) | Ed25519-signed JWT | Ed25519-signed JWT |
 
-Licenses are Ed25519-signed JWTs issued by the [stylobot.net customer portal](https://stylobot.net/portal). The customer's control plane validates tokens against the vendor public key baked into the release binary - no phone-home required. Commercial documentation (tier structure, feature gating, deployment guides) is available to customers via the portal.
+**Startup** gets you PostgreSQL persistence, live dashboard config editing, and 5 users/endpoint policies - everything a single-domain deployment needs. Add Redis ($50/mo) for multi-instance coordination or multi-node ($100/mo) for distributed YARP topologies.
+
+**Enterprise** is capability-based - you buy what you need. Fingerprint approval with locked dimensions, fleet-wide dashboard, K8s operator, scheduled reports, custom integrations. [Start a 30-day trial](https://stylobot.net/portal) - no credit card required.
+
+The commercial product plugs in via extension interfaces in FOSS (`IConfigurationOverrideSource`, `IFleetReporter`) - customers never see these unless they install the commercial plugin package. **FOSS shows all the levers; commercial allows runtime edits.**
+
+Licenses are Ed25519-signed JWTs issued by the [customer portal](https://stylobot.net/portal). No phone-home required.
 
 ## What's New
 
