@@ -389,7 +389,7 @@ public class TrainingDataEndpointsTests
         var options = new TrainingEndpointsOptions();
 
         Assert.True(options.Enabled);
-        Assert.False(options.RequireApiKey);
+        Assert.True(options.RequireApiKey); // Secure default: require API key
         Assert.Empty(options.ApiKeys);
         Assert.Equal(30, options.RateLimitPerMinute);
         Assert.Equal(10_000, options.MaxExportRecords);

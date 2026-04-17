@@ -3242,10 +3242,10 @@ public class TrainingEndpointsOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    ///     Require an API key via X-Training-Api-Key header. Default: false.
+    ///     Require an API key via X-Training-Api-Key header. Default: true.
     ///     When true, requests without a valid key receive 401.
     /// </summary>
-    public bool RequireApiKey { get; set; }
+    public bool RequireApiKey { get; set; } = true;
 
     /// <summary>
     ///     Allowed API keys for training endpoint access. Checked against X-Training-Api-Key header.

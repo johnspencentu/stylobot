@@ -111,13 +111,8 @@ public static class ChallengeEndpoints
 
         store.RecordVerification(verification);
 
-        // Issue signed challenge token cookie
+        // Issue signed challenge token cookie using the auto-generated or configured secret
         var tokenOptions = new ChallengeActionOptions { TokenValidityMinutes = 30 };
-
-        // Use configured secret if available via context items
-        if (context.Items.TryGetValue("BotDetection:TokenSecret", out var secret) && secret is string s)
-            tokenOptions.TokenSecret = s;
-
         var token = ChallengeActionPolicy.GenerateChallengeToken(tokenOptions);
 
         context.Response.Cookies.Append(tokenOptions.TokenCookieName, token, new CookieOptions
@@ -132,7 +127,7 @@ public static class ChallengeEndpoints
             "PoW challenge verified for {Signature}: {Duration:F0}ms, {Workers} workers, {Puzzles} puzzles",
             challenge.Signature, totalDuration, workerCount, challenge.PuzzleCount);
 
-        var returnUrl = request.ReturnUrl ?? "/";
+        var returnUrl = SanitizeReturnUrl(request.ReturnUrl);
 
         // Return JSON for programmatic clients, redirect info for browsers
         return Results.Json(new
@@ -141,6 +136,25 @@ public static class ChallengeEndpoints
             token,
             returnUrl
         });
+    }
+
+    /// <summary>
+    ///     Validates returnUrl is a safe relative path. Rejects absolute URLs,
+    ///     protocol-relative URLs, and scheme injections to prevent open redirect.
+    /// </summary>
+    private static string SanitizeReturnUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "/";
+
+        // Must be a relative path
+        if (url.Contains("://") || url.StartsWith("//") || url.StartsWith("\\"))
+            return "/";
+
+        // Must start with /
+        if (!url.StartsWith('/'))
+            return "/";
+
+        return url;
     }
 
     /// <summary>

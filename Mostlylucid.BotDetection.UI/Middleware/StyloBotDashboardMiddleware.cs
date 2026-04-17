@@ -857,9 +857,14 @@ public class StyloBotDashboardMiddleware
                        ?? context.User.Identity.Name;
             if (!string.IsNullOrEmpty(name)) return name;
         }
-        // Header override lets dev tooling attribute labels without a full auth setup.
-        var hdr = context.Request.Headers["X-SB-Labeler"].FirstOrDefault();
-        return !string.IsNullOrWhiteSpace(hdr) ? hdr.Trim() : "anonymous";
+        // X-SB-Labeler header only honored when user is authenticated (prevents spoofing audit trail)
+        if (context.User?.Identity?.IsAuthenticated == true)
+        {
+            var hdr = context.Request.Headers["X-SB-Labeler"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(hdr)) return hdr.Trim();
+        }
+
+        return "anonymous";
     }
 
     private static bool TryParseLabelKind(string? raw, out SignatureLabelKind kind)
