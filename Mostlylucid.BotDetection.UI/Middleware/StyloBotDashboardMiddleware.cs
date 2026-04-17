@@ -375,17 +375,30 @@ public class StyloBotDashboardMiddleware
             }
         }
 
-        // No auth configured - log warning on first request so operators notice
+        // No auth configured - check if unauthenticated access is explicitly allowed
+        if (_options.AllowUnauthenticatedAccess)
+        {
+            if (!_authWarningLogged)
+            {
+                _authWarningLogged = true;
+                _logger.LogWarning(
+                    "Dashboard running with AllowUnauthenticatedAccess=true. " +
+                    "In production, configure AuthorizationFilter or RequireAuthorizationPolicy instead.");
+            }
+            return true;
+        }
+
+        // Default deny: no auth configured and AllowUnauthenticatedAccess is false
         if (!_authWarningLogged)
         {
             _authWarningLogged = true;
-            _logger.LogWarning(
-                "Dashboard has no authorization configured (AuthorizationFilter and RequireAuthorizationPolicy are both null). " +
-                "In production, configure authentication via AddStyloBotDashboard(options => options.AuthorizationFilter = ...) " +
-                "or options.RequireAuthorizationPolicy = \"PolicyName\"");
+            _logger.LogError(
+                "Dashboard access DENIED: no authorization configured and AllowUnauthenticatedAccess is false. " +
+                "Configure authentication via AddStyloBotDashboard(options => options.AuthorizationFilter = ...), " +
+                "options.RequireAuthorizationPolicy = \"PolicyName\", or set AllowUnauthenticatedAccess = true for dev/demo.");
         }
 
-        return true;
+        return false;
     }
 
     private async Task ServeDashboardPageAsync(HttpContext context)

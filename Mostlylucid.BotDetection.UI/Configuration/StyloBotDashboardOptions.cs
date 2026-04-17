@@ -68,6 +68,14 @@ public sealed class StyloBotDashboardOptions
     public Func<HttpContext, Task<bool>>? AuthorizationFilter { get; set; }
 
     /// <summary>
+    ///     When true, the dashboard is accessible without authentication.
+    ///     Default: false (dashboard requires auth configuration).
+    ///     Set this explicitly to allow unauthenticated access in dev/demo environments.
+    ///     In production, configure AuthorizationFilter or RequireAuthorizationPolicy instead.
+    /// </summary>
+    public bool AllowUnauthenticatedAccess { get; set; }
+
+    /// <summary>
     ///     When true, extract basic browser, protocol, and country info from HTTP headers
     ///     for ALL detections (including human traffic). This enables browser/protocol/country
     ///     dashboard stats even when the detection pipeline doesn't write signals for humans.

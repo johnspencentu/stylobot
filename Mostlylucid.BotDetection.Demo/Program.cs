@@ -46,6 +46,7 @@ builder.Services.AddStyloBotDashboard(options =>
 {
     options.Enabled = true;
     options.BasePath = "/stylobot";
+    options.AllowUnauthenticatedAccess = true; // Demo: no auth required
 });
 
 // Add ApiHolodeck for honeypot detection and bot redirection
