@@ -19,7 +19,7 @@
                 Add it to your gateway or middleware, then get transparent scoring, Markov chain analysis, and policy control from day one. <span class="font-semibold hero-accent-text">Every session gets smarter.</span>
             </p>
             <div class="text-sm text-base-content/70 mb-4">
-                <span class="font-semibold text-base-content">Open source and free (at present).</span> Start with the full core feature set, then scale to enterprise workflows when you need them.
+                <span class="font-semibold text-base-content">Open source core, free forever.</span> Commercial from $100/mo when you need live config editing, PostgreSQL, and team management.
             </div>
             <div class="flex flex-col gap-3 items-center mb-4">
                 <div class="inline-flex items-center gap-3 px-6 py-3 bg-base-200 rounded-full">
@@ -681,6 +681,52 @@ app.UseBotDetection();
 <!-- Technical Depth Without the Complexity -->
 <section class="py-12 bg-gradient-to-br from-base-200 to-base-300">
     <div class="max-w-6xl mx-auto px-4">
+        <div class="text-center mb-16">
+            <h2 class="text-xl font-bold mb-4">Commercial Features</h2>
+            <p class="text-sm text-base-content/70 mb-8">Available with Startup ($100/mo) and Enterprise tiers</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            <div class="card bg-base-100 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title text-base">Per-Endpoint Policies</h3>
+                    <p class="text-sm text-base-content/70">Different detection policies for different endpoints. Strict for /login, relaxed for /api/health, shadow-mode for new endpoints. Assign from the dashboard dropdown (commercial) or YAML config (FOSS).</p>
+                </div>
+            </div>
+            <div class="card bg-base-100 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title text-base">Per-User / Per-API-Key Overrides</h3>
+                    <p class="text-sm text-base-content/70">Partners get their own detection tuning. Approve fingerprints with locked dimensions (country, UA, IP range) so a stolen key from a different environment is useless.</p>
+                </div>
+            </div>
+            <div class="card bg-base-100 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title text-base">Multi-Layer Distributed</h3>
+                    <p class="text-sm text-base-content/70">Chain YARP gateways: edge, regional, app-side. Detection runs once per unique input set. Later hops add signals earlier hops couldn't see. Monotone-escalating policy cascade.</p>
+                </div>
+            </div>
+            <div class="card bg-base-100 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title text-base">LLM-Enhanced Intelligence</h3>
+                    <p class="text-sm text-base-content/70">Optional local or cloud LLMs synthesize bot names, cluster campaign descriptions, and weigh in on edge cases. The LLM enriches decisions - it never makes them. Detection works fully without any LLM.</p>
+                </div>
+            </div>
+            <div class="card bg-base-100 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title text-base">Behavioral Shape Radar</h3>
+                    <p class="text-sm text-base-content/70">129-dimensional session vectors projected into an 8-axis radar chart. Step through sessions to see how behavioral shape morphs over time - a bot rotating strategies shows dramatic visible shifts.</p>
+                    <div class="mt-2 text-xs text-base-content/40 italic">[Dashboard screenshot placeholder]</div>
+                </div>
+            </div>
+            <div class="card bg-base-100 shadow-md">
+                <div class="card-body">
+                    <h3 class="card-title text-base">Real-Time Dashboard</h3>
+                    <p class="text-sm text-base-content/70">Live threat map, traffic charts, session timeline with Markov chain drill-in, cluster visualization. SignalR push updates - no polling. Everything updates the instant a detection fires.</p>
+                    <div class="mt-2 text-xs text-base-content/40 italic">[Dashboard screenshot placeholder]</div>
+                </div>
+            </div>
+        </div>
+
         <div class="text-center mb-16">
             <h2 class="text-xl font-bold mb-4">Enterprise-Grade Architecture</h2>
             <p class="text-sm text-base-content/70">Without the enterprise complexity</p>
