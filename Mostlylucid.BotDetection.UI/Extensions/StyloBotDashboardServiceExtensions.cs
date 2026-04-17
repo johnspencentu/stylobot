@@ -156,7 +156,13 @@ public static class StyloBotDashboardServiceExtensions
         app.UseMiddleware<StyloBotDashboardMiddleware>();
 
         // Map SignalR hub - this must be inside UseEndpoints
-        app.UseEndpoints(endpoints => { endpoints.MapHub<StyloBotDashboardHub>(options.HubPath); });
+        // Detection still runs (signals collected, reputation built) but only confirmed bots
+        // (0.95+) are blocked. Dashboard operators connecting via WebSocket pass through.
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapHub<StyloBotDashboardHub>(options.HubPath)
+                .WithMetadata(new BotDetection.Attributes.BotPolicyAttribute("default") { BlockThreshold = 0.95 });
+        });
 
         return app;
     }

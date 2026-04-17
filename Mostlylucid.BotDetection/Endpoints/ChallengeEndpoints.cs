@@ -44,7 +44,7 @@ public static class ChallengeEndpoints
 
     private static async Task<IResult> HandleVerify(HttpContext context)
     {
-        var logger = context.RequestServices.GetService<ILogger<InMemoryChallengeStore>>();
+        var logger = context.RequestServices.GetService<ILogger<SqliteChallengeStore>>();
         var store = context.RequestServices.GetRequiredService<IChallengeStore>();
 
         ChallengeVerifyRequest? request;

@@ -676,7 +676,8 @@ public static class ServiceCollectionExtensions
         // ==========================================
 
         // Challenge store (PoW challenge issuance + verification feedback loop)
-        services.TryAddSingleton<IChallengeStore, InMemoryChallengeStore>();
+        // SQLite for FOSS (zero-dependency). Commercial overrides with PostgreSQL or Redis.
+        services.TryAddSingleton<IChallengeStore, SqliteChallengeStore>();
 
         // Fingerprint approval store (SQLite-backed, locked dimensions, audit trail)
         services.TryAddSingleton<IFingerprintApprovalStore, SqliteFingerprintApprovalStore>();

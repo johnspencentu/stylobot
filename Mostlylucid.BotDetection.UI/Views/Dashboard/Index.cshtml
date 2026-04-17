@@ -20,6 +20,10 @@
     <script src="https://unpkg.com/htmx.org@@2.0.4" nonce="@Model.CspNonce"></script>
     <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@@8.0.0/dist/browser/signalr.min.js" nonce="@Model.CspNonce"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@@3.13.5/dist/cdn.min.js" nonce="@Model.CspNonce"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsvectormap/dist/jsvectormap.min.js" nonce="@Model.CspNonce"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsvectormap/dist/maps/world-merc.js" nonce="@Model.CspNonce"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap/dist/css/jsvectormap.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@@3.49.0/dist/apexcharts.min.js" nonce="@Model.CspNonce"></script>
     <link rel="stylesheet" href="https://unpkg.com/boxicons@@2.1.4/css/boxicons.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -330,6 +334,121 @@
         connection.start()
             .then(function()  { setStatus('connected'); })
             .catch(function() { setStatus('disconnected'); });
+    })();
+    </script>
+
+    <!-- World Threat Map + Time Series Chart initialization -->
+    <script nonce="@Model.CspNonce">
+    (function() {
+        'use strict';
+        var BASE = '@Html.Raw(bp)';
+
+        // ── World Threat Map ─────────────────────────────────────────────
+        function initMap(containerId) {
+            var el = document.getElementById(containerId);
+            if (!el || typeof jsVectorMap === 'undefined') return;
+
+            var map = new jsVectorMap({
+                selector: '#' + containerId,
+                map: 'world_merc',
+                zoomOnScroll: true,
+                zoomButtons: false,
+                showTooltip: true,
+                backgroundColor: 'transparent',
+                regionStyle: {
+                    initial: { fill: '#2a2e3a', stroke: '#3a3e4a', strokeWidth: 0.5 },
+                    hover: { fill: '#4a4e5a' }
+                },
+                series: {
+                    regions: [{
+                        attribute: 'fill',
+                        scale: { low: '#2dd4bf', mid: '#f59e0b', high: '#ef4444' },
+                        values: {},
+                        min: 0, max: 1,
+                        normalizeFunction: 'polynomial'
+                    }]
+                },
+                onRegionTooltipShow: function(e, tooltip, code) {
+                    var vals = map.series.regions[0].values;
+                    var rate = vals[code];
+                    if (rate !== undefined) {
+                        var span = document.createElement('span');
+                        span.textContent = ' - Bot rate: ' + (rate * 100).toFixed(0) + '%';
+                        tooltip.selector.appendChild(span);
+                    }
+                }
+            });
+
+            function refreshMap() {
+                fetch(BASE + '/api/countries')
+                    .then(function(r) { return r.json(); })
+                    .then(function(countries) {
+                        if (!countries || countries.length === 0) return;
+                        var vals = {};
+                        countries.forEach(function(c) {
+                            if (c.countryCode) vals[c.countryCode] = c.botRate || 0;
+                        });
+                        map.series.regions[0].setValues(vals);
+                    })
+                    .catch(function() {});
+            }
+
+            refreshMap();
+            setInterval(refreshMap, 30000);
+            return map;
+        }
+
+        initMap('command-map');
+        initMap('countries-map');
+
+        // ── Traffic Over Time Chart ──────────────────────────────────────
+        function initTimeChart() {
+            var el = document.getElementById('time-chart');
+            if (!el || typeof ApexCharts === 'undefined') return;
+
+            var chart = new ApexCharts(el, {
+                chart: {
+                    type: 'area', height: 160, toolbar: { show: false },
+                    background: 'transparent', fontFamily: 'inherit', foreColor: '#888',
+                    animations: { enabled: true, easing: 'easeinout', speed: 500 }
+                },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05 } },
+                colors: ['#2dd4bf', '#ef4444'],
+                series: [{ name: 'Human', data: [] }, { name: 'Bot', data: [] }],
+                xaxis: { type: 'datetime', labels: { style: { fontSize: '10px' }, datetimeUTC: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { style: { fontSize: '10px' } }, min: 0 },
+                grid: { borderColor: '#333', strokeDashArray: 3, padding: { left: 8, right: 8, top: 0, bottom: 0 } },
+                legend: { show: true, position: 'top', fontSize: '10px', markers: { size: 4 } },
+                tooltip: { theme: 'dark', x: { format: 'HH:mm' } },
+                dataLabels: { enabled: false }
+            });
+            chart.render();
+
+            function refreshChart() {
+                fetch(BASE + '/api/timeseries')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data || data.length === 0) return;
+                        var humans = [], bots = [];
+                        data.forEach(function(pt) {
+                            var ts = new Date(pt.timestamp).getTime();
+                            humans.push({ x: ts, y: pt.humanCount || 0 });
+                            bots.push({ x: ts, y: pt.botCount || 0 });
+                        });
+                        chart.updateSeries([
+                            { name: 'Human', data: humans },
+                            { name: 'Bot', data: bots }
+                        ]);
+                    })
+                    .catch(function() {});
+            }
+
+            refreshChart();
+            setInterval(refreshChart, 15000);
+        }
+
+        initTimeChart();
     })();
     </script>
 </body>

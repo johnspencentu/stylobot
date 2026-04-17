@@ -51,8 +51,8 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
     private readonly ILogger<VerifiedBotRegistry> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    // DNS cache: key = "ip:suffixPattern" to prevent cross-bot cache pollution
-    private readonly ConcurrentDictionary<string, (bool verified, string? hostname, DateTimeOffset expiry)> _dnsCache = new();
+    // DNS cache: key = "ip:suffixPattern" (bounded, TTL from config, LRU eviction at 10K entries)
+    private readonly BoundedCache<string, (bool verified, string? hostname)> _dnsCache = new(maxSize: 10_000, defaultTtl: TimeSpan.FromHours(1));
     private readonly ConcurrentDictionary<string, List<IPNetwork>> _ipRanges = new();
 
     private Timer? _refreshTimer;
@@ -200,7 +200,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
         // return true for a YandexBot check against *.yandex.ru from the same IP.
         var cacheKey = $"{clientIp}:{allowedDomainPatterns[0]}";
 
-        if (_dnsCache.TryGetValue(cacheKey, out var cached) && cached.expiry > DateTimeOffset.UtcNow)
+        if (_dnsCache.TryGet(cacheKey, out var cached))
             return cached.verified;
 
         try
@@ -316,7 +316,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
     private void CacheDnsResult(string cacheKey, bool verified, string? hostname)
     {
         var ttl = verified ? _dnsVerifiedCacheTtl : _dnsFailedCacheTtl;
-        _dnsCache[cacheKey] = (verified, hostname, DateTimeOffset.UtcNow + ttl);
+        _dnsCache.Set(cacheKey, (verified, hostname), ttl);
     }
 
     /// <summary>
@@ -401,13 +401,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
                 .Select(g => FetchIpRangesForUrlAsync(g.Key, g.Select(b => b.Name).ToArray()));
             await Task.WhenAll(urlGroups);
 
-            // Prune expired DNS cache entries
-            var now = DateTimeOffset.UtcNow;
-            foreach (var key in _dnsCache.Keys)
-            {
-                if (_dnsCache.TryGetValue(key, out var entry) && entry.expiry < now)
-                    _dnsCache.TryRemove(key, out _);
-            }
+            // DNS cache is bounded with automatic LRU eviction via BoundedCache
         }
         finally
         {

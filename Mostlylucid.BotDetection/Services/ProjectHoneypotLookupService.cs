@@ -16,12 +16,7 @@ namespace Mostlylucid.BotDetection.Services;
 /// </summary>
 public class ProjectHoneypotLookupService
 {
-    private static readonly ConcurrentDictionary<string, (HoneypotResult Result, DateTime Expires)> Cache = new();
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
-    private const int MaxCacheSize = 10_000;
-    private static DateTime _lastCleanup = DateTime.UtcNow;
-    private static readonly object CleanupLock = new();
+    private static readonly BoundedCache<string, HoneypotResult?> Cache = new(maxSize: 10_000, defaultTtl: TimeSpan.FromMinutes(30));
 
     private readonly ILogger<ProjectHoneypotLookupService> _logger;
     private readonly BotDetectionOptions _options;
@@ -50,19 +45,8 @@ public class ProjectHoneypotLookupService
     /// <returns>Honeypot result, or null if not listed / lookup failed</returns>
     public async Task<HoneypotResult?> LookupIpAsync(string ip, CancellationToken cancellationToken)
     {
-        // Check cache first
-        if (Cache.TryGetValue(ip, out var cached))
-        {
-            if (cached.Expires > DateTime.UtcNow)
-            {
-                CleanupExpiredEntries();
-                return cached.Result;
-            }
-
-            Cache.TryRemove(ip, out _);
-        }
-
-        CleanupExpiredEntries();
+        if (Cache.TryGet(ip, out var cached))
+            return cached;
 
         // Build DNS query: [key].[reversed-ip].dnsbl.httpbl.org
         var parts = ip.Split('.');
@@ -76,7 +60,7 @@ public class ProjectHoneypotLookupService
 
             if (addresses.Length == 0)
             {
-                Cache[ip] = (new HoneypotResult { IsListed = false }, DateTime.UtcNow.Add(CacheDuration));
+                Cache.Set(ip, new HoneypotResult { IsListed = false });
                 return null;
             }
 
@@ -98,46 +82,18 @@ public class ProjectHoneypotLookupService
                 VisitorType = ParseVisitorType(response[3])
             };
 
-            Cache[ip] = (result, DateTime.UtcNow.Add(CacheDuration));
+            Cache.Set(ip, result);
             return result;
         }
         catch (SocketException)
         {
             // NXDOMAIN means IP is not in the database
-            Cache[ip] = (new HoneypotResult { IsListed = false }, DateTime.UtcNow.Add(CacheDuration));
+            Cache.Set(ip, new HoneypotResult { IsListed = false });
             return null;
         }
     }
 
-    internal static void CleanupExpiredEntries()
-    {
-        var now = DateTime.UtcNow;
-        var forceCleanup = Cache.Count > MaxCacheSize;
-
-        if (!forceCleanup && now - _lastCleanup < CleanupInterval)
-            return;
-
-        if (!Monitor.TryEnter(CleanupLock))
-            return;
-
-        try
-        {
-            if (!forceCleanup && now - _lastCleanup < CleanupInterval)
-                return;
-
-            foreach (var kvp in Cache)
-            {
-                if (kvp.Value.Expires <= now)
-                    Cache.TryRemove(kvp.Key, out _);
-            }
-
-            _lastCleanup = now;
-        }
-        finally
-        {
-            Monitor.Exit(CleanupLock);
-        }
-    }
+    // Cleanup is handled automatically by BoundedCache (LRU eviction + TTL expiry)
 
     private static HoneypotVisitorType ParseVisitorType(byte typeByte)
     {

@@ -110,13 +110,11 @@ public class AsnLookupService : IAsnLookupService
         { 31898, "Oracle Cloud" },
     };
 
-    // Cache: IP → AsnInfo (TTL 1 hour)
-    private static readonly ConcurrentDictionary<string, (AsnInfo? Info, DateTime Expiry)> Cache = new();
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
+    // Cache: IP → AsnInfo (TTL 1 hour, max 10K entries with LRU eviction)
+    private static readonly BoundedCache<string, AsnInfo?> Cache = new(maxSize: 10_000, defaultTtl: TimeSpan.FromHours(1));
 
-    // Cache: ASN → OrgName (TTL 24 hours, ASN names rarely change)
-    private static readonly ConcurrentDictionary<int, (string? OrgName, DateTime Expiry)> OrgCache = new();
-    private static readonly TimeSpan OrgCacheTtl = TimeSpan.FromHours(24);
+    // Cache: ASN → OrgName (TTL 24 hours, ASN names rarely change, max 5K entries)
+    private static readonly BoundedCache<int, string?> OrgCache = new(maxSize: 5_000, defaultTtl: TimeSpan.FromHours(24));
 
     private readonly ILogger<AsnLookupService> _logger;
 
@@ -130,28 +128,19 @@ public class AsnLookupService : IAsnLookupService
         if (string.IsNullOrWhiteSpace(ipAddress))
             return null;
 
-        // Check cache
-        if (Cache.TryGetValue(ipAddress, out var cached) && DateTime.UtcNow < cached.Expiry)
-            return cached.Info;
+        if (Cache.TryGet(ipAddress, out var cached))
+            return cached;
 
         try
         {
             var info = await LookupCoreAsync(ipAddress, ct);
-
-            // Cache result (including nulls to avoid repeated failures)
-            Cache[ipAddress] = (info, DateTime.UtcNow + CacheTtl);
-
-            // Evict old entries periodically
-            if (Cache.Count > 50_000)
-                EvictExpiredEntries();
-
+            Cache.Set(ipAddress, info);
             return info;
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "ASN lookup failed for {IP}", ipAddress);
-            // Cache the failure briefly (5 min) to avoid hammering DNS
-            Cache[ipAddress] = (null, DateTime.UtcNow + TimeSpan.FromMinutes(5));
+            Cache.Set(ipAddress, null, TimeSpan.FromMinutes(5));
             return null;
         }
     }
@@ -222,9 +211,8 @@ public class AsnLookupService : IAsnLookupService
 
     private async Task<string?> GetOrgNameAsync(int asn, CancellationToken ct)
     {
-        // Check org cache
-        if (OrgCache.TryGetValue(asn, out var cached) && DateTime.UtcNow < cached.Expiry)
-            return cached.OrgName;
+        if (OrgCache.TryGet(asn, out var cached))
+            return cached;
 
         // Query: AS24940.peer.asn.cymru.com TXT
         // Response: "24940 | DE | ripencc | 2003-09-19 | HETZNER-AS, DE"
@@ -239,7 +227,7 @@ public class AsnLookupService : IAsnLookupService
                 orgName = peerParts[4].Trim();
         }
 
-        OrgCache[asn] = (orgName, DateTime.UtcNow + OrgCacheTtl);
+        OrgCache.Set(asn, orgName);
         return orgName;
     }
 
@@ -391,10 +379,4 @@ public class AsnLookupService : IAsnLookupService
         return name;
     }
 
-    private void EvictExpiredEntries()
-    {
-        var now = DateTime.UtcNow;
-        var expired = Cache.Where(kv => now >= kv.Value.Expiry).Select(kv => kv.Key).Take(1000).ToList();
-        foreach (var key in expired) Cache.TryRemove(key, out _);
-    }
 }

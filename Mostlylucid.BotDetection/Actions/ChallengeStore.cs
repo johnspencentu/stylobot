@@ -1,6 +1,9 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Mostlylucid.BotDetection.Models;
 
 namespace Mostlylucid.BotDetection.Actions;
 
@@ -46,50 +49,101 @@ public sealed record ChallengeVerificationResult
 /// </summary>
 public interface IChallengeStore
 {
-    /// <summary>
-    ///     Creates a new PoW challenge for the given signature.
-    /// </summary>
+    /// <summary>Creates a new PoW challenge for the given signature.</summary>
     ChallengeRecord CreateChallenge(string signature, int puzzleCount, int requiredZeros, TimeSpan expiry);
 
-    /// <summary>
-    ///     Validates and consumes a challenge (single-use). Returns null if not found or expired.
-    /// </summary>
+    /// <summary>Validates and consumes a challenge (single-use). Returns null if not found or expired.</summary>
     ChallengeRecord? ValidateAndConsume(string challengeId);
 
-    /// <summary>
-    ///     Records the verification result (solve timing metadata) for the feedback loop.
-    /// </summary>
+    /// <summary>Records the verification result (solve timing metadata) for the feedback loop.</summary>
     void RecordVerification(ChallengeVerificationResult result);
 
-    /// <summary>
-    ///     Gets the most recent verification result for a signature, if any.
-    /// </summary>
+    /// <summary>Gets the most recent verification result for a signature, if any.</summary>
     ChallengeVerificationResult? GetVerification(string signature);
 }
 
 /// <summary>
-///     In-memory challenge store with automatic expiry sweep.
-///     Challenges are ephemeral (2-minute default lifetime), so SQLite persistence is unnecessary.
+///     SQLite-backed challenge store. Challenges and verification results are persisted
+///     to disk and survive restarts. Follows the same patterns as SqliteSessionStore
+///     (WAL mode, SemaphoreSlim write lock, same database directory).
 /// </summary>
-public sealed class InMemoryChallengeStore : IChallengeStore, IDisposable
+public sealed class SqliteChallengeStore : IChallengeStore, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, ChallengeRecord> _challenges = new();
-    private readonly ConcurrentDictionary<string, ChallengeVerificationResult> _verifications = new();
-    private readonly Timer _sweepTimer;
-    private readonly ILogger<InMemoryChallengeStore>? _logger;
-    private readonly TimeSpan _verificationRetention;
+    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    public InMemoryChallengeStore(
-        ILogger<InMemoryChallengeStore>? logger = null,
-        TimeSpan? verificationRetention = null)
+    private readonly string _connectionString;
+    private readonly ILogger<SqliteChallengeStore> _logger;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private bool _initialized;
+
+    public SqliteChallengeStore(
+        ILogger<SqliteChallengeStore> logger,
+        IOptions<BotDetectionOptions> options)
     {
         _logger = logger;
-        _verificationRetention = verificationRetention ?? TimeSpan.FromMinutes(30);
-        _sweepTimer = new Timer(SweepExpired, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+        var basePath = Path.GetDirectoryName(
+            options.Value.DatabasePath ?? Path.Combine(AppContext.BaseDirectory, "botdetection.db"))
+            ?? AppContext.BaseDirectory;
+        Directory.CreateDirectory(basePath);
+        var dbPath = Path.Combine(basePath, "challenges.db");
+        _connectionString = $"Data Source={dbPath};Cache=Shared";
+    }
+
+    private void EnsureInitialized()
+    {
+        if (_initialized) return;
+
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            PRAGMA cache_size=-2000;
+
+            CREATE TABLE IF NOT EXISTS challenges (
+                id TEXT PRIMARY KEY,
+                signature TEXT NOT NULL,
+                puzzle_count INTEGER NOT NULL,
+                required_zeros INTEGER NOT NULL,
+                puzzles_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                consumed INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS verifications (
+                signature TEXT PRIMARY KEY,
+                total_solve_duration_ms REAL NOT NULL,
+                reported_worker_count INTEGER NOT NULL,
+                puzzle_count INTEGER NOT NULL,
+                puzzle_timings_json TEXT NOT NULL,
+                timing_jitter REAL NOT NULL,
+                verified_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_challenges_expires ON challenges(expires_at);
+            CREATE INDEX IF NOT EXISTS idx_challenges_signature ON challenges(signature);
+            CREATE INDEX IF NOT EXISTS idx_verifications_verified ON verifications(verified_at);
+            """;
+        cmd.ExecuteNonQuery();
+
+        // Clean up expired challenges on startup
+        using var cleanCmd = conn.CreateCommand();
+        cleanCmd.CommandText = "DELETE FROM challenges WHERE expires_at < @now OR consumed = 1";
+        cleanCmd.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow.ToString("O"));
+        var cleaned = cleanCmd.ExecuteNonQuery();
+        if (cleaned > 0) _logger.LogDebug("Cleaned up {Count} expired/consumed challenges on startup", cleaned);
+
+        _initialized = true;
+        _logger.LogInformation("Challenge store initialized at {ConnectionString}", _connectionString);
     }
 
     public ChallengeRecord CreateChallenge(string signature, int puzzleCount, int requiredZeros, TimeSpan expiry)
     {
+        EnsureInitialized();
+
         var puzzles = new PuzzleSeed[puzzleCount];
         for (var i = 0; i < puzzleCount; i++)
         {
@@ -109,9 +163,33 @@ public sealed class InMemoryChallengeStore : IChallengeStore, IDisposable
             ExpiresAt = DateTimeOffset.UtcNow.Add(expiry)
         };
 
-        _challenges[record.Id] = record;
+        _writeLock.Wait();
+        try
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
 
-        _logger?.LogDebug(
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO challenges (id, signature, puzzle_count, required_zeros, puzzles_json, created_at, expires_at, consumed)
+                VALUES (@id, @sig, @count, @zeros, @puzzles, @created, @expires, 0)
+                """;
+            cmd.Parameters.AddWithValue("@id", record.Id);
+            cmd.Parameters.AddWithValue("@sig", record.Signature);
+            cmd.Parameters.AddWithValue("@count", record.PuzzleCount);
+            cmd.Parameters.AddWithValue("@zeros", record.RequiredZeros);
+            cmd.Parameters.AddWithValue("@puzzles", JsonSerializer.Serialize(
+                record.Puzzles.Select(p => new { seed = Convert.ToBase64String(p.Seed), zeros = p.RequiredZeros }), JsonOpts));
+            cmd.Parameters.AddWithValue("@created", record.CreatedAt.ToString("O"));
+            cmd.Parameters.AddWithValue("@expires", record.ExpiresAt.ToString("O"));
+            cmd.ExecuteNonQuery();
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+
+        _logger.LogDebug(
             "Created PoW challenge {Id} for {Signature}: {Count} puzzles, {Zeros} zeros, expires {Expiry}",
             record.Id, signature, puzzleCount, requiredZeros, record.ExpiresAt);
 
@@ -120,70 +198,128 @@ public sealed class InMemoryChallengeStore : IChallengeStore, IDisposable
 
     public ChallengeRecord? ValidateAndConsume(string challengeId)
     {
-        if (!_challenges.TryRemove(challengeId, out var record))
-            return null;
+        EnsureInitialized();
 
-        if (DateTimeOffset.UtcNow > record.ExpiresAt)
+        _writeLock.Wait();
+        try
         {
-            _logger?.LogDebug("Challenge {Id} expired", challengeId);
-            return null;
-        }
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
 
-        return record;
+            // Atomic: mark consumed and return in one step
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                UPDATE challenges SET consumed = 1
+                WHERE id = @id AND consumed = 0 AND expires_at > @now
+                RETURNING id, signature, puzzle_count, required_zeros, puzzles_json, created_at, expires_at
+                """;
+            cmd.Parameters.AddWithValue("@id", challengeId);
+            cmd.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow.ToString("O"));
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                _logger.LogDebug("Challenge {Id} not found, expired, or already consumed", challengeId);
+                return null;
+            }
+
+            var puzzlesJson = reader.GetString(4);
+            var puzzleData = JsonSerializer.Deserialize<JsonElement[]>(puzzlesJson);
+            var puzzles = puzzleData?.Select(p => new PuzzleSeed(
+                Convert.FromBase64String(p.GetProperty("seed").GetString()!),
+                p.GetProperty("zeros").GetInt32()
+            )).ToArray() ?? [];
+
+            return new ChallengeRecord
+            {
+                Id = reader.GetString(0),
+                Signature = reader.GetString(1),
+                PuzzleCount = reader.GetInt32(2),
+                RequiredZeros = reader.GetInt32(3),
+                Puzzles = puzzles,
+                CreatedAt = DateTimeOffset.Parse(reader.GetString(5)),
+                ExpiresAt = DateTimeOffset.Parse(reader.GetString(6))
+            };
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     public void RecordVerification(ChallengeVerificationResult result)
     {
-        _verifications[result.Signature] = result;
+        EnsureInitialized();
 
-        _logger?.LogDebug(
+        _writeLock.Wait();
+        try
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO verifications (signature, total_solve_duration_ms, reported_worker_count, puzzle_count, puzzle_timings_json, timing_jitter, verified_at)
+                VALUES (@sig, @dur, @workers, @count, @timings, @jitter, @at)
+                ON CONFLICT(signature) DO UPDATE SET
+                    total_solve_duration_ms = @dur,
+                    reported_worker_count = @workers,
+                    puzzle_count = @count,
+                    puzzle_timings_json = @timings,
+                    timing_jitter = @jitter,
+                    verified_at = @at
+                """;
+            cmd.Parameters.AddWithValue("@sig", result.Signature);
+            cmd.Parameters.AddWithValue("@dur", result.TotalSolveDurationMs);
+            cmd.Parameters.AddWithValue("@workers", result.ReportedWorkerCount);
+            cmd.Parameters.AddWithValue("@count", result.PuzzleCount);
+            cmd.Parameters.AddWithValue("@timings", JsonSerializer.Serialize(result.PuzzleTimingsMs, JsonOpts));
+            cmd.Parameters.AddWithValue("@jitter", result.TimingJitter);
+            cmd.Parameters.AddWithValue("@at", result.VerifiedAt.ToString("O"));
+            cmd.ExecuteNonQuery();
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+
+        _logger.LogDebug(
             "Recorded PoW verification for {Signature}: {Duration:F0}ms, {Workers} workers, jitter={Jitter:F3}",
             result.Signature, result.TotalSolveDurationMs, result.ReportedWorkerCount, result.TimingJitter);
     }
 
     public ChallengeVerificationResult? GetVerification(string signature)
     {
-        if (!_verifications.TryGetValue(signature, out var result))
-            return null;
+        EnsureInitialized();
 
-        // Check retention window
-        if (DateTimeOffset.UtcNow - result.VerifiedAt > _verificationRetention)
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM verifications WHERE signature = @sig";
+        cmd.Parameters.AddWithValue("@sig", signature);
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read()) return null;
+
+        var timingsJson = reader.GetString(reader.GetOrdinal("puzzle_timings_json"));
+        var timings = JsonSerializer.Deserialize<double[]>(timingsJson) ?? [];
+
+        return new ChallengeVerificationResult
         {
-            _verifications.TryRemove(signature, out _);
-            return null;
-        }
-
-        return result;
+            Signature = reader.GetString(reader.GetOrdinal("signature")),
+            TotalSolveDurationMs = reader.GetDouble(reader.GetOrdinal("total_solve_duration_ms")),
+            ReportedWorkerCount = reader.GetInt32(reader.GetOrdinal("reported_worker_count")),
+            PuzzleCount = reader.GetInt32(reader.GetOrdinal("puzzle_count")),
+            PuzzleTimingsMs = timings,
+            TimingJitter = reader.GetDouble(reader.GetOrdinal("timing_jitter")),
+            VerifiedAt = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("verified_at")))
+        };
     }
 
-    private void SweepExpired(object? state)
+    public ValueTask DisposeAsync()
     {
-        var now = DateTimeOffset.UtcNow;
-        var expiredChallenges = 0;
-        var expiredVerifications = 0;
-
-        foreach (var kvp in _challenges)
-        {
-            if (now > kvp.Value.ExpiresAt && _challenges.TryRemove(kvp.Key, out _))
-                expiredChallenges++;
-        }
-
-        foreach (var kvp in _verifications)
-        {
-            if (now - kvp.Value.VerifiedAt > _verificationRetention && _verifications.TryRemove(kvp.Key, out _))
-                expiredVerifications++;
-        }
-
-        if (expiredChallenges > 0 || expiredVerifications > 0)
-        {
-            _logger?.LogDebug(
-                "Swept {Challenges} expired challenges, {Verifications} expired verifications",
-                expiredChallenges, expiredVerifications);
-        }
-    }
-
-    public void Dispose()
-    {
-        _sweepTimer.Dispose();
+        _writeLock.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

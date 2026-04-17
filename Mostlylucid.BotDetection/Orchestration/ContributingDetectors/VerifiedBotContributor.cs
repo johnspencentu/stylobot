@@ -32,8 +32,8 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
     [GeneratedRegex(@"^([A-Za-z][\w-]+)(?:/[\d.]|[ (])", RegexOptions.Compiled)]
     private static partial Regex BotNameRegex();
 
-    // Cache reverse DNS results to avoid repeated lookups (TTL 30 min)
-    private static readonly ConcurrentDictionary<string, (string? Hostname, DateTime Expiry)> RdnsCache = new();
+    // Cache reverse DNS results (bounded, TTL 30 min, LRU eviction at 5K entries)
+    private static readonly BoundedCache<string, string?> RdnsCache = new(maxSize: 5_000, defaultTtl: TimeSpan.FromMinutes(30));
 
     private readonly ILogger<VerifiedBotContributor> _logger;
     private readonly VerifiedBotRegistry _registry;
@@ -207,9 +207,8 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
 
     private static async Task<string?> GetReverseDns(string ipAddress, CancellationToken ct)
     {
-        // Check cache
-        if (RdnsCache.TryGetValue(ipAddress, out var cached) && DateTime.UtcNow < cached.Expiry)
-            return cached.Hostname;
+        if (RdnsCache.TryGet(ipAddress, out var cached))
+            return cached;
 
         string? hostname = null;
         try
@@ -217,7 +216,6 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
             if (IPAddress.TryParse(ipAddress, out var addr))
             {
                 var entry = await Dns.GetHostEntryAsync(ipAddress);
-                // GetHostEntry returns the IP as hostname if no PTR record exists
                 if (entry.HostName != ipAddress && !IPAddress.TryParse(entry.HostName, out _))
                     hostname = entry.HostName;
             }
@@ -227,10 +225,7 @@ public partial class VerifiedBotContributor : ConfiguredContributorBase
             // DNS failures are normal (no PTR record)
         }
 
-        // Cache for 30 minutes (including null results)
-        if (RdnsCache.Count < 50_000)
-            RdnsCache[ipAddress] = (hostname, DateTime.UtcNow.AddMinutes(30));
-
+        RdnsCache.Set(ipAddress, hostname);
         return hostname;
     }
 }

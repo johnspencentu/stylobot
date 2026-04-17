@@ -44,8 +44,8 @@ public class IpContributor : ConfiguredContributorBase
         { "Hetzner", ["5.9.", "23.88.", "46.4.", "65.21.", "65.108.", "65.109.", "78.46.", "78.47.", "85.10.", "88.198.", "88.99.", "95.216.", "116.202.", "116.203.", "128.140.", "135.181.", "136.243.", "138.201.", "142.132.", "144.76.", "148.251.", "157.90.", "159.69.", "162.55.", "167.235.", "168.119.", "176.9.", "178.63.", "195.201.", "213.133.", "213.239."] }
     };
 
-    // Cached CIDR ranges from the database (refreshed periodically by BotListUpdateService)
-    private static readonly ConcurrentDictionary<string, bool> CidrCache = new();
+    // Cached CIDR match results (bounded, TTL 1h, LRU eviction)
+    private static readonly BoundedCache<string, bool> CidrCache = new(maxSize: 10_000, defaultTtl: TimeSpan.FromHours(1));
     private static IReadOnlyList<string>? _cachedCidrRanges;
     private static DateTime _cidrCacheExpiry = DateTime.MinValue;
     private static readonly SemaphoreSlim CidrLock = new(1, 1);
@@ -242,8 +242,7 @@ public class IpContributor : ConfiguredContributorBase
     /// </summary>
     private async Task<bool> CheckDynamicCidrRanges(string ip, CancellationToken ct)
     {
-        // Quick cache check
-        if (CidrCache.TryGetValue(ip, out var cached))
+        if (CidrCache.TryGet(ip, out var cached))
             return cached;
 
         // Load CIDR ranges (cached for 5 min)
@@ -266,8 +265,7 @@ public class IpContributor : ConfiguredContributorBase
         }
 
         // Cache result (bounded to prevent unbounded growth)
-        if (CidrCache.Count < 10_000)
-            CidrCache[ip] = result;
+        CidrCache.Set(ip, result);
 
         return result;
     }
