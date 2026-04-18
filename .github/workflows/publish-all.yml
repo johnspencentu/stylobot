@@ -527,15 +527,8 @@ jobs:
 
           ### Verification
 
-          All binaries are signed with [Sigstore cosign](https://docs.sigstore.dev/). Verify with:
-
-          ```bash
-          cosign verify-blob stylobot-linux-x64.tar.gz \
-            --signature stylobot-linux-x64.tar.gz.sig \
-            --certificate stylobot-linux-x64.tar.gz.pem \
-            --certificate-identity-regexp "github.com/scottgal/stylobot" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com
-          ```
+          All binaries are signed with Sigstore cosign. Each archive has a matching .sig and .pem file.
+          Verify with cosign verify-blob. See https://docs.sigstore.dev for details.
         draft: false
         prerelease: false
         files: |
