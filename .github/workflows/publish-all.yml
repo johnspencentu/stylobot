@@ -514,23 +514,60 @@ jobs:
         name: StyloBot Gateway v${{ needs.validate-version.outputs.version }}
         tag_name: console-v${{ needs.validate-version.outputs.version }}
         body: |
-          ## StyloBot Gateway v${{ needs.validate-version.outputs.version }}
+          ## StyloBot v${{ needs.validate-version.outputs.version }} - Self-hosted bot defense. Free forever.
 
-          Published via Publish All workflow.
+          ### Install
+
+          ```bash
+          # macOS / Linux
+          brew install scottgal/stylobot/stylobot
+
+          # Windows
+          choco install stylobot
+
+          # Or download a binary below
+          ```
+
+          ### Quick start
+
+          ```bash
+          stylobot 5080 http://localhost:3000              # Live detection table
+          stylobot 5080 http://localhost:3000 --tunnel      # + Cloudflare Tunnel
+          stylobot start 5080 http://localhost:3000         # Background daemon
+          stylobot 8000 http://myapp.com --policy block     # Block bots
+          stylobot --help                                   # All options
+          ```
 
           ### Downloads
 
-          - **Linux x64**: `stylobot-linux-x64.tar.gz`
-          - **Linux ARM64**: `stylobot-linux-arm64.tar.gz`
-          - **Windows x64**: `stylobot-win-x64.zip`
-          - **Windows ARM64**: `stylobot-win-arm64.zip`
-          - **macOS Intel**: `stylobot-osx-x64.tar.gz`
-          - **macOS Apple Silicon**: `stylobot-osx-arm64.tar.gz`
+          | Platform | File |
+          |----------|------|
+          | Linux x64 | `stylobot-linux-x64.tar.gz` |
+          | Linux ARM64 | `stylobot-linux-arm64.tar.gz` |
+          | Windows x64 | `stylobot-win-x64.zip` |
+          | Windows ARM64 | `stylobot-win-arm64.zip` |
+          | macOS Intel | `stylobot-osx-x64.tar.gz` |
+          | macOS Apple Silicon | `stylobot-osx-arm64.tar.gz` |
+
+          ### CLI reference
+
+          | Flag | Description |
+          |------|-------------|
+          | `--mode <demo\|production>` | Detection mode |
+          | `--policy <name>` | Action policy: `logonly` (default), `block`, `throttle`, `challenge` |
+          | `--threshold <0.0-1.0>` | Bot probability threshold (default: 0.7) |
+          | `--llm <url>` | Ollama URL for LLM enrichment |
+          | `--model <name>` | LLM model (default: qwen3:0.6b) |
+          | `--tunnel [token]` | Cloudflare Tunnel (requires `cloudflared`) |
+          | `--cert <path>` | TLS certificate (.pfx or .pem) |
+          | `--config <path>` | Custom appsettings.json |
+          | `--verbose` | Full log output (disables live table) |
 
           ### Verification
 
-          All binaries are signed with Sigstore cosign. Each archive has a matching .sig and .pem file.
-          Verify with cosign verify-blob. See https://docs.sigstore.dev for details.
+          All binaries signed with [Sigstore cosign](https://docs.sigstore.dev). Each archive has `.sig` and `.pem` files.
+
+          Full docs: https://github.com/scottgal/stylobot
         draft: false
         prerelease: false
         files: |
