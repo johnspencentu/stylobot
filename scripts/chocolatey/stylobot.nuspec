@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>stylobot</id>
+    <version>5.6.5</version>
+    <title>StyloBot - Self-hosted Bot Defense</title>
+    <authors>Scott Galloway</authors>
+    <owners>scottgal</owners>
+    <projectUrl>https://stylobot.net</projectUrl>
+    <projectSourceUrl>https://github.com/scottgal/stylobot</projectSourceUrl>
+    <docsUrl>https://github.com/scottgal/stylobot</docsUrl>
+    <bugTrackerUrl>https://github.com/scottgal/stylobot/issues</bugTrackerUrl>
+    <licenseUrl>https://unlicense.org</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Self-hosted bot detection with 31 detectors, session vectors, and zero PII.</summary>
+    <description>StyloBot is a self-hosted bot defense proxy. 31 detectors, wave-based orchestration, 129-dimensional session behavioral vectors, intent classification with threat scoring, real-time dashboard, and reverse-proxy integration. Runs as a standalone binary or ASP.NET Core middleware. Your traffic never leaves your perimeter.
+
+## Features
+- Sub-millisecond fast path detection (&lt;1ms)
+- 129-dim session vectors (Markov chains)
+- Protocol fingerprinting (JA3/JA4, p0f, HTTP/2, QUIC)
+- Real-time Spectre.Console live detection table
+- Cloudflare Tunnel support (--tunnel)
+- Background daemon mode (start/stop/status/logs)
+- Zero PII architecture
+
+## Quick Start
+```
+stylobot 5080 http://localhost:3000
+stylobot start 5080 http://localhost:3000 --policy block
+```
+    </description>
+    <tags>bot-detection security waf reverse-proxy bot defense</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
