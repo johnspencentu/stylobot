@@ -3,7 +3,7 @@
 ## Document Status
 - Status: Historical/implementation note kept for engineering context.
 - Canonical docs to use first: `docs/README.md`, `QUICKSTART.md`, `DOCKER_SETUP.md`.
-- Website-friendly docs: `mostlylucid.stylobot.website/src/Stylobot.Website/Docs/`.
+- Website-friendly docs: `stylobot-commercial repo`.
 
 
 ## Test Execution Results
