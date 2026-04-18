@@ -84,7 +84,6 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    stylobot 443 https://api.example.com --cert cert.pfx");
     Console.WriteLine("    stylobot 5080 http://localhost:3000 --tunnel");
     Console.WriteLine();
-    Console.WriteLine("  Dashboard:  http://localhost:<port>/_stylobot");
     Console.WriteLine("  Health:     http://localhost:<port>/health");
     Console.WriteLine();
     Console.WriteLine("  Docs:       https://github.com/scottgal/stylobot");

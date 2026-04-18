@@ -227,7 +227,7 @@ public sealed class LiveDetectionTableService : BackgroundService
             configPanel.AddRow("[dim]Tunnel[/]",
                 tUrl != null ? $"[bold green]{Markup.Escape(tUrl)}[/]" : "[yellow]connecting...[/]");
         }
-        configPanel.AddRow("[dim]Dashboard[/]", $"[dim]{scheme}://localhost:{_port}/_stylobot[/]");
+        configPanel.AddRow("[dim]Health[/]", $"[dim]{scheme}://localhost:{_port}/health[/]");
         configPanel.AddRow("[dim]Uptime[/]", $"[dim]{uptime:hh\\:mm\\:ss}[/]");
 
         // Stats panel
@@ -341,7 +341,7 @@ public sealed class LiveDetectionTableService : BackgroundService
         }
         else
         {
-            suggestion = new Markup("[dim]Press Ctrl+C to stop  |  Dashboard: /_stylobot  |  --verbose for full logs[/]");
+            suggestion = new Markup("[dim]Press Ctrl+C to stop  |  --verbose for full logs[/]");
         }
 
         // === FINAL ASSEMBLY ===
