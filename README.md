@@ -94,12 +94,14 @@ app.UseBotDetection();
 | **Price** | Free forever | **$100/mo** per domain | From $1,000/mo |
 | **Detectors** | All 31 | All 31 | All 31 |
 | **Dashboard** | Read-only (unlimited logins) | Live config editor | Fleet dashboard |
-| **Persistence** | SQLite (zero-dependency) | PostgreSQL | PostgreSQL + pgvector |
+| **Persistence** | SQLite (zero-dependency) | PostgreSQL + pgvector | PostgreSQL + pgvector |
+| **Session similarity** | Local (in-memory) | pgvector HNSW | pgvector HNSW |
 | **Protected identities** | - | 5 per-user policy overrides | Unlimited |
 | **Endpoint policies** | Unlimited (via YAML) | 5 live overrides | Unlimited |
 | **LLM (optional)** | Local Ollama | Local Ollama | Any (OpenAI, Anthropic, Azure) |
 | **SSO** | Local accounts | OIDC | OIDC/SAML |
-| **Add-ons** | - | Redis +$50/mo, Multi-node +$100/mo | Included |
+| **Backplane** | - | - | Redis (multi-node coordination) |
+| **Add-ons** | - | Multi-node +$100/mo | Included |
 
 [Start a 30-day trial](https://stylobot.net/portal) - no credit card. After trial, commercial features switch to logging-only mode. Detection never stops.
 
