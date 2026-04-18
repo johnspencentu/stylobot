@@ -56,7 +56,21 @@ var configBuilder = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", true, false);
 
 var tempConfig = configBuilder.Build();
-if (tempConfig.GetSection("Serilog").Exists()) logConfig = logConfig.ReadFrom.Configuration(tempConfig);
+if (tempConfig.GetSection("Serilog").Exists())
+{
+    try
+    {
+        // Explicit assembly reference for single-file/AOT compatibility
+        var readerOptions = new Serilog.Settings.Configuration.ConfigurationReaderOptions(
+            typeof(Serilog.ConsoleLoggerConfigurationExtensions).Assembly,
+            typeof(Serilog.FileLoggerConfigurationExtensions).Assembly);
+        logConfig = logConfig.ReadFrom.Configuration(tempConfig, readerOptions);
+    }
+    catch (InvalidOperationException)
+    {
+        // Single-file publish: Serilog assembly scanning fails, use code-based config only
+    }
+}
 
 Log.Logger = logConfig.CreateLogger();
 
