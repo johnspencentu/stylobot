@@ -1134,7 +1134,6 @@ The CLI now exposes standard health and metrics endpoints:
 
 - `/health` for liveness/basic config state
 - `/metrics` for Prometheus scraping
-- `/_stylobot` for the dashboard
 
 OpenTelemetry is wired for:
 
