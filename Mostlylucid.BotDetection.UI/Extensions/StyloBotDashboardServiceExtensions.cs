@@ -84,7 +84,7 @@ public static class StyloBotDashboardServiceExtensions
 
         // Operator-supplied signature labels (for detector weighting / ground truth).
         // In-memory by default; production hosts can register SQLite / PostgreSQL impls.
-        services.TryAddSingleton<ISignatureLabelStore, InMemorySignatureLabelStore>();
+        services.TryAddSingleton<ISignatureLabelStore, SqliteSignatureLabelStore>();
 
         // Aggregate cache - populated by beacon, read by API endpoints
         services.AddSingleton<DashboardAggregateCache>();
@@ -223,7 +223,7 @@ public static class StyloBotDashboardServiceExtensions
 
         // Operator-supplied signature labels for detector weighting / ground truth
         // (in-memory by default; production wires a SQLite or PostgreSQL implementation).
-        services.TryAddSingleton<ISignatureLabelStore, InMemorySignatureLabelStore>();
+        services.TryAddSingleton<ISignatureLabelStore, SqliteSignatureLabelStore>();
 
         // Aggregate cache - populated by beacon, read by API endpoints
         services.TryAddSingleton<DashboardAggregateCache>();
