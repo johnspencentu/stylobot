@@ -9,7 +9,11 @@ using Mostlylucid.BotDetection.Console.Services;
 using Mostlylucid.BotDetection.Console.Transforms;
 using Mostlylucid.BotDetection.Events;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Middleware;
+using Mostlylucid.BotDetection.Telemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 using SQLitePCL;
@@ -46,6 +50,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine();
     Console.WriteLine("  Usage:");
     Console.WriteLine("    stylobot <port> <upstream>                  Proxy to upstream on port");
+    Console.WriteLine("    stylobot --port <port> --upstream <url>    Standard named options");
     Console.WriteLine("    stylobot <port> <upstream> --mode production     Enable blocking");
     Console.WriteLine();
     Console.WriteLine("  Commands:");
@@ -55,6 +60,8 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    stylobot logs                               Show recent log output");
     Console.WriteLine();
     Console.WriteLine("  Options:");
+    Console.WriteLine("    --port <port>               Port to listen on (default: 5080)");
+    Console.WriteLine("    --upstream <url>            Upstream server URL");
     Console.WriteLine("    --mode <demo|production>    Detection mode (default: demo)");
     Console.WriteLine("    --policy <name>             Default action policy (default: logonly)");
     Console.WriteLine("    --cert <path>               TLS certificate (.pfx or .pem)");
@@ -88,7 +95,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
 // Parse: stylobot <port> <upstream> [--mode demo|production]
 // Collect positional args, skipping values that belong to known flags
 var flagsWithValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    { "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level", "--threshold", "--llm", "--model" };
+    { "--port", "--upstream", "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level", "--threshold", "--llm", "--model" };
 var positionals = new List<string>();
 for (var i = 1; i < cmdArgs.Length; i++)
 {
@@ -107,31 +114,31 @@ for (var i = 1; i < cmdArgs.Length; i++)
         positionals.Add(cmdArgs[i]);
     }
 }
-string port, upstream;
+
+var cliPort = GetArg(cmdArgs, "--port");
+var cliUpstream = GetArg(cmdArgs, "--upstream");
+var envPort = Environment.GetEnvironmentVariable("PORT");
+var envUpstream = Environment.GetEnvironmentVariable("UPSTREAM")
+                  ?? Environment.GetEnvironmentVariable("DEFAULT_UPSTREAM");
+
+string? positionalPort = null;
+string? positionalUpstream = null;
 if (positionals.Count >= 2)
 {
-    port = positionals[0];
-    upstream = positionals[1];
+    positionalPort = positionals[0];
+    positionalUpstream = positionals[1];
 }
 else if (positionals.Count == 1)
 {
     // Single arg: if it looks like a number, it's the port; otherwise it's the upstream
     if (int.TryParse(positionals[0], out _))
-    {
-        port = positionals[0];
-        upstream = Environment.GetEnvironmentVariable("DEFAULT_UPSTREAM") ?? "http://localhost:8080";
-    }
+        positionalPort = positionals[0];
     else
-    {
-        upstream = positionals[0];
-        port = Environment.GetEnvironmentVariable("PORT") ?? "5080";
-    }
+        positionalUpstream = positionals[0];
 }
-else
-{
-    port = Environment.GetEnvironmentVariable("PORT") ?? "5080";
-    upstream = Environment.GetEnvironmentVariable("DEFAULT_UPSTREAM") ?? "http://localhost:8080";
-}
+
+var port = cliPort ?? positionalPort ?? envPort ?? "5080";
+var upstream = cliUpstream ?? positionalUpstream ?? envUpstream ?? "http://localhost:8080";
 var mode = GetArg(cmdArgs, "--mode") ?? Environment.GetEnvironmentVariable("MODE") ?? "demo";
 var actionPolicy = GetArg(cmdArgs, "--policy") ?? Environment.GetEnvironmentVariable("STYLOBOT_POLICY") ?? "logonly";
 var certPath = GetArg(cmdArgs, "--cert");
@@ -145,6 +152,19 @@ var llmModel = GetArg(cmdArgs, "--model") ?? "qwen3:0.6b";
 var useTls = certPath != null;
 var verbose = cmdArgs.Contains("--verbose");
 double? botThreshold = thresholdArg != null && double.TryParse(thresholdArg, out var t) ? t : null;
+
+if (!int.TryParse(port, out var portNumber) || portNumber is < 1 or > 65535)
+{
+    Console.Error.WriteLine($"  Invalid port: {port}");
+    return 1;
+}
+
+if (!Uri.TryCreate(upstream, UriKind.Absolute, out var upstreamUri) ||
+    (upstreamUri.Scheme != Uri.UriSchemeHttp && upstreamUri.Scheme != Uri.UriSchemeHttps))
+{
+    Console.Error.WriteLine($"  Invalid upstream URL: {upstream}");
+    return 1;
+}
 
 // Cloudflare tunnel: --tunnel (quick) or --tunnel <token> (named)
 string? tunnelToken = null;
@@ -210,7 +230,10 @@ logConfig = logConfig.WriteTo.File(
 // Read configuration from appsettings.json if available
 var configBuilder = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
-    .AddJsonFile("appsettings.json", true, false);
+    .AddJsonFile("appsettings.json", true, false)
+    .AddJsonFile($"appsettings.{mode}.json", true, false)
+    .AddEnvironmentVariables()
+    .AddEnvironmentVariables("STYLOBOT_");
 if (configPath != null)
     configBuilder.AddJsonFile(Path.GetFullPath(configPath), optional: false, reloadOnChange: false);
 
@@ -299,10 +322,12 @@ try
     });
 
     // Load configuration from appsettings.json (with mode override + CLI config)
-    builder.Configuration.AddJsonFile("appsettings.json", false, true);
+    builder.Configuration.AddJsonFile("appsettings.json", true, true);
     builder.Configuration.AddJsonFile($"appsettings.{mode}.json", true, true);
     if (configPath != null)
         builder.Configuration.AddJsonFile(Path.GetFullPath(configPath), optional: false, reloadOnChange: true);
+    builder.Configuration.AddEnvironmentVariables();
+    builder.Configuration.AddEnvironmentVariables("STYLOBOT_");
 
     // Read signature logging configuration early (needed by YARP transforms)
     // DEMO MODE: Enable PII logging by default for debugging (can be disabled in appsettings.json)
@@ -368,6 +393,17 @@ try
         builder.Services.AddBotDetection();
     }
 
+    builder.Services.AddBotDetectionTelemetry();
+    builder.Services.AddOpenTelemetry()
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddMeter(BotDetectionMetrics.MeterName)
+            .AddMeter(BotDetectionSignalMeter.MeterName)
+            .AddPrometheusExporter())
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddSource(BotDetectionTelemetry.ActivitySourceName));
+
     // Apply CLI overrides on top of config
     builder.Services.PostConfigure<Mostlylucid.BotDetection.Models.BotDetectionOptions>(opts =>
     {
@@ -397,7 +433,7 @@ try
     {
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
-            kestrel.ListenAnyIP(int.Parse(port), listenOptions =>
+            kestrel.ListenAnyIP(portNumber, listenOptions =>
             {
                 if (certPath!.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase))
                 {
@@ -442,6 +478,8 @@ try
         () => Results.Text(
             $"{{\"status\":\"healthy\",\"mode\":\"{mode}\",\"upstream\":\"{upstream}\",\"port\":\"{port}\"}}",
             "application/json"));
+
+    app.MapPrometheusScrapingEndpoint("/metrics");
 
     // Serve embedded test page - mapped BEFORE YARP to avoid being proxied
     app.MapGet("/test-client-side.html", async (HttpContext context) =>
@@ -668,7 +706,7 @@ try
 
     // Set listen URL (when not using TLS; TLS uses ConfigureKestrel before Build)
     if (!useTls)
-        app.Urls.Add($"http://*:{port}");
+        app.Urls.Add($"http://*:{portNumber}");
 
     var scheme = useTls ? "https" : "http";
     if (verbose)
