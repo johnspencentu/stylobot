@@ -476,6 +476,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+    - name: Extract version from tag
+      id: ver
+      env:
+        GIT_REF: ${{ github.ref_name }}
+      run: |
+        VERSION="${GIT_REF#allbot-v}"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Version: $VERSION"
+
     - name: Download all artifacts
       uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
@@ -511,10 +520,10 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
-        name: StyloBot Gateway v${{ needs.validate-version.outputs.version }}
-        tag_name: console-v${{ needs.validate-version.outputs.version }}
+        name: StyloBot v${{ steps.ver.outputs.version }} - Free forever
+        tag_name: console-v${{ steps.ver.outputs.version }}
         body: |
-          ## StyloBot v${{ needs.validate-version.outputs.version }} - Self-hosted bot defense. Free forever.
+          ## StyloBot v${{ steps.ver.outputs.version }} - Self-hosted bot defense. Free forever.
 
           ### Install
 
@@ -579,7 +588,7 @@ jobs:
     - name: Trigger Homebrew formula update
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        VERSION: ${{ needs.validate-version.outputs.version }}
+        VERSION: ${{ steps.ver.outputs.version }}
       run: |
         gh workflow run update-homebrew.yml \
           --repo "$GITHUB_REPOSITORY" \
@@ -588,7 +597,7 @@ jobs:
     - name: Trigger Chocolatey publish
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        VERSION: ${{ needs.validate-version.outputs.version }}
+        VERSION: ${{ steps.ver.outputs.version }}
       run: |
         gh workflow run publish-chocolatey.yml \
           --repo "$GITHUB_REPOSITORY" \
