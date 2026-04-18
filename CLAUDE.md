@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**StyloBot** is an enterprise-grade bot detection framework for ASP.NET Core. It uses a blackboard architecture (via StyloFlow) with 31 detectors in 4 waves, AI-powered classification, intent classification with threat scoring, Leiden clustering for bot network discovery, and zero-PII design. The system combines fast-path detection (<1ms) with optional LLM escalation for complex cases. Sessions are the primary behavioral unit - compressed into 118-dimensional Markov chain vectors with unified fingerprint dimensions, enabling inter-session velocity analysis and behavioral anomaly detection. Persistence uses SQLite (zero-dependency) with PostgreSQL + pgvector as the commercial upgrade path. The real-time dashboard features session timeline visualization with Markov chain drill-in, radar charts for behavioral shape, country analytics, cluster visualization, threat scoring, user agent breakdown, and live signature feed.
+**StyloBot** is an enterprise-grade bot detection framework for ASP.NET Core. It uses a blackboard architecture (via StyloFlow) with 31 detectors in 4 waves, real-time inference with <1ms fast path, intent classification with threat scoring, Leiden clustering for bot network discovery, and zero-PII design. The system combines fast-path detection with optional LLM enrichment (not decision-making) for edge cases. Sessions are the primary behavioral unit - compressed into 129-dimensional Markov chain vectors with unified fingerprint dimensions and per-transition timing anomaly detection, enabling inter-session velocity analysis and behavioral anomaly detection. Persistence uses SQLite everywhere (zero-dependency) for the FOSS product, with PostgreSQL as the commercial upgrade path (in the `stylobot-commercial` repo). The website/portal has been moved to `stylobot-commercial` as it depends on commercial packages. The real-time dashboard features session timeline visualization with Markov chain drill-in, behavioral shape radar charts (8-axis projection from 129-dim vectors), world threat map, traffic charts, country analytics, cluster visualization, threat scoring, deterministic bot naming, and live signature feed. All dashboard data persists to SQLite (no in-memory stores).
 
 ## Critical Rules
 
 - **NEVER add hard-coded site-specific exceptions, bypass keys, or allowlists.** StyloBot is a detection product - the fix is always to make detection *correct*, not to add workarounds. The live site (www.stylobot.net) runs the product as-is to test it.
 - **The `X-SB-Api-Key` header** is part of the product's detection policy system (for customers to exempt their own monitoring/health-check traffic). It is NOT for operational use to bypass detection on the StyloBot site itself.
 - **All detection improvements must be generic** - based on protocol specs (W3C Fetch Metadata, RFC 6455, etc.), not site-specific paths or domains.
+- **NEVER use in-memory stores for persistence.** All state must persist to SQLite (FOSS) or PostgreSQL (commercial). `ConcurrentDictionary` is fine for per-request transient state and performance caches only. No `InMemory*Store` classes for anything that matters.
+- **NEVER skip detection.** No skip paths, no logonly workarounds. Use `BotPolicyAttribute(BlockThreshold = 0.95)` for internal endpoints that need to be reachable by edge-case visitors.
+- **Dashboard logins are unlimited.** The "users" limit in commercial tiers refers to protected identity policy overrides (`ConfigResolutionContext.UserId`), not dashboard seats.
 
 ## Build Commands
 
@@ -65,7 +68,7 @@ dotnet pack Mostlylucid.BotDetection -c Release
 
 **Test Projects**: `*.Test`, `*.Tests` - xUnit + Moq
 
-**Website Solution**: `mostlylucid.stylobot.website/Stylobot.Website.sln` (separate marketing site)
+**Website Solution**: Moved to `stylobot-commercial` repo (depends on commercial packages for portal/licensing)
 
 ## Architecture
 
