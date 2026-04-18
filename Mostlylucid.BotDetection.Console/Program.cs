@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Mostlylucid.BotDetection.Console.Helpers;
 using Mostlylucid.BotDetection.Console.Logging;
 using Mostlylucid.BotDetection.Console.Models;
@@ -19,10 +21,127 @@ Batteries.Init();
 
 // Parse command-line arguments
 var cmdArgs = Environment.GetCommandLineArgs();
-var upstream = GetArg(cmdArgs, "--upstream") ??
-               Environment.GetEnvironmentVariable("UPSTREAM") ?? "http://localhost:8080";
-var port = GetArg(cmdArgs, "--port") ?? Environment.GetEnvironmentVariable("PORT") ?? "5080";
+
+// Show help if no args or --help
+if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
+{
+    Console.WriteLine();
+    Console.WriteLine("  stylobot · self-hosted bot defense");
+    Console.WriteLine("  https://stylobot.net");
+    Console.WriteLine();
+    Console.WriteLine("  Usage:");
+    Console.WriteLine("    stylobot <port> <upstream>                  Proxy to upstream on port");
+    Console.WriteLine("    stylobot <port> <upstream> --mode production     Enable blocking");
+    Console.WriteLine();
+    Console.WriteLine("  Options:");
+    Console.WriteLine("    --mode <demo|production>    Detection mode (default: demo)");
+    Console.WriteLine("    --cert <path>               TLS certificate (.pfx or .pem)");
+    Console.WriteLine("    --key <path>                TLS private key (required with .pem cert)");
+    Console.WriteLine("    --cert-password <pass>      PFX certificate password");
+    Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (quick or named)");
+    Console.WriteLine("    --config <path>             Path to appsettings.json override");
+    Console.WriteLine("    --log-level <level>         Minimum log level (default: Debug)");
+    Console.WriteLine("    -h, --help                  Show this help");
+    Console.WriteLine();
+    Console.WriteLine("  Examples:");
+    Console.WriteLine("    stylobot 5080 http://localhost:3000");
+    Console.WriteLine("    stylobot 8000 http://192.168.0.6:2040 --mode production");
+    Console.WriteLine("    stylobot 443 https://api.example.com --cert cert.pfx");
+    Console.WriteLine("    stylobot 5080 http://localhost:3000 --tunnel");
+    Console.WriteLine("    stylobot 5080 http://localhost:3000 --tunnel eyJhIjoiNjQ2...");
+    Console.WriteLine();
+    Console.WriteLine("  Dashboard:  http://localhost:<port>/_stylobot");
+    Console.WriteLine("  Health:     http://localhost:<port>/health");
+    Console.WriteLine();
+    Console.WriteLine("  Docs:       https://github.com/scottgal/stylobot");
+    Console.WriteLine("  Commercial: https://stylobot.net/pricing");
+    Console.WriteLine();
+    return 0;
+}
+
+// Parse: stylobot <port> <upstream> [--mode demo|production]
+// Collect positional args, skipping values that belong to known flags
+var flagsWithValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    { "--mode", "--cert", "--key", "--cert-password", "--config", "--log-level" };
+var positionals = new List<string>();
+for (var i = 1; i < cmdArgs.Length; i++)
+{
+    if (cmdArgs[i].StartsWith("-"))
+    {
+        if (flagsWithValues.Contains(cmdArgs[i]) && i + 1 < cmdArgs.Length)
+            i++; // skip the flag's value
+        else if (cmdArgs[i].Equals("--tunnel", StringComparison.OrdinalIgnoreCase)
+                 && i + 1 < cmdArgs.Length && !cmdArgs[i + 1].StartsWith("-")
+                 && !Uri.TryCreate(cmdArgs[i + 1], UriKind.Absolute, out _)
+                 && !int.TryParse(cmdArgs[i + 1], out _))
+            i++; // skip tunnel token (not a URL or port)
+    }
+    else
+    {
+        positionals.Add(cmdArgs[i]);
+    }
+}
+string port, upstream;
+if (positionals.Count >= 2)
+{
+    port = positionals[0];
+    upstream = positionals[1];
+}
+else if (positionals.Count == 1)
+{
+    // Single arg: if it looks like a number, it's the port; otherwise it's the upstream
+    if (int.TryParse(positionals[0], out _))
+    {
+        port = positionals[0];
+        upstream = Environment.GetEnvironmentVariable("DEFAULT_UPSTREAM") ?? "http://localhost:8080";
+    }
+    else
+    {
+        upstream = positionals[0];
+        port = Environment.GetEnvironmentVariable("PORT") ?? "5080";
+    }
+}
+else
+{
+    port = Environment.GetEnvironmentVariable("PORT") ?? "5080";
+    upstream = Environment.GetEnvironmentVariable("DEFAULT_UPSTREAM") ?? "http://localhost:8080";
+}
 var mode = GetArg(cmdArgs, "--mode") ?? Environment.GetEnvironmentVariable("MODE") ?? "demo";
+var certPath = GetArg(cmdArgs, "--cert");
+var keyPath = GetArg(cmdArgs, "--key");
+var certPassword = GetArg(cmdArgs, "--cert-password");
+var configPath = GetArg(cmdArgs, "--config");
+var logLevel = GetArg(cmdArgs, "--log-level");
+var useTls = certPath != null;
+
+// Cloudflare tunnel: --tunnel (quick) or --tunnel <token> (named)
+string? tunnelToken = null;
+var tunnelEnabled = false;
+var tunnelArgIndex = Array.FindIndex(cmdArgs, a => a.Equals("--tunnel", StringComparison.OrdinalIgnoreCase));
+if (tunnelArgIndex >= 0)
+{
+    tunnelEnabled = true;
+    // Next arg is the token if it doesn't start with --
+    if (tunnelArgIndex + 1 < cmdArgs.Length && !cmdArgs[tunnelArgIndex + 1].StartsWith("-"))
+        tunnelToken = cmdArgs[tunnelArgIndex + 1];
+}
+
+// Validate TLS cert exists
+if (certPath != null && !File.Exists(certPath))
+{
+    Console.Error.WriteLine($"  Certificate file not found: {certPath}");
+    return 1;
+}
+if (keyPath != null && !File.Exists(keyPath))
+{
+    Console.Error.WriteLine($"  Private key file not found: {keyPath}");
+    return 1;
+}
+
+// Parse log level override
+var minLogLevel = LogEventLevel.Debug;
+if (logLevel != null && Enum.TryParse<LogEventLevel>(logLevel, true, out var parsed))
+    minLogLevel = parsed;
 
 // Configure Serilog (console + file logging for errors/warnings only)
 // File logging can be configured via appsettings.json Serilog section
@@ -31,7 +150,7 @@ Directory.CreateDirectory(logsDir);
 
 // Build initial configuration from code (will be enriched by appsettings.json)
 var logConfig = new LoggerConfiguration()
-    .MinimumLevel.Debug()
+    .MinimumLevel.Is(minLogLevel)
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
     .MinimumLevel.Override("Yarp", LogEventLevel.Information)
@@ -54,6 +173,8 @@ var logConfig = new LoggerConfiguration()
 var configBuilder = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json", true, false);
+if (configPath != null)
+    configBuilder.AddJsonFile(Path.GetFullPath(configPath), optional: false, reloadOnChange: false);
 
 var tempConfig = configBuilder.Build();
 if (tempConfig.GetSection("Serilog").Exists())
@@ -105,6 +226,8 @@ try
     Log.Information("  Mode:     {Mode}", mode.ToUpper());
     Log.Information("  Upstream: {Upstream}", upstream);
     Log.Information("  Port:     {Port}", port);
+    if (useTls) Log.Information("  TLS:      {CertPath}", certPath);
+    if (tunnelEnabled) Log.Information("  Tunnel:   Cloudflare {TunnelType}", tunnelToken != null ? "(named)" : "(quick)");
     Log.Information("  Docs:     https://github.com/scottgal/stylobot");
     Log.Information("");
 
@@ -116,9 +239,9 @@ try
     // Use Serilog
     builder.Host.UseSerilog();
 
-    // Enable Windows Service support (AOT-compatible)
+    // Enable service hosting (Windows SCM + Linux systemd)
     builder.Host.UseWindowsService();
-    Log.Information("Windows Service support enabled (if running as service)");
+    builder.Host.UseSystemd();
 
     // Configure forwarded headers to extract real client IP from Cloudflare/proxies
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -133,9 +256,11 @@ try
         options.ForwardLimit = 1;
     });
 
-    // Load configuration from appsettings.json (with mode override)
+    // Load configuration from appsettings.json (with mode override + CLI config)
     builder.Configuration.AddJsonFile("appsettings.json", false, true);
     builder.Configuration.AddJsonFile($"appsettings.{mode}.json", true, true);
+    if (configPath != null)
+        builder.Configuration.AddJsonFile(Path.GetFullPath(configPath), optional: false, reloadOnChange: true);
 
     // Read signature logging configuration early (needed by YARP transforms)
     // DEMO MODE: Enable PII logging by default for debugging (can be disabled in appsettings.json)
@@ -206,6 +331,35 @@ try
         builderContext.AddResponseTransform(async transformContext =>
             await responseTransform.TransformAsync(transformContext));
     });
+
+    // Configure Kestrel for TLS if certificate provided (must be before Build)
+    if (useTls)
+    {
+        builder.WebHost.ConfigureKestrel(kestrel =>
+        {
+            kestrel.ListenAnyIP(int.Parse(port), listenOptions =>
+            {
+                if (certPath!.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase))
+                {
+                    listenOptions.UseHttps(certPath, certPassword);
+                }
+                else
+                {
+                    // PEM cert + key
+                    if (keyPath == null)
+                    {
+                        Log.Fatal("--key is required when using a .pem certificate");
+                        throw new InvalidOperationException("--key is required when using a .pem certificate");
+                    }
+                    listenOptions.UseHttps(httpsOptions =>
+                    {
+                        httpsOptions.ServerCertificateSelector = (_, _) =>
+                            System.Security.Cryptography.X509Certificates.X509Certificate2.CreateFromPemFile(certPath, keyPath);
+                    });
+                }
+            });
+        });
+    }
 
     var app = builder.Build();
 
@@ -447,13 +601,23 @@ try
     // Map YARP reverse proxy (catch-all, should be LAST)
     app.MapReverseProxy();
 
-    // Configure Kestrel to listen on specified port
-    app.Urls.Add($"http://*:{port}");
+    // Set listen URL (when not using TLS; TLS uses ConfigureKestrel before Build)
+    if (!useTls)
+        app.Urls.Add($"http://*:{port}");
 
-    Log.Information("  ✓ Ready on http://localhost:{Port}", port);
+    var scheme = useTls ? "https" : "http";
+    Log.Information("  ✓ Ready on {Scheme}://localhost:{Port}", scheme, port);
     Log.Information("  ✓ Upstream: {Upstream}", upstream);
-    Log.Information("  ✓ Health:   http://localhost:{Port}/health", port);
+    Log.Information("  ✓ Health:   {Scheme}://localhost:{Port}/health", scheme, port);
     Log.Information("");
+
+    // Launch Cloudflare tunnel if requested
+    Process? tunnelProcess = null;
+    if (tunnelEnabled)
+    {
+        tunnelProcess = LaunchCloudflaredTunnel(port, scheme, tunnelToken);
+    }
+
     Log.Information("  Press Ctrl+C to stop.");
 
     try
@@ -472,6 +636,14 @@ try
     }
     finally
     {
+        // Kill tunnel process if we started one
+        if (tunnelProcess is { HasExited: false })
+        {
+            Log.Information("Stopping Cloudflare tunnel...");
+            tunnelProcess.Kill(entireProcessTree: true);
+            tunnelProcess.Dispose();
+        }
+
         // Flush signature logger before shutdown
         await signatureLogger.FlushAndStopAsync();
     }
@@ -513,7 +685,7 @@ static double CalculateClientBotScore(bool hasCanvas, bool hasWebGL, bool hasAud
     return Math.Clamp(score, 0.0, 1.0);
 }
 
-// Helper to get command-line argument
+// Helper to get command-line argument value
 static string? GetArg(string[] args, string name)
 {
     for (var i = 0; i < args.Length - 1; i++)
@@ -521,4 +693,91 @@ static string? GetArg(string[] args, string name)
             return args[i + 1];
 
     return null;
+}
+
+// Launch cloudflared tunnel subprocess
+static Process? LaunchCloudflaredTunnel(string port, string scheme, string? token)
+{
+    // Check cloudflared is installed
+    try
+    {
+        var check = Process.Start(new ProcessStartInfo
+        {
+            FileName = "cloudflared",
+            Arguments = "version",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+        check?.WaitForExit(5000);
+        if (check is null || check.ExitCode != 0)
+        {
+            Log.Error("cloudflared not found. Install it: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/");
+            return null;
+        }
+    }
+    catch
+    {
+        Log.Error("cloudflared not found. Install it: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/");
+        return null;
+    }
+
+    ProcessStartInfo psi;
+    if (token != null)
+    {
+        // Named tunnel with pre-configured token
+        Log.Information("Starting Cloudflare named tunnel...");
+        psi = new ProcessStartInfo
+        {
+            FileName = "cloudflared",
+            Arguments = $"tunnel run --token {token}",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+    }
+    else
+    {
+        // Quick tunnel (random *.trycloudflare.com URL)
+        Log.Information("Starting Cloudflare quick tunnel...");
+        psi = new ProcessStartInfo
+        {
+            FileName = "cloudflared",
+            Arguments = $"tunnel --url {scheme}://localhost:{port}",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+    }
+
+    var process = Process.Start(psi);
+    if (process == null)
+    {
+        Log.Error("Failed to start cloudflared process");
+        return null;
+    }
+
+    // Log tunnel output in background (tunnel URL appears in stderr)
+    _ = Task.Run(async () =>
+    {
+        while (!process.HasExited)
+        {
+            var line = await process.StandardError.ReadLineAsync();
+            if (line != null)
+            {
+                // Look for the tunnel URL in output
+                if (line.Contains(".trycloudflare.com") || line.Contains("Registered tunnel connection"))
+                    Log.Information("  ✓ Tunnel: {TunnelInfo}", line.Trim());
+                else if (line.Contains("ERR"))
+                    Log.Warning("[cloudflared] {Line}", line.Trim());
+                else
+                    Log.Debug("[cloudflared] {Line}", line.Trim());
+            }
+        }
+    });
+
+    return process;
 }

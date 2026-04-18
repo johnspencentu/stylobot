@@ -1,13 +1,19 @@
 # Mostlylucid.BotDetection.UI.PostgreSQL
 
+> **⚠️ DEPRECATED from v1.0.0 onwards.** PostgreSQL and TimescaleDB are no longer required for FOSS StyloBot.
+>
+> The new **temporal behavioral vector compression** technique achieves 100x+ storage reduction by compressing session histories into fixed-size behavioral vectors — without needing TimescaleDB hypertables, continuous aggregates, or any database-specific extensions. The FOSS product works with file/SQLite storage out of the box.
+>
+> PostgreSQL persistence (with pgvector for similarity search) has moved to [StyloBot Commercial](https://github.com/scottgal/stylobot-commercial) (`Stylobot.Commercial.Persistence.Postgres`) for customers who need fleet-wide reporting and long-term session history.
+>
+> If you'd like to continue maintaining a FOSS PostgreSQL provider, feel free to fork this into a separate package or community branch.
+
 **Optional PostgreSQL Storage Provider** for Stylobot Dashboard with comprehensive bot detection data storage.
 
 > **Important**: This package is an **optional enhancement**! Stylobot works perfectly without it:
 >
 > - ✅ **Default**: File/SQLite storage (zero setup, works out of the box)
-> - 🚀 **Enhanced**: Add this package for PostgreSQL (better performance, advanced queries)
-> - ⚡ **Optimized**: + TimescaleDB (100-1000x faster, 90% storage reduction)
-> - 🤖 **ML-Powered**: + pgvector (ML similarity search, replaces Qdrant)
+> - 🚀 **Enhanced**: PostgreSQL support is now in StyloBot Commercial
 >
 > **Only install this if you need production-scale storage or advanced features!**
 

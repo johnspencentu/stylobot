@@ -24,16 +24,23 @@ dotnet add package mostlylucid.botdetection
 Then run it:
 
 ```bash
-stylobot
+stylobot 5080 http://localhost:3000
 # ✓ Ready on http://localhost:5080
+# ✓ Upstream: http://localhost:3000
 # ✓ Dashboard: http://localhost:5080/_stylobot
+
+stylobot 8000 http://192.168.0.6:2040 --mode production
+# Production mode with blocking enabled
+
+# With TLS
+stylobot 443 https://api.example.com --cert cert.pfx
+
+# Cloudflare Tunnel (instant public URL, no port forwarding)
+stylobot 5080 http://localhost:3000 --tunnel
+stylobot 5080 http://localhost:3000 --tunnel eyJhIjoiNjQ2...
 ```
 
-Or protect an existing app:
-
-```bash
-DEFAULT_UPSTREAM=http://localhost:3000 stylobot --mode production
-```
+**CLI options:** `--mode`, `--cert`, `--key`, `--cert-password`, `--tunnel`, `--config`, `--log-level`. Run `stylobot --help` for details.
 
 Or embed as middleware:
 
