@@ -162,6 +162,90 @@ jobs:
           --source https://api.nuget.org/v3/index.json \
           --skip-duplicate
 
+  # Publish BotDetection.UI NuGet package
+  publish-botdetection-ui:
+    needs: validate-version
+    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      with:
+        dotnet-version: '10.0.x'
+    - name: Restore, Build, Pack
+      run: |
+        dotnet restore ci.slnf
+        dotnet build Mostlylucid.BotDetection.UI/Mostlylucid.BotDetection.UI.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.UI/Mostlylucid.BotDetection.UI.csproj -c Release --no-build -o ./artifacts
+    - uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544
+      id: nuget_login
+      with:
+        user: 'mostlylucid'
+    - name: Push to NuGet
+      env:
+        NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  # Publish BotDetection.UI.PostgreSQL NuGet package
+  publish-botdetection-ui-postgresql:
+    needs: validate-version
+    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      with:
+        dotnet-version: '10.0.x'
+    - name: Restore, Build, Pack
+      run: |
+        dotnet restore ci.slnf
+        dotnet build Mostlylucid.BotDetection.UI.PostgreSQL/Mostlylucid.BotDetection.UI.PostgreSQL.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.UI.PostgreSQL/Mostlylucid.BotDetection.UI.PostgreSQL.csproj -c Release --no-build -o ./artifacts
+    - uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544
+      id: nuget_login
+      with:
+        user: 'mostlylucid'
+    - name: Push to NuGet
+      env:
+        NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  # Publish GeoDetection.Contributor NuGet package
+  publish-geodetection-contributor:
+    needs: validate-version
+    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      with:
+        dotnet-version: '10.0.x'
+    - name: Restore, Build, Pack
+      run: |
+        dotnet restore ci.slnf
+        dotnet build Mostlylucid.GeoDetection.Contributor/Mostlylucid.GeoDetection.Contributor.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.GeoDetection.Contributor/Mostlylucid.GeoDetection.Contributor.csproj -c Release --no-build -o ./artifacts
+    - uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544
+      id: nuget_login
+      with:
+        user: 'mostlylucid'
+    - name: Push to NuGet
+      env:
+        NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
   # Publish Stylobot.Gateway Docker image
   publish-gateway:
     needs: validate-version
