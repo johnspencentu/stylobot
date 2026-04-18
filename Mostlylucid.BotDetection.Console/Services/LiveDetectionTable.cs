@@ -105,6 +105,7 @@ public sealed class LiveDetectionTableService : BackgroundService
     private int _totalRequests;
     private int _totalBots;
     private int _totalHumans;
+    private int _totalThreats; // prob >= 0.8
     private double _totalDetectionTimeMs;
     private double _maxDetectionTimeMs;
     private readonly DateTime _startTime = DateTime.Now;
@@ -117,10 +118,6 @@ public sealed class LiveDetectionTableService : BackgroundService
 
     // Top bot signatures
     private readonly ConcurrentDictionary<string, int> _botSignatures = new();
-
-    // High-risk bot tracking for suggestions
-    private int _highRiskBots; // prob >= 0.8
-    private bool _blockSuggestionShown;
 
     public LiveDetectionTableService(
         DetectionEventSink sink,
@@ -165,7 +162,7 @@ public sealed class LiveDetectionTableService : BackgroundService
                         if (entry.Verdict == "BOT")
                         {
                             _totalBots++;
-                            if (entry.BotProbability >= 0.8) _highRiskBots++;
+                            if (entry.BotProbability >= 0.8) _totalThreats++;
                             var sig = entry.BotName ?? entry.TopDetector;
                             _botSignatures.AddOrUpdate(sig, 1, (_, c) => c + 1);
                         }
@@ -210,14 +207,17 @@ public sealed class LiveDetectionTableService : BackgroundService
         var uptime = DateTime.Now - _startTime;
         var reqPerSec = _recentRequests.Count / 10.0;
         var avgDetectionMs = _totalRequests > 0 ? _totalDetectionTimeMs / _totalRequests : 0;
-        var botPct = _totalRequests > 0 ? (double)_totalBots / _totalRequests * 100 : 0;
+
+        // === HEADER: Status line ===
+        var statusLine = _totalThreats > 0
+            ? $"[bold blue]stylobot[/] [dim]|[/] Protected for [bold]{FormatUptime(uptime)}[/] [dim]|[/] [bold]{_totalRequests}[/] requests [dim]|[/] [bold red]{_totalThreats} threats[/]"
+            : $"[bold blue]stylobot[/] [dim]|[/] Protected for [bold]{FormatUptime(uptime)}[/] [dim]|[/] [bold]{_totalRequests}[/] requests [dim]|[/] [green]0 threats[/]";
 
         // === LEFT COLUMN: Config + Stats ===
         var configPanel = new Table { Border = TableBorder.None, ShowHeaders = false };
         configPanel.AddColumn(new TableColumn("").Width(10).NoWrap());
         configPanel.AddColumn(new TableColumn("").NoWrap());
-        configPanel.AddRow("[bold blue]stylobot[/]", "[dim]self-hosted bot defense[/]");
-        configPanel.AddRow("[dim]Mode[/]", $"[bold]{_mode.ToUpper()}[/]");
+        configPanel.AddRow("[dim]Mode[/]", ModeMarkup(_mode));
         configPanel.AddRow("[dim]Policy[/]", PolicyMarkup(_policy));
         configPanel.AddRow("[dim]Upstream[/]", Markup.Escape(_upstream));
         configPanel.AddRow("[dim]Listen[/]", $"{scheme}://localhost:{_port}");
@@ -227,19 +227,17 @@ public sealed class LiveDetectionTableService : BackgroundService
             configPanel.AddRow("[dim]Tunnel[/]",
                 tUrl != null ? $"[bold green]{Markup.Escape(tUrl)}[/]" : "[yellow]connecting...[/]");
         }
-        configPanel.AddRow("[dim]Health[/]", $"[dim]{scheme}://localhost:{_port}/health[/]");
-        configPanel.AddRow("[dim]Uptime[/]", $"[dim]{uptime:hh\\:mm\\:ss}[/]");
 
         // Stats panel
         var statsPanel = new Table { Border = TableBorder.None, ShowHeaders = false };
         statsPanel.AddColumn(new TableColumn("").Width(10).NoWrap());
         statsPanel.AddColumn(new TableColumn("").NoWrap());
-        statsPanel.AddRow("[dim]Requests[/]", $"[bold]{_totalRequests}[/]");
         statsPanel.AddRow("[dim]Rate[/]", $"[bold]{reqPerSec:F1}[/] req/s");
-        statsPanel.AddRow("[dim]Bots[/]", $"[red]{_totalBots}[/] ({botPct:F0}%)");
-        statsPanel.AddRow("[dim]Humans[/]", $"[green]{_totalHumans}[/]");
+        statsPanel.AddRow("[dim]Humans[/]", $"[bold green]{_totalHumans}[/]");
+        statsPanel.AddRow("[dim]Bots[/]", $"[bold red]{_totalBots}[/]");
+        statsPanel.AddRow("[dim]Threats[/]", _totalThreats > 0 ? $"[bold red on black] {_totalThreats} [/]" : "[dim]0[/]");
         statsPanel.AddRow("[dim]Avg time[/]", $"{avgDetectionMs:F1}ms");
-        statsPanel.AddRow("[dim]Max time[/]", $"{_maxDetectionTimeMs:F1}ms");
+        statsPanel.AddRow("[dim]P95 max[/]", $"{_maxDetectionTimeMs:F1}ms");
 
         // Top endpoints (top 5)
         var endpointsTable = new Table { Border = TableBorder.Simple, Expand = true };
@@ -283,60 +281,68 @@ public sealed class LiveDetectionTableService : BackgroundService
         var detectionTable = new Table { Border = TableBorder.Rounded, Expand = true };
         detectionTable.AddColumn(new TableColumn("[dim]Time[/]").Width(8));
         detectionTable.AddColumn(new TableColumn("[dim]Path[/]"));
-        detectionTable.AddColumn(new TableColumn("[dim]Prob[/]").Width(5));
-        detectionTable.AddColumn(new TableColumn("[dim]Verdict[/]").Width(7));
+        detectionTable.AddColumn(new TableColumn("[dim]Risk[/]").Width(12));
+        detectionTable.AddColumn(new TableColumn("[dim]Action[/]").Width(11));
         detectionTable.AddColumn(new TableColumn("[dim]ms[/]").Width(5));
         detectionTable.AddColumn(new TableColumn("[dim]Detector[/]"));
-        detectionTable.AddColumn(new TableColumn("[dim]Bot Name[/]"));
-        detectionTable.AddColumn(new TableColumn("[dim]Action[/]").Width(10));
+        detectionTable.AddColumn(new TableColumn("[dim]Identity[/]"));
 
         if (entries.Count == 0)
         {
-            detectionTable.AddRow("[dim]Waiting for requests...[/]", "", "", "", "", "", "", "");
+            detectionTable.AddRow("[dim]Waiting for requests...[/]", "", "", "", "", "", "");
         }
         else
         {
             foreach (var e in entries)
             {
-                var probColor = e.BotProbability >= 0.7 ? "red"
-                    : e.BotProbability >= 0.4 ? "yellow"
-                    : "green";
-                var verdictMarkup = e.Verdict == "BOT"
-                    ? "[bold red]BOT[/]"
-                    : "[bold green]OK[/]";
-                var timeColor = e.DetectionTimeMs > 50 ? "yellow"
-                    : e.DetectionTimeMs > 200 ? "red"
+                var riskMarkup = FormatRisk(e.BotProbability);
+                var actionMarkup = FormatAction(e);
+                var timeColor = e.DetectionTimeMs > 200 ? "red"
+                    : e.DetectionTimeMs > 50 ? "yellow"
                     : "dim";
 
                 var path = e.Path.Length > 25 ? e.Path[..22] + "..." : e.Path;
                 var detector = e.TopDetector.Length > 16 ? e.TopDetector[..13] + "..." : e.TopDetector;
-                var botName = (e.BotName ?? "-");
-                if (botName.Length > 18) botName = botName[..15] + "...";
+                var identity = (e.BotName ?? "-");
+                if (identity.Length > 18) identity = identity[..15] + "...";
 
                 detectionTable.AddRow(
                     $"[dim]{e.Timestamp:HH:mm:ss}[/]",
                     Markup.Escape(path),
-                    $"[{probColor}]{e.BotProbability:F2}[/]",
-                    verdictMarkup,
+                    riskMarkup,
+                    actionMarkup,
                     $"[{timeColor}]{e.DetectionTimeMs:F0}[/]",
                     Markup.Escape(detector),
-                    Markup.Escape(botName),
-                    Markup.Escape(e.ActionPolicy ?? "-"));
+                    Markup.Escape(identity));
             }
         }
 
-        // === LAYOUT: Two columns ===
-        var layout = new Columns(
-            new Padder(leftSide, new Padding(0, 0, 1, 0)),
-            detectionTable
-        );
+        // === LAYOUT: responsive - side-by-side on wide terminals, stacked on narrow ===
+        var termWidth = AnsiConsole.Profile.Width;
+        IRenderable layout;
+        if (termWidth >= 120)
+        {
+            layout = new Columns(
+                new Padder(leftSide, new Padding(0, 0, 1, 0)),
+                detectionTable
+            );
+        }
+        else
+        {
+            // Narrow terminal: compact stats bar + full-width detection table
+            var compactStats = new Markup(
+                $"[bold blue]stylobot[/] [dim]|[/] {ModeMarkup(_mode)} [dim]|[/] {PolicyMarkup(_policy)} " +
+                $"[dim]|[/] [bold]{reqPerSec:F1}[/]req/s [dim]|[/] [green]{_totalHumans}[/]ok [red]{_totalBots}[/]bot " +
+                (_totalThreats > 0 ? $"[dim]|[/] [bold red]{_totalThreats}[/]threats" : ""));
+            layout = new Rows(compactStats, detectionTable);
+        }
 
         // === SUGGESTION BAR ===
         IRenderable suggestion;
-        if (_highRiskBots >= 5 && _policy.Equals("logonly", StringComparison.OrdinalIgnoreCase) && !_blockSuggestionShown)
+        if (_totalThreats >= 5 && _policy.Equals("logonly", StringComparison.OrdinalIgnoreCase))
         {
             suggestion = new Panel(
-                new Markup($"[bold yellow]! {_highRiskBots} high-risk bots detected.[/] Your policy is [bold]logonly[/]. Consider: [bold]stylobot {_port} {Markup.Escape(_upstream)} --policy block[/]"))
+                new Markup($"[bold yellow]! {_totalThreats} threats detected in observe-only mode.[/] To block: [bold]--policy block[/]"))
             { Border = BoxBorder.Heavy, BorderStyle = new Style(Color.Yellow) };
         }
         else
@@ -345,18 +351,56 @@ public sealed class LiveDetectionTableService : BackgroundService
         }
 
         // === FINAL ASSEMBLY ===
-        var root = new Rows(layout, suggestion);
+        var root = new Rows(new Markup(statusLine), layout, suggestion);
         return root;
     }
 
+    private static string FormatRisk(double prob)
+    {
+        if (prob >= 0.9) return $"[bold red on black] {prob:F2} HIGH [/]";
+        if (prob >= 0.7) return $"[bold red]{prob:F2}[/] [red]RISK[/]";
+        if (prob >= 0.4) return $"[yellow]{prob:F2}[/] [dim]MED[/]";
+        return $"[green]{prob:F2}[/] [dim]LOW[/]";
+    }
+
+    private static string FormatAction(DetectionEntry e)
+    {
+        var policy = (e.ActionPolicy ?? "").ToLowerInvariant();
+        if (e.Verdict == "HUMAN") return "[bold green]Allowed[/]";
+
+        return policy switch
+        {
+            "block" or "block-hard" or "block-soft" => "[bold red]Blocked[/]",
+            "challenge" or "challenge-pow" or "challenge-js" => "[bold yellow]Challenge[/]",
+            "throttle" or "throttle-stealth" or "throttle-aggressive" => "[yellow]Throttled[/]",
+            "logonly" or "shadow" or "debug" => "[dim]Monitored[/]",
+            _ => e.BotProbability >= 0.5 ? "[dim]Monitored[/]" : "[bold green]Allowed[/]"
+        };
+    }
+
+    private static string ModeMarkup(string mode) => mode.ToLowerInvariant() switch
+    {
+        "demo" => "[bold]OBSERVE ONLY[/] [dim](demo)[/]",
+        "production" => "[bold green]ACTIVE PROTECTION[/]",
+        "learning" => "[bold yellow]LEARNING[/]",
+        _ => $"[bold]{Markup.Escape(mode.ToUpper())}[/]"
+    };
+
     private static string PolicyMarkup(string policy) => policy.ToLowerInvariant() switch
     {
-        "block" => "[bold red]block[/]",
-        "throttle" or "throttle-stealth" => "[bold yellow]throttle[/]",
-        "challenge" => "[bold yellow]challenge[/]",
-        "logonly" => "[bold dim]logonly[/] [dim](monitoring only)[/]",
+        "block" => "[bold red]Block[/]",
+        "throttle" or "throttle-stealth" => "[bold yellow]Throttle[/]",
+        "challenge" => "[bold yellow]Challenge[/]",
+        "logonly" => "[dim]Observe only[/]",
         _ => $"[bold]{Markup.Escape(policy)}[/]"
     };
+
+    private static string FormatUptime(TimeSpan ts)
+    {
+        if (ts.TotalHours >= 1) return $"{ts.Hours}h{ts.Minutes:D2}m";
+        if (ts.TotalMinutes >= 1) return $"{ts.Minutes}m{ts.Seconds:D2}s";
+        return $"{ts.Seconds}s";
+    }
 
     private static void TrimDictionary(ConcurrentDictionary<string, int> dict, int keepTop)
     {
