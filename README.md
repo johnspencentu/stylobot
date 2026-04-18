@@ -85,9 +85,18 @@ See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 ## Install
 
 ```bash
-# NuGet package - add to your ASP.NET Core app
-dotnet add package mostlylucid.botdetection
+# One-line install (Linux/macOS) - downloads pre-built binary
+curl -fsSL https://raw.githubusercontent.com/scottgal/stylobot/main/scripts/install.sh | bash
+stylobot  # starts in demo mode on port 5080
 
+# Or via Homebrew (macOS + Linux)
+brew install scottgal/stylobot/stylobot
+
+# Or via Docker
+docker run --rm -p 8080:8080 -e DEFAULT_UPSTREAM=http://host.docker.internal:3000 scottgal/stylobot-gateway:latest
+
+# Or as a NuGet package in your ASP.NET Core app
+dotnet add package mostlylucid.botdetection
 # Two lines in Program.cs:
 # builder.Services.AddBotDetection();
 # app.UseBotDetection();
