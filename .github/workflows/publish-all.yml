@@ -290,6 +290,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Build and push
+      id: gateway-build
       uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
       with:
         context: .
@@ -301,6 +302,14 @@ jobs:
         platforms: linux/amd64,linux/arm64
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign Gateway Docker image
+      env:
+        DIGEST: ${{ steps.gateway-build.outputs.digest }}
+      run: cosign sign --yes scottgal/stylobot-gateway@${DIGEST}
 
   # Publish Stylobot Demo Docker image
   publish-demo:
@@ -323,6 +332,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Build and push
+      id: demo-build
       uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
       with:
         context: .
@@ -334,6 +344,14 @@ jobs:
         platforms: linux/amd64,linux/arm64
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign Demo Docker image
+      env:
+        DIGEST: ${{ steps.demo-build.outputs.digest }}
+      run: cosign sign --yes scottgal/stylobot-demo@${DIGEST}
         build-args: |
           BUILD_VERSION=${{ needs.validate-version.outputs.version }}
 
@@ -473,6 +491,21 @@ jobs:
         sha256sum * > SHA256SUMS.txt
         cat SHA256SUMS.txt
 
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign release artifacts with cosign
+      working-directory: release-assets
+      run: |
+        for f in *.tar.gz *.zip; do
+          cosign sign-blob --yes "$f" \
+            --output-signature "${f}.sig" \
+            --output-certificate "${f}.pem"
+        done
+        cosign sign-blob --yes SHA256SUMS.txt \
+          --output-signature SHA256SUMS.txt.sig \
+          --output-certificate SHA256SUMS.txt.pem
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
@@ -491,6 +524,18 @@ jobs:
           - **Windows ARM64**: `stylobot-win-arm64.zip`
           - **macOS Intel**: `stylobot-osx-x64.tar.gz`
           - **macOS Apple Silicon**: `stylobot-osx-arm64.tar.gz`
+
+          ### Verification
+
+          All binaries are signed with [Sigstore cosign](https://docs.sigstore.dev/). Verify with:
+
+          ```bash
+          cosign verify-blob stylobot-linux-x64.tar.gz \
+            --signature stylobot-linux-x64.tar.gz.sig \
+            --certificate stylobot-linux-x64.tar.gz.pem \
+            --certificate-identity-regexp "github.com/scottgal/stylobot" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          ```
         draft: false
         prerelease: false
         files: |
