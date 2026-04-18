@@ -1,0 +1,27 @@
+{
+  "solution": {
+    "path": "mostlylucid.stylobot.sln",
+    "projects": [
+      "Mostlylucid.BotDetection\\Mostlylucid.BotDetection.csproj",
+      "Mostlylucid.BotDetection.Demo\\Mostlylucid.BotDetection.Demo.csproj",
+      "Mostlylucid.BotDetection.MinimalDemo\\Mostlylucid.BotDetection.MinimalDemo.csproj",
+      "Mostlylucid.BotDetection.Console\\Mostlylucid.BotDetection.Console.csproj",
+      "Mostlylucid.BotDetection.UI\\Mostlylucid.BotDetection.UI.csproj",
+      "Mostlylucid.BotDetection.UI.PostgreSQL\\Mostlylucid.BotDetection.UI.PostgreSQL.csproj",
+      "Mostlylucid.BotDetection.Test\\Mostlylucid.BotDetection.Test.csproj",
+      "Mostlylucid.BotDetection.Orchestration.Tests\\Mostlylucid.BotDetection.Orchestration.Tests.csproj",
+      "Mostlylucid.BotDetection.Demo.Tests\\Mostlylucid.BotDetection.Demo.Tests.csproj",
+      "Mostlylucid.BotDetection.Benchmarks\\Mostlylucid.BotDetection.Benchmarks.csproj",
+      "Mostlylucid.Common\\Mostlylucid.Common.csproj",
+      "Mostlylucid.GeoDetection\\Mostlylucid.GeoDetection.csproj",
+      "Mostlylucid.GeoDetection.Contributor\\Mostlylucid.GeoDetection.Contributor.csproj",
+      "Mostlylucid.GeoDetection.Test\\Mostlylucid.GeoDetection.Test.csproj",
+      "Stylobot.Gateway\\Stylobot.Gateway.csproj",
+      "Stylobot.Gateway.Tests\\Stylobot.Gateway.Tests.csproj",
+      "Mostlylucid.BotDetection.Llm.Ollama\\Mostlylucid.BotDetection.Llm.Ollama.csproj",
+      "Mostlylucid.BotDetection.Llm.LlamaSharp\\Mostlylucid.BotDetection.Llm.LlamaSharp.csproj",
+      "Mostlylucid.BotDetection.BdfGenerator\\Mostlylucid.BotDetection.BdfGenerator.csproj",
+      "Mostlylucid.BotDetection.ApiHolodeck\\Mostlylucid.BotDetection.ApiHolodeck.csproj"
+    ]
+  }
+}
