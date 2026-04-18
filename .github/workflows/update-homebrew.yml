@@ -1,30 +1,37 @@
 name: Update Homebrew Formula
 
 on:
-  release:
-    types: [published]
+  # Triggers when the Publish All workflow completes (any job)
+  workflow_run:
+    workflows: ["Publish All"]
+    types: [completed]
+  # Also allow manual trigger
+  workflow_dispatch:
 
 jobs:
   update-formula:
-    # Only run for console releases (tag: console-v*)
-    if: startsWith(github.event.release.tag_name, 'console-v')
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-    - name: Extract version
-      id: version
+    - name: Find latest console release
+      id: release
       env:
-        TAG_NAME: ${{ github.event.release.tag_name }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        VERSION="${TAG_NAME#console-v}"
+        # Get the latest console-v* release
+        TAG=$(gh release list --repo "${{ github.repository }}" --limit 20 --json tagName \
+          | jq -r '[.[] | select(.tagName | startswith("console-v"))][0].tagName')
+        VERSION="${TAG#console-v}"
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-        echo "Updating Homebrew formula to v$VERSION"
+        echo "Found release: $TAG (v$VERSION)"
 
     - name: Download SHA256SUMS from release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TAG_NAME: ${{ github.event.release.tag_name }}
+        TAG: ${{ steps.release.outputs.tag }}
       run: |
-        gh release download "$TAG_NAME" \
+        gh release download "$TAG" \
           --repo "${{ github.repository }}" \
           --pattern "SHA256SUMS.txt" \
           --output SHA256SUMS.txt
@@ -47,7 +54,7 @@ jobs:
 
     - name: Update formula
       env:
-        VERSION: ${{ steps.version.outputs.version }}
+        VERSION: ${{ steps.release.outputs.version }}
         SHA_OSX_ARM64: ${{ steps.hashes.outputs.osx_arm64 }}
         SHA_OSX_X64: ${{ steps.hashes.outputs.osx_x64 }}
         SHA_LINUX_ARM64: ${{ steps.hashes.outputs.linux_arm64 }}
@@ -64,6 +71,8 @@ jobs:
 
     - name: Commit and push
       working-directory: homebrew-tap
+      env:
+        VERSION: ${{ steps.release.outputs.version }}
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
