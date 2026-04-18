@@ -548,10 +548,58 @@ jobs:
           --repo "$GITHUB_REPOSITORY" \
           -f "version=${VERSION}"
 
+  # Publish to Chocolatey (Windows runner required for choco CLI)
+  publish-chocolatey:
+    needs: [validate-version, create-console-release]
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'console-only'
+    runs-on: windows-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+    - name: Download SHA256SUMS from release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ needs.validate-version.outputs.version }}
+      shell: bash
+      run: |
+        gh release download "console-v${VERSION}" \
+          --repo "$GITHUB_REPOSITORY" \
+          --pattern "SHA256SUMS.txt"
+        cat SHA256SUMS.txt
+
+    - name: Update version and checksum
+      env:
+        VERSION: ${{ needs.validate-version.outputs.version }}
+      shell: pwsh
+      run: |
+        $sha = (Get-Content SHA256SUMS.txt | Select-String 'stylobot-win-x64.zip').ToString().Split(' ')[0]
+        $nuspec = Get-Content scripts/chocolatey/stylobot.nuspec -Raw
+        $nuspec = $nuspec -replace '<version>.*</version>', "<version>$env:VERSION</version>"
+        Set-Content scripts/chocolatey/stylobot.nuspec $nuspec
+        $install = Get-Content scripts/chocolatey/tools/chocolateyInstall.ps1 -Raw
+        $install = $install -replace "checksum       = '.*'", "checksum       = '$sha'"
+        $install = $install -replace '\$version = .*', "`$version = '$env:VERSION'"
+        Set-Content scripts/chocolatey/tools/chocolateyInstall.ps1 $install
+
+    - name: Pack and push
+      env:
+        VERSION: ${{ needs.validate-version.outputs.version }}
+        CHOCO_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+      shell: pwsh
+      run: |
+        cd scripts/chocolatey
+        choco pack stylobot.nuspec
+        if ($env:CHOCO_API_KEY) {
+          choco push "stylobot.$env:VERSION.nupkg" --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+        } else {
+          Write-Host "CHOCOLATEY_API_KEY not set, skipping push"
+        }
+
   # Summary
   summary:
     if: always()
-    needs: [validate-version, publish-botdetection, publish-common, publish-geodetection, publish-botdetection-ui, publish-botdetection-ui-postgresql, publish-geodetection-contributor, publish-gateway, publish-demo, publish-console, create-console-release]
+    needs: [validate-version, publish-botdetection, publish-common, publish-geodetection, publish-botdetection-ui, publish-botdetection-ui-postgresql, publish-geodetection-contributor, publish-gateway, publish-demo, publish-console, create-console-release, publish-chocolatey]
     runs-on: ubuntu-latest
     steps:
     - name: Create summary
@@ -570,4 +618,5 @@ jobs:
         echo "| GeoDetection.Contributor NuGet | ${{ needs.publish-geodetection-contributor.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Console Binaries | ${{ needs.publish-console.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Console Release | ${{ needs.create-console-release.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Chocolatey | ${{ needs.publish-chocolatey.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Homebrew Tap | (via update-homebrew.yml on release) |" >> $GITHUB_STEP_SUMMARY
