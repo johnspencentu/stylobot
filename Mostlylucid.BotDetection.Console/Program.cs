@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -312,13 +313,53 @@ try
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
 
-        // Trust all proxies (Cloudflare, reverse proxies, etc.)
+        var trustAllProxies = builder.Configuration.GetValue("Network:TrustAllForwardedProxies", false) ||
+                              bool.TryParse(Environment.GetEnvironmentVariable("TRUST_ALL_FORWARDED_PROXIES"), out var trustAll) &&
+                              trustAll;
+
+        if (trustAllProxies)
+        {
+            Log.Warning("TrustAllForwardedProxies is enabled. This allows IP spoofing via X-Forwarded-For. Configure Network:KnownNetworks/KnownProxies instead.");
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+            return;
+        }
+
         options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
 
-        // Limit to first proxy for security
-        options.ForwardLimit = 1;
+        var configNetworks = builder.Configuration["Network:KnownNetworks"];
+        var knownNetworks = string.IsNullOrEmpty(configNetworks)
+            ? Environment.GetEnvironmentVariable("KNOWN_NETWORKS") ?? string.Empty
+            : configNetworks;
+        foreach (var network in knownNetworks.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (TryParseNetwork(network, out var parsedNetwork))
+                options.KnownIPNetworks.Add(parsedNetwork);
+            else
+                Log.Warning("Ignoring invalid forwarded-header trusted network: {Network}", network);
+        }
+
+        var configProxies = builder.Configuration["Network:KnownProxies"];
+        var knownProxies = string.IsNullOrEmpty(configProxies)
+            ? Environment.GetEnvironmentVariable("KNOWN_PROXIES") ?? string.Empty
+            : configProxies;
+        foreach (var proxy in knownProxies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (IPAddress.TryParse(proxy, out var parsedProxy))
+                options.KnownProxies.Add(parsedProxy);
+            else
+                Log.Warning("Ignoring invalid forwarded-header trusted proxy: {Proxy}", proxy);
+        }
+
+        if (tunnelEnabled)
+        {
+            // Local cloudflared acts as the direct proxy in tunnel mode.
+            options.KnownProxies.Add(IPAddress.Loopback);
+            options.KnownProxies.Add(IPAddress.IPv6Loopback);
+        }
     });
 
     // Load configuration from appsettings.json (with mode override + CLI config)
@@ -825,6 +866,24 @@ static string? GetArg(string[] args, string name)
             return args[i + 1];
 
     return null;
+}
+
+static bool TryParseNetwork(string value, out System.Net.IPNetwork network)
+{
+    network = default;
+    var parts = value.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (parts.Length != 2 ||
+        !IPAddress.TryParse(parts[0], out var prefix) ||
+        !int.TryParse(parts[1], out var prefixLength))
+        return false;
+
+    // Validate prefix length range (IPv4: 0-32, IPv6: 0-128)
+    var maxPrefix = prefix.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128;
+    if (prefixLength < 0 || prefixLength > maxPrefix)
+        return false;
+
+    network = new System.Net.IPNetwork(prefix, prefixLength);
+    return true;
 }
 
 // Launch cloudflared tunnel subprocess

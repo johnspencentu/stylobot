@@ -129,7 +129,7 @@ it with your OS's service manager - no special installation scripts required.
 ### Demo Mode
 
 - **Purpose**: Testing, development, observability
-- **Detectors**: Fast-path only (UserAgent, Header, IP, SecurityTool, etc.)
+- **Detectors**: Full pipeline with trigger bypass for maximum visibility
 - **Blocking**: Disabled - all traffic allowed
 - **Learning**: Disabled
 - **Logging**: Full verbose output with all signals and detector contributions
@@ -171,8 +171,8 @@ for details.
 - **Purpose**: Real-world deployment with bot blocking
 - **Detectors**: Fast-path + slow-path + AI escalation
     - Fast: FastPathReputation, UserAgent, Header, IP, SecurityTool
-    - Slow: Behavioral, Fingerprinting (HTTP/2, TLS, TCP/IP), MultiLayerCorrelation, Waveform
-    - AI: Heuristic learning
+    - Slow: Behavioral, AdvancedBehavioral, ClientSide, Inconsistency, VersionAge, HTTP/2, TLS, TCP/IP, MultiLayerCorrelation, BehavioralWaveform
+    - AI: `Llm` and `HeuristicLate` when AI escalation is enabled
 - **Blocking**: Enabled with adaptive policies
     - > 0.95 risk: Immediate block (403)
     - > 0.70 risk: Block with logging
@@ -195,11 +195,20 @@ Example output (always zero-PII in production):
 
 ## Command-Line Options
 
-| Option       | Environment Variable | Default                 | Description                  |
-|--------------|----------------------|-------------------------|------------------------------|
-| `--upstream` | `UPSTREAM`           | `http://localhost:8080` | Upstream server URL          |
-| `--port`     | `PORT`               | `5080`                  | Port to listen on            |
-| `--mode`     | `MODE`               | `demo`                  | Mode: `demo` or `production` |
+| Option              | Environment Variable | Default                 | Description                             |
+|---------------------|----------------------|-------------------------|-----------------------------------------|
+| `--upstream`        | `UPSTREAM`           | `http://localhost:8080` | Upstream server URL                     |
+| `--port`            | `PORT`               | `5080`                  | Port to listen on                       |
+| `--mode`            | `MODE`               | `demo`                  | Mode: `demo` or `production`            |
+| `--policy`          | `STYLOBOT_POLICY`    | `logonly`               | Override default action policy          |
+| `--threshold`       | -                    | `0.7`                   | Override bot threshold                  |
+| `--llm`             | -                    | -                       | Ollama base URL for LLM escalation      |
+| `--model`           | -                    | `qwen3:0.6b`            | Ollama model name                       |
+| `--config`          | -                    | -                       | Additional JSON config file             |
+| `--log-level`       | -                    | `Warning`               | Minimum Serilog level                   |
+| `--verbose`         | -                    | `false`                 | Disable live table and print full logs  |
+| `--cert` / `--key`  | -                    | -                       | Enable TLS with PFX or PEM certificate  |
+| `--tunnel [token]`  | -                    | -                       | Start `cloudflared` tunnel              |
 
 ## Configuration
 
@@ -226,6 +235,19 @@ export MODE=production
 
 The `--mode` flag determines which configuration file is loaded. This allows you to maintain separate configurations for
 development/testing and production without modifying files.
+
+### Environment Variables
+
+Supported operational environment variables include:
+
+- `UPSTREAM`
+- `DEFAULT_UPSTREAM`
+- `PORT`
+- `MODE`
+- `STYLOBOT_POLICY`
+- `KNOWN_NETWORKS`
+- `KNOWN_PROXIES`
+- `TRUST_ALL_FORWARDED_PROXIES`
 
 ## Zero-PII Logging
 
@@ -404,8 +426,8 @@ The gateway handles Content Security Policy headers differently based on mode:
 
 ## LLM Detection (Optional)
 
-> **Note**: LLM-based detection is available in the full product but not included by default in this console gateway
-> demo. You can enable it by configuring an LLM endpoint.
+The console gateway supports optional Ollama-based LLM escalation. It is off unless you provide an endpoint with
+`--llm` or configure the equivalent `BotDetection:AiDetection:Ollama:Endpoint` setting.
 
 ### Why Use LLM Detection?
 
@@ -424,73 +446,26 @@ LLM detectors provide:
 
 ### Configuration
 
-Add the LLM detector to your detection policy and configure the endpoint:
+The shipped production policy already contains `AiPath: ["Llm", "HeuristicLate"]`. To activate it, point the CLI at
+an Ollama instance:
 
-**appsettings.json** (or **appsettings.production.json**):
+```bash
+stylobot --mode production --llm http://localhost:11434 --model qwen3:0.6b
+```
+
+Equivalent config:
 
 ```json
 {
   "BotDetection": {
-    "Policies": {
-      "production": {
-        "FastPath": ["FastPathReputation", "UserAgent", "Header"],
-        "SlowPath": ["Behavioral", "ClientSide"],
-
-        // Add LLM to AI path for high-uncertainty cases
-        "AiPath": ["Heuristic", "Llm"],
-
-        // Only escalate to LLM when heuristics are uncertain
-        "EscalateToAi": true,
-        "AiEscalationThreshold": 0.6  // 40-60% confidence = uncertain
+    "AiDetection": {
+      "Provider": "Ollama",
+      "TimeoutMs": 2000,
+      "MaxConcurrentRequests": 5,
+      "Ollama": {
+        "Endpoint": "http://localhost:11434",
+        "Model": "qwen3:0.6b"
       }
-    },
-
-    // LLM Detector Configuration
-    "LlmDetector": {
-      // OPTION 1: OpenAI (GPT-4, GPT-3.5)
-      /* "Provider": "OpenAI",
-      "ApiKey": "${OPENAI_API_KEY}",  // From environment variable
-      "Model": "gpt-4o-mini",          // Fast, cheap model
-      "MaxTokens": 150,
-      "Temperature": 0.3,              // Low temperature for consistent results
-      "Timeout": 2000,                 // 2 second timeout
-      */
-
-      // OPTION 2: Anthropic Claude
-      /* "Provider": "Anthropic",
-      "ApiKey": "${ANTHROPIC_API_KEY}",
-      "Model": "claude-3-haiku-20240307",  // Fast, cheap model
-      "MaxTokens": 150,
-      "Temperature": 0.3,
-      "Timeout": 2000,
-      */
-
-      // OPTION 3: Local Ollama
-      /* "Provider": "Ollama",
-      "BaseUrl": "http://localhost:11434",
-      "Model": "llama3.2:3b",          // Small, fast local model
-      "MaxTokens": 150,
-      "Temperature": 0.3,
-      "Timeout": 5000,                 // Local can be slower
-      */
-
-      // OPTION 4: Azure OpenAI
-      /* "Provider": "AzureOpenAI",
-      "ApiKey": "${AZURE_OPENAI_KEY}",
-      "Endpoint": "https://your-resource.openai.azure.com/",
-      "DeploymentName": "gpt-4o-mini",
-      "ApiVersion": "2024-02-15-preview",
-      "MaxTokens": 150,
-      "Temperature": 0.3,
-      "Timeout": 2000,
-      */
-
-      // Shared settings for all providers
-      "Enabled": false,  // Set to true to enable
-      "CacheResults": true,              // Cache identical patterns
-      "CacheDuration": "01:00:00",       // 1 hour cache
-      "RunAsync": true,                  // Don't block request (recommended)
-      "IncludeReasoning": true           // Include LLM explanation in logs
     }
   }
 }
@@ -502,25 +477,23 @@ Add the LLM detector to your detection policy and configure the endpoint:
 
 ```json
 {
-  "LlmDetector": {
-    "Enabled": true,
-    "Provider": "OpenAI",
-    "Model": "gpt-4o-mini",        // Fast, cheap ($0.15/1M tokens)
-    "Timeout": 1000,               // Aggressive 1s timeout
-    "RunAsync": true,              // CRITICAL: Don't block responses
-    "CacheResults": true,          // CRITICAL: Cache identical patterns
-    "CacheDuration": "01:00:00"    // 1 hour cache
-  },
-
-  "Policies": {
-    "production": {
-      // Only escalate when truly uncertain (saves API calls)
-      "EscalateToAi": true,
-      "AiEscalationThreshold": 0.6,
-
-      // Skip LLM if fast path is conclusive
-      "ImmediateBlockThreshold": 0.95,
-      "EarlyExitThreshold": 0.3
+  "BotDetection": {
+    "AiDetection": {
+      "Provider": "Ollama",
+      "TimeoutMs": 1000,
+      "MaxConcurrentRequests": 5,
+      "Ollama": {
+        "Endpoint": "http://localhost:11434",
+        "Model": "qwen3:0.6b"
+      }
+    },
+    "Policies": {
+      "production": {
+        "EscalateToAi": true,
+        "AiEscalationThreshold": 0.6,
+        "ImmediateBlockThreshold": 0.95,
+        "EarlyExitThreshold": 0.3
+      }
     }
   }
 }
@@ -554,12 +527,9 @@ When enabled, you'll see LLM reasoning in detection results:
 ### Testing LLM Detection
 
 ```bash
-# Set API key
-export OPENAI_API_KEY=sk-...
-
-# Enable LLM in config (set Enabled: true)
-
-# Test with bot traffic
+ollama serve
+ollama pull qwen3:0.6b
+stylobot --mode production --llm http://localhost:11434
 curl -A "HeadlessChrome/120.0.0.0" http://localhost:5080/
 
 # Check logs for LLM reasoning
@@ -800,7 +770,7 @@ const plugins = Array.from(navigator.plugins).map(p => p.name);
 ```json
 {
   "status": "accepted",
-  "message": "Client-side detection result received"
+  "message": "Client-side detection result processed"
 }
 ```
 
@@ -860,7 +830,8 @@ detector paths:
 
 **AI Path** - Expensive detectors (only run when escalated):
 
-- `Heuristic` - ML-based heuristic analysis using ONNX models
+- `Llm` - Ollama LLM analysis
+- `HeuristicLate` - learned heuristic follow-up analysis
 
 **Response Path** - Post-request detectors (zero latency impact):
 
@@ -876,7 +847,7 @@ detector paths:
 
       "FastPath": ["FastPathReputation", "UserAgent", "Header", "Ip", "SecurityTool"],
       "SlowPath": ["Behavioral", "AdvancedBehavioral", "ClientSide"],
-      "AiPath": ["Heuristic"],
+      "AiPath": ["Llm", "HeuristicLate"],
       "ResponsePath": ["ResponseBehavior"],
 
       // Use fast path before slow path
@@ -1135,8 +1106,42 @@ server {
 
 **5. Configure gateway to trust X-Forwarded-For headers:**
 
-The gateway automatically configures `ForwardedHeaders` middleware to extract real client IPs from `X-Forwarded-For`
-headers. No additional configuration needed.
+The gateway only trusts forwarded headers from explicitly configured proxies/networks.
+Configure one of these in `appsettings.json` or environment variables:
+
+```json
+{
+  "Network": {
+    "KnownNetworks": "10.0.0.0/8,192.168.0.0/16",
+    "KnownProxies": "127.0.0.1,::1"
+  }
+}
+```
+
+Environment variable equivalents:
+
+```bash
+export KNOWN_NETWORKS="10.0.0.0/8,192.168.0.0/16"
+export KNOWN_PROXIES="127.0.0.1,::1"
+```
+
+`TrustAllForwardedProxies=true` is available for testing, but it is not safe on an internet-facing port because it
+allows client IP spoofing via `X-Forwarded-For`.
+
+## Observability
+
+The CLI now exposes standard health and metrics endpoints:
+
+- `/health` for liveness/basic config state
+- `/metrics` for Prometheus scraping
+- `/_stylobot` for the dashboard
+
+OpenTelemetry is wired for:
+
+- ASP.NET Core request instrumentation
+- `Mostlylucid.BotDetection` metrics
+- `Mostlylucid.BotDetection.Signals` metrics
+- `Mostlylucid.BotDetection` tracing
 
 #### Setup with HAProxy
 
@@ -1443,7 +1448,8 @@ sudo systemctl status stylobot
 
 Typical latency (measured on a Raspberry Pi 5):
 
-- Fast-path only (demo): ~1-3ms
+- Fast-path only policy: ~1-3ms
+- Demo mode (full detector visibility): higher than fast-path-only and workload-dependent
 - Fast + slow path: ~5-15ms
 - With AI escalation: ~20-50ms
 
