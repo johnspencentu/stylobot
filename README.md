@@ -15,9 +15,9 @@ Flat per-domain pricing. **Unlimited requests.** No per-request metering. No sur
 |---|---|---|---|
 | **Price** | Free forever | **$100/mo per domain** (unlimited subdomains) | From $1,000/mo ([talk to us](https://stylobot.net/portal)) |
 | **Detectors** | All 31 | All 31 | All 31 |
-| **Dashboard** | Read-only | Live config editor | Fleet dashboard |
+| **Dashboard** | Read-only (unlimited logins) | Live config editor (unlimited logins) | Fleet dashboard |
 | **Config** | YAML files (restart to apply) | Live per-endpoint overrides | Per-endpoint + per-user + per-API-key |
-| **Users** | Unlimited (local accounts) | 5 users | Unlimited |
+| **Protected identities** | - | 5 per-user policy overrides | Unlimited |
 | **Endpoint policies** | Unlimited (via config) | 5 live overrides | Unlimited |
 | **Persistence** | SQLite (zero-dependency) | PostgreSQL | PostgreSQL + pgvector |
 | **LLM (optional)** | Local Ollama | Local Ollama | Any (OpenAI, Anthropic, Azure) |
@@ -27,7 +27,7 @@ Flat per-domain pricing. **Unlimited requests.** No per-request metering. No sur
 | **Support** | Community | Email | SLA + dedicated |
 | **License** | Unlicense (public domain) | Ed25519-signed JWT | Ed25519-signed JWT |
 
-**Startup** gets you PostgreSQL persistence, live dashboard config editing, and 5 users/endpoint policies - everything a single-domain deployment needs. Add Redis ($50/mo) for multi-instance coordination or multi-node ($100/mo) for distributed YARP topologies.
+**Startup** gets you PostgreSQL persistence, live dashboard config editing, and 5 protected identity / endpoint policy overrides - everything a single-domain deployment needs. Dashboard login is unlimited at every tier. Add Redis ($50/mo) for multi-instance coordination or multi-node ($100/mo) for distributed YARP topologies.
 
 **Enterprise** is capability-based - you buy what you need. Fingerprint approval with locked dimensions, fleet-wide dashboard, K8s operator, scheduled reports, custom integrations. [Start a 30-day trial](https://stylobot.net/portal) - no credit card required.
 
