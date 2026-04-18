@@ -539,8 +539,14 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Homebrew tap update is handled by .github/workflows/update-homebrew.yml
-  # which triggers on the release:published event from create-console-release.
+    - name: Trigger Homebrew formula update
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ needs.validate-version.outputs.version }}
+      run: |
+        gh workflow run update-homebrew.yml \
+          --repo "$GITHUB_REPOSITORY" \
+          -f "version=${VERSION}"
 
   # Summary
   summary:
