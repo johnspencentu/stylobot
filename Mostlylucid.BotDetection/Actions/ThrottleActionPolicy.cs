@@ -119,14 +119,9 @@ public class ThrottleActionPolicy : IActionPolicy
             context.Response.StatusCode = _options.StatusCode;
             context.Response.ContentType = _options.ContentType;
 
-            var responseBody = new
-            {
-                message = _options.Message,
-                retryAfterMs = delay,
-                policy = Name
-            };
-
-            await context.Response.WriteAsJsonAsync(responseBody, cancellationToken);
+            // AOT-safe: no anonymous types with WriteAsJsonAsync
+            var json = $$"""{"message":"{{_options.Message.Replace("\"", "\\\"")}}","retryAfterMs":{{delay}},"policy":"{{Name.Replace("\"", "\\\"")}}"}""";
+            await context.Response.WriteAsync(json, cancellationToken);
 
             return ActionResult.Blocked(_options.StatusCode, $"Throttled by {Name}: {delay}ms delay");
         }

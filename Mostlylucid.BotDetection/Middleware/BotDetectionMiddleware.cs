@@ -1116,12 +1116,10 @@ public class BotDetectionMiddleware(
             await Task.Delay(responseDelay, context.RequestAborted);
         }
 
-        await context.Response.WriteAsJsonAsync(new
-        {
-            error = "Too many requests",
-            retryAfter = delay,
-            message = throttleConfig.ThrottleMessage
-        });
+        // AOT-safe: no anonymous types with WriteAsJsonAsync
+        var msg = throttleConfig.ThrottleMessage?.Replace("\"", "\\\"") ?? "";
+        await context.Response.WriteAsync(
+            $$"""{"error":"Too many requests","retryAfter":{{delay}},"message":"{{msg}}"}""");
     }
 
     #endregion

@@ -35,12 +35,14 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine();
     Console.WriteLine("  Options:");
     Console.WriteLine("    --mode <demo|production>    Detection mode (default: demo)");
+    Console.WriteLine("    --policy <name>             Default action policy (default: logonly)");
     Console.WriteLine("    --cert <path>               TLS certificate (.pfx or .pem)");
     Console.WriteLine("    --key <path>                TLS private key (required with .pem cert)");
     Console.WriteLine("    --cert-password <pass>      PFX certificate password");
     Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (quick or named)");
     Console.WriteLine("    --config <path>             Path to appsettings.json override");
-    Console.WriteLine("    --log-level <level>         Minimum log level (default: Debug)");
+    Console.WriteLine("    --log-level <level>         Minimum log level (default: Warning)");
+    Console.WriteLine("    --verbose                   Show all log output (disables live table)");
     Console.WriteLine("    -h, --help                  Show this help");
     Console.WriteLine();
     Console.WriteLine("  Examples:");
@@ -62,7 +64,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
 // Parse: stylobot <port> <upstream> [--mode demo|production]
 // Collect positional args, skipping values that belong to known flags
 var flagsWithValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    { "--mode", "--cert", "--key", "--cert-password", "--config", "--log-level" };
+    { "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level" };
 var positionals = new List<string>();
 for (var i = 1; i < cmdArgs.Length; i++)
 {
@@ -107,12 +109,14 @@ else
     upstream = Environment.GetEnvironmentVariable("DEFAULT_UPSTREAM") ?? "http://localhost:8080";
 }
 var mode = GetArg(cmdArgs, "--mode") ?? Environment.GetEnvironmentVariable("MODE") ?? "demo";
+var actionPolicy = GetArg(cmdArgs, "--policy") ?? Environment.GetEnvironmentVariable("STYLOBOT_POLICY") ?? "logonly";
 var certPath = GetArg(cmdArgs, "--cert");
 var keyPath = GetArg(cmdArgs, "--key");
 var certPassword = GetArg(cmdArgs, "--cert-password");
 var configPath = GetArg(cmdArgs, "--config");
 var logLevel = GetArg(cmdArgs, "--log-level");
 var useTls = certPath != null;
+var verbose = cmdArgs.Contains("--verbose");
 
 // Cloudflare tunnel: --tunnel (quick) or --tunnel <token> (named)
 string? tunnelToken = null;
@@ -138,8 +142,8 @@ if (keyPath != null && !File.Exists(keyPath))
     return 1;
 }
 
-// Parse log level override
-var minLogLevel = LogEventLevel.Debug;
+// Parse log level override (default: Warning when live table active, Debug when verbose)
+var minLogLevel = verbose ? LogEventLevel.Debug : LogEventLevel.Warning;
 if (logLevel != null && Enum.TryParse<LogEventLevel>(logLevel, true, out var parsed))
     minLogLevel = parsed;
 
@@ -153,14 +157,20 @@ var logConfig = new LoggerConfiguration()
     .MinimumLevel.Is(minLogLevel)
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-    .MinimumLevel.Override("Yarp", LogEventLevel.Information)
+    .MinimumLevel.Override("Yarp", LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .Enrich.WithProperty("Mode", mode)
-    .Enrich.WithProperty("Port", port)
-    .WriteTo.Console(
+    .Enrich.WithProperty("Port", port);
+
+// Only write to console in verbose mode; live table replaces console output otherwise
+if (verbose)
+{
+    logConfig = logConfig.WriteTo.Console(
         outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-        restrictedToMinimumLevel: LogEventLevel.Debug)
-    .WriteTo.File(
+        restrictedToMinimumLevel: LogEventLevel.Debug);
+}
+
+logConfig = logConfig.WriteTo.File(
         Path.Combine(logsDir, "errors-.log"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30,
@@ -217,19 +227,23 @@ TaskScheduler.UnobservedTaskException += (sender, e) =>
 
 try
 {
-    Log.Information("");
-    Log.Information("  ┌─────────────────────────────────────────┐");
-    Log.Information("  │  stylobot  ·  self-hosted bot defense   │");
-    Log.Information("  │  https://stylobot.net                   │");
-    Log.Information("  └─────────────────────────────────────────┘");
-    Log.Information("");
-    Log.Information("  Mode:     {Mode}", mode.ToUpper());
-    Log.Information("  Upstream: {Upstream}", upstream);
-    Log.Information("  Port:     {Port}", port);
-    if (useTls) Log.Information("  TLS:      {CertPath}", certPath);
-    if (tunnelEnabled) Log.Information("  Tunnel:   Cloudflare {TunnelType}", tunnelToken != null ? "(named)" : "(quick)");
-    Log.Information("  Docs:     https://github.com/scottgal/stylobot");
-    Log.Information("");
+    if (verbose)
+    {
+        Log.Information("");
+        Log.Information("  ┌─────────────────────────────────────────┐");
+        Log.Information("  │  stylobot  ·  self-hosted bot defense   │");
+        Log.Information("  │  https://stylobot.net                   │");
+        Log.Information("  └─────────────────────────────────────────┘");
+        Log.Information("");
+        Log.Information("  Mode:     {Mode}", mode.ToUpper());
+        Log.Information("  Policy:   {Policy}", actionPolicy);
+        Log.Information("  Upstream: {Upstream}", upstream);
+        Log.Information("  Port:     {Port}", port);
+        if (useTls) Log.Information("  TLS:      {CertPath}", certPath);
+        if (tunnelEnabled) Log.Information("  Tunnel:   Cloudflare {TunnelType}", tunnelToken != null ? "(named)" : "(quick)");
+        Log.Information("  Docs:     https://github.com/scottgal/stylobot");
+        Log.Information("");
+    }
 
     var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     {
@@ -317,7 +331,15 @@ try
             });
 
     // Add Bot Detection (configured via appsettings.json)
-    builder.Services.AddBotDetection();
+    builder.Services.AddBotDetection(opts =>
+    {
+        // Apply --policy override from CLI
+        opts.DefaultActionPolicyName = actionPolicy;
+    });
+
+    // Detection event sink for live table
+    var detectionSink = new DetectionEventSink();
+    builder.Services.AddSingleton(detectionSink);
 
     // Add heartbeat service to detect silent failures (logs every 5 minutes)
     builder.Services.AddHostedService<HeartbeatService>();
@@ -368,6 +390,11 @@ try
 
     // Use Forwarded Headers middleware FIRST to extract real client IP
     app.UseForwardedHeaders();
+
+    // Tap detection results for the live table (placed BEFORE bot detection
+    // so it wraps around it and always sees the evidence in Items after _next completes)
+    if (!verbose)
+        app.UseMiddleware<DetectionTapMiddleware>();
 
     // Use Bot Detection middleware
     app.UseBotDetection();
@@ -606,10 +633,13 @@ try
         app.Urls.Add($"http://*:{port}");
 
     var scheme = useTls ? "https" : "http";
-    Log.Information("  ✓ Ready on {Scheme}://localhost:{Port}", scheme, port);
-    Log.Information("  ✓ Upstream: {Upstream}", upstream);
-    Log.Information("  ✓ Health:   {Scheme}://localhost:{Port}/health", scheme, port);
-    Log.Information("");
+    if (verbose)
+    {
+        Log.Information("  ✓ Ready on {Scheme}://localhost:{Port}", scheme, port);
+        Log.Information("  ✓ Upstream: {Upstream}", upstream);
+        Log.Information("  ✓ Health:   {Scheme}://localhost:{Port}/health", scheme, port);
+        Log.Information("");
+    }
 
     // Launch Cloudflare tunnel if requested
     Process? tunnelProcess = null;
@@ -618,7 +648,21 @@ try
         tunnelProcess = LaunchCloudflaredTunnel(port, scheme, tunnelToken);
     }
 
-    Log.Information("  Press Ctrl+C to stop.");
+    // Start live detection table (replaces verbose log output)
+    CancellationTokenSource? liveTableCts = null;
+    Task? liveTableTask = null;
+    if (!verbose)
+    {
+        liveTableCts = new CancellationTokenSource();
+        var liveTable = new LiveDetectionTableService(
+            detectionSink, mode, upstream, port, actionPolicy,
+            useTls, tunnelEnabled);
+        liveTableTask = liveTable.StartAsync(liveTableCts.Token);
+    }
+    else
+    {
+        Log.Information("  Press Ctrl+C to stop.");
+    }
 
     try
     {
@@ -636,6 +680,15 @@ try
     }
     finally
     {
+        // Stop live table
+        if (liveTableCts != null)
+        {
+            await liveTableCts.CancelAsync();
+            if (liveTableTask != null)
+                try { await liveTableTask; } catch (OperationCanceledException) { }
+            liveTableCts.Dispose();
+        }
+
         // Kill tunnel process if we started one
         if (tunnelProcess is { HasExited: false })
         {

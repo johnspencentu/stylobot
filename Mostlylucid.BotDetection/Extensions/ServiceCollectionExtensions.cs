@@ -259,6 +259,13 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<BotDetectionMetrics>();
         services.TryAddSingleton<ICompiledPatternCache, CompiledPatternCache>();
 
+        // Telemetry (required by middleware - always register defaults;
+        // AddBotDetectionTelemetry() can override with custom config)
+        services.AddOptions<Telemetry.BotDetectionTelemetryOptions>()
+            .BindConfiguration("BotDetection:Telemetry");
+        services.TryAddSingleton<Telemetry.BotDetectionSignalMeter>();
+        services.TryAddSingleton<Telemetry.BotDetectionInstrumentation>();
+
         // Register bot list fetcher and database
         services.TryAddSingleton<IBotListFetcher, BotListFetcher>();
         services.TryAddSingleton<IBotListDatabase>(sp =>

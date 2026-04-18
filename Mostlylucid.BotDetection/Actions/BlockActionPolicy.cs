@@ -87,28 +87,25 @@ public class BlockActionPolicy : IActionPolicy
         }
         else
         {
-            // Build JSON response body
-            object responseBody;
+            // Build JSON response body (AOT-safe: no anonymous types with WriteAsJsonAsync)
+            string json;
             if (_options.IncludeRiskScore)
-                responseBody = new
-                {
-                    error = _options.Message,
-                    riskScore = evidence.BotProbability,
-                    riskBand = evidence.RiskBand.ToString(),
-                    policy = Name,
-                    timestamp = DateTimeOffset.UtcNow
-                };
+            {
+                json = $$"""{"error":"{{EscapeJson(_options.Message)}}","riskScore":{{evidence.BotProbability:F4}},"riskBand":"{{evidence.RiskBand}}","policy":"{{EscapeJson(Name)}}","timestamp":"{{DateTimeOffset.UtcNow:O}}"}""";
+            }
             else
-                responseBody = new
-                {
-                    error = _options.Message
-                };
+            {
+                json = $$"""{"error":"{{EscapeJson(_options.Message)}}"}""";
+            }
 
-            await context.Response.WriteAsJsonAsync(responseBody, cancellationToken);
+            await context.Response.WriteAsync(json, cancellationToken);
         }
 
         return ActionResult.Blocked(_options.StatusCode, $"Blocked by {Name}: {_options.Message}");
     }
+
+    private static string EscapeJson(string s) =>
+        s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
 }
 
 /// <summary>
