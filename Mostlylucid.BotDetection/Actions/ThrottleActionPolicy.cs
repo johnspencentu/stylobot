@@ -120,7 +120,7 @@ public class ThrottleActionPolicy : IActionPolicy
             context.Response.ContentType = _options.ContentType;
 
             // AOT-safe: no anonymous types with WriteAsJsonAsync
-            var json = $$"""{"message":"{{_options.Message.Replace("\"", "\\\"")}}","retryAfterMs":{{delay}},"policy":"{{Name.Replace("\"", "\\\"")}}"}""";
+            var json = $$"""{"message":"{{BlockActionPolicy.EscapeJson(_options.Message)}}","retryAfterMs":{{delay}},"policy":"{{BlockActionPolicy.EscapeJson(Name)}}"}""";
             await context.Response.WriteAsync(json, cancellationToken);
 
             return ActionResult.Blocked(_options.StatusCode, $"Throttled by {Name}: {delay}ms delay");

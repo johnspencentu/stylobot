@@ -61,6 +61,9 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    --key <path>                TLS private key (required with .pem cert)");
     Console.WriteLine("    --cert-password <pass>      PFX certificate password");
     Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (requires cloudflared)");
+    Console.WriteLine("    --threshold <0.0-1.0>       Bot probability threshold (default: 0.7)");
+    Console.WriteLine("    --llm <url>                 Ollama URL for LLM enrichment");
+    Console.WriteLine("    --model <name>              LLM model name (default: qwen3:0.6b)");
     Console.WriteLine("    --config <path>             Path to appsettings.json override");
     Console.WriteLine("    --log-level <level>         Minimum log level (default: Warning)");
     Console.WriteLine("    --verbose                   Show all log output (disables live table)");
@@ -85,7 +88,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
 // Parse: stylobot <port> <upstream> [--mode demo|production]
 // Collect positional args, skipping values that belong to known flags
 var flagsWithValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    { "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level" };
+    { "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level", "--threshold", "--llm", "--model" };
 var positionals = new List<string>();
 for (var i = 1; i < cmdArgs.Length; i++)
 {
@@ -136,8 +139,12 @@ var keyPath = GetArg(cmdArgs, "--key");
 var certPassword = GetArg(cmdArgs, "--cert-password");
 var configPath = GetArg(cmdArgs, "--config");
 var logLevel = GetArg(cmdArgs, "--log-level");
+var thresholdArg = GetArg(cmdArgs, "--threshold");
+var llmUrl = GetArg(cmdArgs, "--llm");
+var llmModel = GetArg(cmdArgs, "--model") ?? "qwen3:0.6b";
 var useTls = certPath != null;
 var verbose = cmdArgs.Contains("--verbose");
+double? botThreshold = thresholdArg != null && double.TryParse(thresholdArg, out var t) ? t : null;
 
 // Cloudflare tunnel: --tunnel (quick) or --tunnel <token> (named)
 string? tunnelToken = null;
@@ -351,11 +358,21 @@ try
                 }
             });
 
-    // Add Bot Detection (configured via appsettings.json)
-    builder.Services.AddBotDetection(opts =>
+    // Add Bot Detection (configured via appsettings.json + CLI overrides)
+    if (llmUrl != null)
     {
-        // Apply --policy override from CLI
+        builder.Services.AddAdvancedBotDetection(llmUrl, llmModel);
+    }
+    else
+    {
+        builder.Services.AddBotDetection();
+    }
+
+    // Apply CLI overrides on top of config
+    builder.Services.PostConfigure<Mostlylucid.BotDetection.Models.BotDetectionOptions>(opts =>
+    {
         opts.DefaultActionPolicyName = actionPolicy;
+        if (botThreshold.HasValue) opts.BotThreshold = botThreshold.Value;
     });
 
     // Detection event sink for live table

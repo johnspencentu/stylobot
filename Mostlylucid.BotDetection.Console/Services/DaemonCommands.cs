@@ -52,7 +52,7 @@ public static class DaemonCommands
         var psi = new ProcessStartInfo
         {
             FileName = exePath,
-            Arguments = string.Join(' ', childArgs.Select(QuoteIfNeeded)),
+            Arguments = string.Join(' ', childArgs.Select(EscapeArg)),
             UseShellExecute = false,
             RedirectStandardOutput = false,
             RedirectStandardError = false,
@@ -286,7 +286,16 @@ public static class DaemonCommands
         try
         {
             var process = Process.GetProcessById(pid);
-            return !process.HasExited;
+            if (process.HasExited) { File.Delete(PidFile); return false; }
+
+            // Verify it's actually a stylobot process (not a recycled PID)
+            var name = process.ProcessName.ToLowerInvariant();
+            if (!name.Contains("stylobot") && !name.Contains("dotnet"))
+            {
+                File.Delete(PidFile);
+                return false;
+            }
+            return true;
         }
         catch (ArgumentException)
         {
@@ -296,6 +305,10 @@ public static class DaemonCommands
         }
     }
 
-    private static string QuoteIfNeeded(string arg) =>
-        arg.Contains(' ') ? $"\"{arg}\"" : arg;
+    private static string EscapeArg(string arg)
+    {
+        if (!arg.Contains(' ') && !arg.Contains('"') && !arg.Contains('\\'))
+            return arg;
+        return "\"" + arg.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+    }
 }

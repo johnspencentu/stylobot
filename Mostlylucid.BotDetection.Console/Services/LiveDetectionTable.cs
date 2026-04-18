@@ -56,10 +56,9 @@ public sealed class DetectionTapMiddleware
         {
             await _next(context);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex.Message.Contains("response has already started", StringComparison.OrdinalIgnoreCase))
         {
-            // "Response has already started" from YARP when bot detection blocked the request.
-            // Evidence is still in Items - read it below.
+            // Expected: YARP throws when bot detection already wrote a block response.
         }
 
         // Read detection results from HttpContext.Items (set by BotDetectionMiddleware)
@@ -169,8 +168,14 @@ public sealed class LiveDetectionTableService : BackgroundService
                         }
                         else _totalHumans++;
 
-                        _endpointHits.AddOrUpdate(entry.Path, 1, (_, c) => c + 1);
+                        // Normalize path (strip query string to prevent unbounded growth)
+                        var normalizedPath = entry.Path.Split('?')[0];
+                        _endpointHits.AddOrUpdate(normalizedPath, 1, (_, c) => c + 1);
                         _recentRequests.Enqueue(DateTime.Now);
+
+                        // Trim dictionaries to prevent unbounded growth
+                        if (_endpointHits.Count > 500) TrimDictionary(_endpointHits, 100);
+                        if (_botSignatures.Count > 200) TrimDictionary(_botSignatures, 50);
 
                         while (entries.Count > _maxRows)
                             entries.RemoveLast();
@@ -344,4 +349,12 @@ public sealed class LiveDetectionTableService : BackgroundService
         "logonly" => "[bold dim]logonly[/] [dim](monitoring only)[/]",
         _ => $"[bold]{Markup.Escape(policy)}[/]"
     };
+
+    private static void TrimDictionary(ConcurrentDictionary<string, int> dict, int keepTop)
+    {
+        var toKeep = dict.OrderByDescending(kv => kv.Value).Take(keepTop).Select(kv => kv.Key).ToHashSet();
+        foreach (var key in dict.Keys)
+            if (!toKeep.Contains(key))
+                dict.TryRemove(key, out _);
+    }
 }

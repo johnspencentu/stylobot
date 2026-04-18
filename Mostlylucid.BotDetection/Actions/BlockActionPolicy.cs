@@ -104,7 +104,7 @@ public class BlockActionPolicy : IActionPolicy
         return ActionResult.Blocked(_options.StatusCode, $"Blocked by {Name}: {_options.Message}");
     }
 
-    private static string EscapeJson(string s) =>
+    internal static string EscapeJson(string s) =>
         s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
 }
 
