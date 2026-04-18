@@ -1,4 +1,4 @@
-# Mostlylucid.BotDetection.Console
+# StyloBot Console Gateway
 
 Minimal, single-file YARP gateway with bot detection. Built on .NET 10 with Native AOT compilation and minimal APIs for
 maximum performance and minimal footprint.
@@ -1417,7 +1417,7 @@ docker run -p 5080:5080 -e UPSTREAM=http://backend:8080 -e MODE=production stylo
 
 ```ini
 [Unit]
-Description=Mostlylucid Bot Detection Gateway
+Description=StyloBot Gateway
 After=network.target
 
 [Service]

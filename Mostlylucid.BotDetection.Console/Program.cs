@@ -96,13 +96,16 @@ TaskScheduler.UnobservedTaskException += (sender, e) =>
 
 try
 {
-    Log.Information("╔══════════════════════════════════════════════════════════╗");
-    Log.Information("║   Mostlylucid Bot Detection Console Gateway            ║");
-    Log.Information("╚══════════════════════════════════════════════════════════╝");
     Log.Information("");
-    Log.Information("Mode:     {Mode}", mode.ToUpper());
-    Log.Information("Upstream: {Upstream}", upstream);
-    Log.Information("Port:     {Port}", port);
+    Log.Information("  ┌─────────────────────────────────────────┐");
+    Log.Information("  │  stylobot  ·  self-hosted bot defense   │");
+    Log.Information("  │  https://stylobot.net                   │");
+    Log.Information("  └─────────────────────────────────────────┘");
+    Log.Information("");
+    Log.Information("  Mode:     {Mode}", mode.ToUpper());
+    Log.Information("  Upstream: {Upstream}", upstream);
+    Log.Information("  Port:     {Port}", port);
+    Log.Information("  Docs:     https://github.com/scottgal/stylobot");
     Log.Information("");
 
     var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -447,11 +450,11 @@ try
     // Configure Kestrel to listen on specified port
     app.Urls.Add($"http://*:{port}");
 
-    Log.Information("✓ Gateway ready on http://localhost:{Port}", port);
-    Log.Information("✓ Proxying to {Upstream}", upstream);
-    Log.Information("✓ Health check: http://localhost:{Port}/health", port);
+    Log.Information("  ✓ Ready on http://localhost:{Port}", port);
+    Log.Information("  ✓ Upstream: {Upstream}", upstream);
+    Log.Information("  ✓ Health:   http://localhost:{Port}/health", port);
     Log.Information("");
-    Log.Information("Starting application host... (press Ctrl+C to stop)");
+    Log.Information("  Press Ctrl+C to stop.");
 
     try
     {
