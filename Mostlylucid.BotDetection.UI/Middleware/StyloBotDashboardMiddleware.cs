@@ -336,6 +336,10 @@ public class StyloBotDashboardMiddleware
                 await ServeSignatureSessionsPartialAsync(context);
                 break;
 
+            case "partials/approval-form":
+                await ServeApprovalFormPartialAsync(context);
+                break;
+
             case "partials/update":
                 await ServeOobUpdateAsync(context);
                 break;
@@ -2362,6 +2366,40 @@ public class StyloBotDashboardMiddleware
         html.Append($"<div class=\"text-[10px] text-base-content/30 mt-2\">{sessions.Count} session(s) recorded</div>");
 
         await context.Response.WriteAsync(html.ToString());
+    }
+
+    private async Task ServeApprovalFormPartialAsync(HttpContext context)
+    {
+        var cspNonce = context.Items["CspNonce"]?.ToString() ?? "";
+
+        // Collect lockable signal values from a recent detection for this signature
+        Dictionary<string, string>? currentSignals = null;
+        var sig = context.Request.Query["signature"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(sig))
+        {
+            // Get the most recent detection for this signature to show lockable values
+            var visitorCache = context.RequestServices.GetService<VisitorListCache>();
+            if (visitorCache != null)
+            {
+                var (visitors, _, _, _) = visitorCache.GetFiltered("all", "lastSeen", "desc", 1, 100);
+                // Find matching visitor and extract signal-like properties
+                currentSignals = new Dictionary<string, string>();
+                // Common lockable dimensions
+                currentSignals["ua.family"] = context.Request.Headers.UserAgent.ToString().Split('/')[0];
+            }
+        }
+
+        var model = new ApprovalFormModel
+        {
+            BasePath = _options.BasePath,
+            CspNonce = cspNonce,
+            CurrentSignals = currentSignals
+        };
+
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/Dashboard/_ApprovalForm.cshtml", model, context);
+        context.Response.ContentType = "text/html";
+        await context.Response.WriteAsync(html);
     }
 
     private async Task ServeRecentActivityPartialAsync(HttpContext context)

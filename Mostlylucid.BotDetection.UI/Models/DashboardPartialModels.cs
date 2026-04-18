@@ -413,3 +413,14 @@ public sealed class SessionDetailModel
     /// <summary>Templatized paths visited</summary>
     public List<string>? Paths { get; init; }
 }
+/// <summary>
+///     View model for the fingerprint approval form.
+/// </summary>
+public sealed class ApprovalFormModel
+{
+    public required string BasePath { get; init; }
+    public required string CspNonce { get; init; }
+
+    /// <summary>Current signal values that can be locked as approval dimensions.</summary>
+    public Dictionary<string, string>? CurrentSignals { get; init; }
+}
