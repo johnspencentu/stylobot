@@ -82,6 +82,17 @@ See [`CHANGELOG.md`](CHANGELOG.md) for full details.
   - Keycloak (commercial portal auth - self-hostable)
   - Ollama (FOSS LLM provider) or OpenAI/Anthropic/Azure OpenAI (commercial)
 
+## Install
+
+```bash
+# NuGet package - add to your ASP.NET Core app
+dotnet add package mostlylucid.botdetection
+
+# Two lines in Program.cs:
+# builder.Services.AddBotDetection();
+# app.UseBotDetection();
+```
+
 ## Quick Start - OSS, one gateway
 
 ```bash
