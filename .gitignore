@@ -442,3 +442,6 @@ csp-smoke/
 /*.env
 BenchmarkDotNet.Artifacts/
 stylobot-config/
+
+# Website moved to stylobot-commercial repo
+mostlylucid.stylobot.website/
