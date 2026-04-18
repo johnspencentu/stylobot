@@ -46,7 +46,7 @@ switch (firstArg)
 if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
 {
     Console.WriteLine();
-    Console.WriteLine("  stylobot · self-hosted bot defense");
+    Console.WriteLine("  stylobot · self-hosted bot defense · free forever");
     Console.WriteLine("  https://stylobot.net");
     Console.WriteLine();
     Console.WriteLine("  Usage:");

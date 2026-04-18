@@ -35,7 +35,7 @@ $exePath = Join-Path $installDir 'stylobot.exe'
 Install-BinFile -Name 'stylobot' -Path $exePath
 
 Write-Host ""
-Write-Host "StyloBot installed! Quick start:" -ForegroundColor Green
+Write-Host "StyloBot installed! Free forever." -ForegroundColor Green
 Write-Host "  stylobot 5080 http://localhost:3000"
 Write-Host "  stylobot --help"
 Write-Host ""

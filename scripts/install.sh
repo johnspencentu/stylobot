@@ -30,7 +30,7 @@ esac
 ASSET_NAME="stylobot-${PLATFORM}-${ARCH_SUFFIX}.tar.gz"
 
 echo "========================================"
-echo "  StyloBot Community Edition Installer"
+echo "  StyloBot · Free Forever"
 echo "========================================"
 echo ""
 echo "Platform: ${PLATFORM}-${ARCH_SUFFIX}"

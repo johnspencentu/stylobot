@@ -1,6 +1,6 @@
 # StyloBot
 
-**Self-hosted bot defense with audit-grade decision evidence on every request.** 31 detectors, wave-based orchestration, 129-dimensional session behavioral vectors, intent classification with threat scoring, real-time dashboard, and reverse-proxy integration. Runs in your VPC, your Kubernetes cluster, or as a standalone binary. Your traffic never leaves your perimeter.
+**Self-hosted bot defense. Free forever.** 31 detectors, sub-millisecond inference, 129-dimensional session vectors, intent classification, and reverse-proxy integration. One binary. No cloud dependency. Your traffic never leaves your perimeter.
 
 [![NuGet](https://img.shields.io/nuget/v/mostlylucid.botdetection)](https://www.nuget.org/packages/mostlylucid.botdetection)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
@@ -8,11 +8,14 @@
 ## Install
 
 ```bash
+# Homebrew (macOS + Linux)
+brew install scottgal/stylobot/stylobot
+
 # One-line install (Linux/macOS)
 curl -fsSL https://raw.githubusercontent.com/scottgal/stylobot/main/scripts/install.sh | bash
 
-# Homebrew (macOS + Linux)
-brew install scottgal/stylobot/stylobot
+# Windows
+choco install stylobot
 
 # Docker
 docker run --rm -p 8080:8080 -e DEFAULT_UPSTREAM=http://host.docker.internal:3000 scottgal/stylobot-gateway:latest

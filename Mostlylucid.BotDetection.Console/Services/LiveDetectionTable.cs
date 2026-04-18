@@ -209,9 +209,10 @@ public sealed class LiveDetectionTableService : BackgroundService
         var avgDetectionMs = _totalRequests > 0 ? _totalDetectionTimeMs / _totalRequests : 0;
 
         // === HEADER: Status line ===
-        var statusLine = _totalThreats > 0
-            ? $"[bold blue]stylobot[/] [dim]|[/] Protected for [bold]{FormatUptime(uptime)}[/] [dim]|[/] [bold]{_totalRequests}[/] requests [dim]|[/] [bold red]{_totalThreats} threats[/]"
-            : $"[bold blue]stylobot[/] [dim]|[/] Protected for [bold]{FormatUptime(uptime)}[/] [dim]|[/] [bold]{_totalRequests}[/] requests [dim]|[/] [green]0 threats[/]";
+        var threatPart = _totalThreats > 0
+            ? $"[bold red]{_totalThreats} threats[/]"
+            : "[green]0 threats[/]";
+        var statusLine = $"[bold blue]stylobot[/] [dim]community edition - free forever |[/] Protected for [bold]{FormatUptime(uptime)}[/] [dim]|[/] [bold]{_totalRequests}[/] requests [dim]|[/] {threatPart}";
 
         // === LEFT COLUMN: Config + Stats ===
         var configPanel = new Table { Border = TableBorder.None, ShowHeaders = false };
