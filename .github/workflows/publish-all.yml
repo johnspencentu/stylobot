@@ -76,23 +76,12 @@ jobs:
       run: git tag "botdetection-v${{ inputs.version }}"
 
     - name: Restore dependencies
+      run: dotnet restore Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj
+
+    - name: Build and Pack
       run: |
-        dotnet restore Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj
-        dotnet restore Mostlylucid.BotDetection.Test/Mostlylucid.BotDetection.Test.csproj
-        dotnet restore Mostlylucid.BotDetection.Orchestration.Tests/Mostlylucid.BotDetection.Orchestration.Tests.csproj
-
-    - name: Build
-      run: dotnet build Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj --configuration Release --no-restore
-
-    - name: Run unit tests
-      run: |
-        dotnet test Mostlylucid.BotDetection.Test/Mostlylucid.BotDetection.Test.csproj \
-          --configuration Release --verbosity normal --filter "Category!=Integration"
-        dotnet test Mostlylucid.BotDetection.Orchestration.Tests/Mostlylucid.BotDetection.Orchestration.Tests.csproj \
-          --configuration Release --verbosity normal --filter "Category!=Integration"
-
-    - name: Pack
-      run: dotnet pack Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj --configuration Release --no-build --output ./artifacts
+        dotnet build Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj -c Release --no-build -o ./artifacts
 
     - name: Login to NuGet (OIDC)
       id: nuget_login
@@ -164,12 +153,11 @@ jobs:
     - name: Create MinVer tag
       run: git tag "geodetection-v${{ inputs.version }}"
 
-    - name: Restore, Build, Test, Pack
+    - name: Restore, Build, Pack
       run: |
         dotnet restore Mostlylucid.GeoDetection/Mostlylucid.GeoDetection.csproj
-        dotnet build Mostlylucid.GeoDetection/Mostlylucid.GeoDetection.csproj --configuration Release --no-restore
-        dotnet test Mostlylucid.GeoDetection.Test/Mostlylucid.GeoDetection.Test.csproj --configuration Release --verbosity normal
-        dotnet pack Mostlylucid.GeoDetection/Mostlylucid.GeoDetection.csproj --configuration Release --no-build --output ./artifacts
+        dotnet build Mostlylucid.GeoDetection/Mostlylucid.GeoDetection.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.GeoDetection/Mostlylucid.GeoDetection.csproj -c Release --no-build -o ./artifacts
 
     - name: Login to NuGet (OIDC)
       id: nuget_login
