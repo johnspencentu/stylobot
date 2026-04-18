@@ -5,8 +5,8 @@ Canonical entry points for this repository.
 ## Start Here
 
 - [`README.md`](../README.md): Repo overview, architecture surface, and primary commands
-- [`QUICKSTART.md`](../QUICKSTART.md): Fast local runbook for demo and gateway
-- [`DOCKER_SETUP.md`](../DOCKER_SETUP.md): Containerized deployment options
+- [`QUICKSTART.md`](QUICKSTART.md): Fast local runbook for demo and gateway
+- [`DOCKER_SETUP.md`](DOCKER_SETUP.md): Containerized deployment options
 - [`GETTING_STARTED.md`](GETTING_STARTED.md): First implementation path
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): Component and flow overview
 - [`OPERATIONS.md`](OPERATIONS.md): Day-2 operations and rollout pattern
@@ -25,6 +25,11 @@ Canonical entry points for this repository.
 - [`Mostlylucid.BotDetection/docs/detection-strategies.md`](../Mostlylucid.BotDetection/docs/detection-strategies.md)
 - [`Mostlylucid.BotDetection/docs/action-policies.md`](../Mostlylucid.BotDetection/docs/action-policies.md)
 - [`Mostlylucid.BotDetection/docs/response-pii-masking.md`](../Mostlylucid.BotDetection/docs/response-pii-masking.md)
+
+## New in v5.6
+
+- [`Mostlylucid.BotDetection/docs/proof-of-work-challenge.md`](../Mostlylucid.BotDetection/docs/proof-of-work-challenge.md): PoW challenge system (micro-puzzles, blackboard difficulty)
+- [`Mostlylucid.BotDetection/docs/fingerprint-approval.md`](../Mostlylucid.BotDetection/docs/fingerprint-approval.md): Fingerprint approval with locked dimensions
 
 ## Detector Reference Docs
 
