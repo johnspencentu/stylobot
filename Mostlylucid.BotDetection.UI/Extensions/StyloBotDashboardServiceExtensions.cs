@@ -78,8 +78,9 @@ public static class StyloBotDashboardServiceExtensions
         // Razor view renderer for middleware-hosted dashboard
         services.AddSingleton<RazorViewRenderer>();
 
-        // Event store for in-memory history
-        services.AddSingleton<IDashboardEventStore, InMemoryDashboardEventStore>();
+        // Dashboard event store: SQLite for FOSS (persists across restarts).
+        // Commercial PostgreSQL package overrides via TryAddSingleton.
+        services.TryAddSingleton<IDashboardEventStore, SqliteDashboardEventStore>();
 
         // Operator-supplied signature labels (for detector weighting / ground truth).
         // In-memory by default; production hosts can register SQLite / PostgreSQL impls.
