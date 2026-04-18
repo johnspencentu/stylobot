@@ -31,18 +31,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Dashboard Enhancements
 - **Monaco YAML config editor** - in-dashboard configuration viewer (read-only in FOSS, live-edit in commercial)
 - **FOSS licensing v1 wiring** - license status display in dashboard
+- **World threat map** - jsVectorMap with countries colored by bot rate (green-amber-red gradient), 30s auto-refresh
+- **Traffic-over-time chart** - ApexCharts area chart with Human/Bot series, 15s auto-refresh
+- **Sessions in signature detail** - HTMX-loaded session timeline with Markov chain transition previews, path sequences, timing entropy
+- **Behavioral shape radar chart** - 129-dim session vector projected into 8 interpretable radar axes with session stepping (prev/next)
+- **Dashboard overview redesign** - Top Threats above fold, actionable intelligence first
+
+#### Hardened Proof-of-Work Challenge
+- **SHA-256 micro-puzzles** - Web Worker pool (up to `navigator.hardwareConcurrency`) solves puzzles in parallel
+- **Blackboard-driven difficulty** - puzzle count and zeros scale with session velocity, cluster membership, reputation bias, threat score
+- **Transport-aware** - API/SignalR/gRPC clients get 429 + JSON challenge, not HTML
+- **Challenge-as-signal feedback loop** - ChallengeVerificationContributor reads solve metadata, emits human/bot signals based on timing characteristics
+- **SqliteChallengeStore** - persistent challenge store (was in-memory)
+
+#### Fingerprint Approval System
+- **IFingerprintApprovalStore** - SQLite-backed approval with locked dimensions and audit trail
+- **Locked dimensions** - behavioral contract: country, UA, IP CIDR constraints checked against live signals on every request
+- **FingerprintApprovalContributor** - strong human signal (-0.4 delta) when approved with matching dimensions, strong bot signal (+0.3) on dimension mismatch (catches stolen credentials)
+- **X-SB-Approval-Id header** - one-time approval token for borderline requests (opt-in)
+- **Dashboard approval API** - full CRUD + token-based approval flow
+
+#### Per-Transition Timing
+- **3 new session vector dimensions** (126-128): impossible timing ratio, timing consistency score, fastest transition z-score
+- Session vector now 129 dimensions (was 126/118)
+- `CosineSimilarity` handles dimension mismatch via zero-padding for migration
+
+#### Bot Naming
+- **DeterministicBotNameSynthesizer** - generates names from signals without LLM: "Rapid Scraper", "Headless Python Bot", "Targeted Scanner"
+- Replaces NoOpBotNameSynthesizer as default; LLM packages override via TryAddSingleton
+
+#### Response Headers (opt-in)
+- **X-SB-Reason** - top contributing detector reason (PII-free, 200 char max)
+- **X-SB-Approval-Id** - one-time fingerprint approval token for borderline requests
 
 ### Changed
 
 - Site repositioned as security product (not a tech demo)
 - Detector-weights audit and benchmark artifact cleanup
 - Bumped all dependencies to latest, cleared Dependabot alerts
+- Pricing: $100/mo per domain (unlimited requests, no per-request metering)
+- **BoundedCache** replaces raw ConcurrentDictionary across 6 lookup services (ASN, Honeypot, RDNS, CIDR, VerifiedBot DNS)
+- Read-through caches on FingerprintApprovalStore and ChallengeStore (eliminates 50-500us/req SQLite hits)
+- AccountTakeoverContributor eviction: O(N^2) -> O(N log N)
+- GeoChangeContributor: two-phase pruning (expire + LRU)
+- MarkovTracker: MaxTrackedSignatures with eviction
+- SignatureCoordinator: shadow index pruning
+- DriftDetectionHandler: bounded at 10K patterns/50 samples per pattern
 
 ### Fixed
 
 - Five bugs found running the Phase 1 portal end-to-end
 - Normalized em-dash characters to hyphens for consistent documentation style
 - Synced reputation/decay tests to post-oscillation-fix behavior
+- **IPv4-mapped IPv6 subnet classification** - `::ffff:x.x.x.x` addresses were grouped into `::ffff::/48` subnet, causing ALL IPv4-mapped addresses to share reputation. Fixed to extract IPv4 and use /24
+
+### Security
+
+- **CRITICAL-1**: HMAC token secret auto-generates cryptographically random secret (no guessable fallback)
+- **CRITICAL-2**: returnUrl open redirect fixed (rejects absolute URLs, protocol-relative, scheme injection)
+- **CRITICAL-3**: Token secret propagation fixed (EffectiveTokenSecret across requests)
+- **HIGH-1**: TrainingEndpoints RequireApiKey defaults to true
+- **HIGH-2**: Policy mutation endpoints require authorization
+- **HIGH-3**: Dashboard defaults to deny when no auth configured (AllowUnauthenticatedAccess flag)
+- **HIGH-4**: X-SB-Labeler header only honored when authenticated
+- **MEDIUM-1**: PoW solution SeedIndex validated server-side
+- **MEDIUM-2**: BDF replay header injection blocked (X-SB-*, X-Bot-*, Host, X-Forwarded-For)
+- **MEDIUM-3**: Rate limiter dictionaries bounded at 10K entries
+- **MEDIUM-4**: Raw HMAC token removed from verify JSON response
 
 ---
 
