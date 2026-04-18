@@ -5,6 +5,17 @@
 # Screenshots from Playwright / debugging
 *.png
 !**/wwwroot/**/*.png
+!**/icon.png
+
+# Temp HTML files
+tmp-*.html
+
+# Backup / test data
+bot-signatures-v1-backup/
+test-bdf-v2/
+
+# Playwright MCP screenshots
+.playwright-mcp/
 
 # Windows null device artifact
 NUL
