@@ -1,6 +1,9 @@
 name: Publish All
 
 on:
+  push:
+    tags:
+      - 'allbot-v*.*.*'
   workflow_dispatch:
     inputs:
       version:
@@ -10,6 +13,7 @@ on:
         description: 'Components to publish'
         required: true
         type: choice
+        default: 'all'
         options:
           - all
           - nuget-only
@@ -25,19 +29,37 @@ jobs:
   # Validate version input format
   validate-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      components: ${{ steps.extract.outputs.components }}
     steps:
-    - name: Validate version input
+    - name: Extract version and components
+      id: extract
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_COMPONENTS: ${{ inputs.components }}
+        GIT_REF: ${{ github.ref_name }}
       run: |
-        VERSION="${{ inputs.version }}"
+        # Tag push: extract version from tag name (allbot-v1.2.3 -> 1.2.3)
+        if [ -n "$GIT_REF" ] && [[ "$GIT_REF" == allbot-v* ]]; then
+          VERSION="${GIT_REF#allbot-v}"
+          COMPONENTS="all"
+        else
+          VERSION="$INPUT_VERSION"
+          COMPONENTS="${INPUT_COMPONENTS:-all}"
+        fi
         if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
-          echo "::error::Invalid version format: '$VERSION'. Expected semver (e.g., 1.0.0 or 1.0.0-alpha1)"
+          echo "::error::Invalid version format: '$VERSION'. Expected semver."
           exit 1
         fi
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "components=$COMPONENTS" >> "$GITHUB_OUTPUT"
+        echo "Publishing version $VERSION (components: $COMPONENTS)"
 
   # Publish BotDetection NuGet package
   publish-botdetection:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -88,7 +110,7 @@ jobs:
   # Publish Common NuGet package
   publish-common:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -126,7 +148,7 @@ jobs:
   # Publish GeoDetection NuGet package
   publish-geodetection:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -165,7 +187,7 @@ jobs:
   # Publish BotDetection.UI NuGet package
   publish-botdetection-ui:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -193,7 +215,7 @@ jobs:
   # Publish BotDetection.UI.PostgreSQL NuGet package
   publish-botdetection-ui-postgresql:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -221,7 +243,7 @@ jobs:
   # Publish GeoDetection.Contributor NuGet package
   publish-geodetection-contributor:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only'
+    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -249,7 +271,7 @@ jobs:
   # Publish Stylobot.Gateway Docker image
   publish-gateway:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'docker-only'
+    if: inputs.components == 'all' || inputs.components == 'docker-only' || inputs.components == ''
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -295,7 +317,7 @@ jobs:
   # Publish Stylobot Demo Docker image
   publish-demo:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'docker-only'
+    if: inputs.components == 'all' || inputs.components == 'docker-only' || inputs.components == ''
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -330,7 +352,7 @@ jobs:
   # Publish Stylobot Website Docker image
   publish-website:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'docker-only'
+    if: inputs.components == 'all' || inputs.components == 'docker-only' || inputs.components == ''
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -361,7 +383,7 @@ jobs:
   # Publish Console Gateway cross-platform binaries
   publish-console:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'console-only'
+    if: inputs.components == 'all' || inputs.components == 'console-only' || inputs.components == ''
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -467,7 +489,7 @@ jobs:
 
   # Create GitHub Release for console gateway
   create-console-release:
-    if: inputs.components == 'all' || inputs.components == 'console-only'
+    if: inputs.components == 'all' || inputs.components == 'console-only' || inputs.components == ''
     needs: publish-console
     runs-on: ubuntu-latest
     steps:
