@@ -36,6 +36,7 @@
                             <th class="py-1 text-right @ThClass("unique") cursor-pointer hidden sm:table-cell" hx-get="@SortUrl("unique")" hx-target="#endpoints-list" hx-swap="outerHTML transition:true">Sigs@(Html.Raw(SortIcon("unique")))</th>
                             <th class="py-1 text-right @ThClass("latency") cursor-pointer hidden md:table-cell" hx-get="@SortUrl("latency")" hx-target="#endpoints-list" hx-swap="outerHTML transition:true">Ms@(Html.Raw(SortIcon("latency")))</th>
                             <th class="py-1 text-right @ThClass("threat") cursor-pointer hidden md:table-cell" hx-get="@SortUrl("threat")" hx-target="#endpoints-list" hx-swap="outerHTML transition:true">Threat@(Html.Raw(SortIcon("threat")))</th>
+                            <th class="py-1 hidden lg:table-cell text-base-content/40">Policy</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -53,6 +54,12 @@
                                 <td class="py-1 text-right text-xs font-mono hidden sm:table-cell">@endpoint.UniqueSignatures</td>
                                 <td class="py-1 text-right text-xs hidden md:table-cell">@endpoint.AvgProcessingTimeMs.ToString("F0")</td>
                                 <td class="py-1 text-right text-xs hidden md:table-cell">@endpoint.AvgThreatScore.ToString("F1")</td>
+                                <td class="py-1 hidden lg:table-cell">
+                                    @if (!string.IsNullOrEmpty(endpoint.ActivePolicyName))
+                                    {
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-base-300 text-base-content/60 font-medium">@endpoint.ActivePolicyName</span>
+                                    }
+                                </td>
                             </tr>
                         }
                         </tbody>

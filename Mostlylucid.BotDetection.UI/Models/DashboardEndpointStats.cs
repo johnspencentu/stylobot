@@ -17,6 +17,12 @@ public sealed record DashboardEndpointStats
     public string? TopAction { get; init; }
     public string? DominantRiskBand { get; init; }
     public DateTime LastSeen { get; init; }
+
+    /// <summary>
+    ///     The detection policy that resolves for this endpoint's path.
+    ///     Populated from IPolicyRegistry.GetPolicyForPath() when available.
+    /// </summary>
+    public string? ActivePolicyName { get; init; }
 }
 
 /// <summary>

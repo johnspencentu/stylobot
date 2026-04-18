@@ -446,7 +446,7 @@ public class StyloBotDashboardMiddleware
         catch { countriesData = []; }
 
         List<DashboardEndpointStats> endpointsData;
-        try { endpointsData = await GetEndpointsDataAsync(); }
+        try { endpointsData = await GetEndpointsDataAsync(context); }
         catch { endpointsData = []; }
 
         var allUserAgents = _aggregateCache.Current.UserAgents.Count > 0
@@ -2163,7 +2163,7 @@ public class StyloBotDashboardMiddleware
         var page = int.TryParse(context.Request.Query["page"].FirstOrDefault(), out var p) && p > 0 ? p : 1;
         var pageSize = int.TryParse(context.Request.Query["pageSize"].FirstOrDefault(), out var ps) && ps is > 0 and <= 100 ? ps : 20;
 
-        var model = BuildEndpointsModel(sortField, sortDir, page, pageSize, await GetEndpointsDataAsync());
+        var model = BuildEndpointsModel(sortField, sortDir, page, pageSize, await GetEndpointsDataAsync(context));
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -2522,7 +2522,7 @@ public class StyloBotDashboardMiddleware
 
     private async Task<string> RenderEndpointPartialAsync(HttpContext context)
     {
-        var data = await GetEndpointsDataAsync();
+        var data = await GetEndpointsDataAsync(context);
         var model = BuildEndpointsModel("total", "desc", 1, 20, data);
         return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_EndpointsList.cshtml", model, context);
     }
@@ -3027,10 +3027,27 @@ public class StyloBotDashboardMiddleware
         return cached.Count > 0 ? cached : await _eventStore.GetCountryStatsAsync(100);
     }
 
-    private async Task<List<DashboardEndpointStats>> GetEndpointsDataAsync()
+    private async Task<List<DashboardEndpointStats>> GetEndpointsDataAsync(HttpContext? httpContext = null)
     {
         var cached = _aggregateCache.Current.Endpoints;
-        return cached.Count > 0 ? cached : await _eventStore.GetEndpointStatsAsync(100);
+        var endpoints = cached.Count > 0 ? cached : await _eventStore.GetEndpointStatsAsync(100);
+
+        // Enrich with resolved policy names if IPolicyRegistry is available
+        if (httpContext != null)
+        {
+            var policyRegistry = httpContext.RequestServices
+                .GetService(typeof(BotDetection.Policies.IPolicyRegistry))
+                as BotDetection.Policies.IPolicyRegistry;
+            if (policyRegistry != null)
+            {
+                endpoints = endpoints.Select(e => e with
+                {
+                    ActivePolicyName = e.ActivePolicyName ?? policyRegistry.GetPolicyForPath(e.Path).Name
+                }).ToList();
+            }
+        }
+
+        return endpoints;
     }
 
     private EndpointsListModel BuildEndpointsModel(string sortField, string sortDir, int page, int pageSize, List<DashboardEndpointStats> all)
