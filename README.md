@@ -21,13 +21,26 @@ docker run --rm -p 8080:8080 -e DEFAULT_UPSTREAM=http://host.docker.internal:300
 dotnet add package mostlylucid.botdetection
 ```
 
+Then run it:
+
+```bash
+stylobot
+# ✓ Ready on http://localhost:5080
+# ✓ Dashboard: http://localhost:5080/_stylobot
+```
+
+Or protect an existing app:
+
+```bash
+DEFAULT_UPSTREAM=http://localhost:3000 stylobot --mode production
+```
+
+Or embed as middleware:
+
 ```csharp
-// Two lines in Program.cs
 builder.Services.AddBotDetection();
 app.UseBotDetection();
 ```
-
-Dashboard at `http://localhost:5080/_stylobot`
 
 ## Pricing
 
