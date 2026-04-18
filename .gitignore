@@ -445,3 +445,11 @@ stylobot-config/
 
 # Website moved to stylobot-commercial repo
 mostlylucid.stylobot.website/
+
+# Screenshots and temp files
+*.png
+tmp-*.html
+BenchmarkDotNet.Artifacts/
+TestSite/
+stylobot-react/
+*.playwright-mcp/

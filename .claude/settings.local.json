@@ -275,7 +275,18 @@
       "Bash(npm audit:*)",
       "Bash(kill -TERM 22365)",
       "Bash(mv UNLICENSE:*)",
-      "Bash(md5 README.md)"
+      "Bash(md5 README.md)",
+      "Bash(git tag:*)",
+      "Read(//tmp/**)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(ssh-copy-id -o StrictHostKeyChecking=no scott@192.168.0.89)",
+      "Bash(brew install:*)",
+      "Bash(sshpass:*)",
+      "Bash(kill 2983 2981)",
+      "Read(//Users/scottgalloway/Desktop/**)",
+      "Bash(disown)",
+      "Bash(mkdir -p /Users/scottgalloway/RiderProjects/stylobot-commercial/.github/workflows/)",
+      "Bash(cp /Users/scottgalloway/RiderProjects/stylobot/.github/workflows/docker-build-push.yml /Users/scottgalloway/RiderProjects/stylobot-commercial/.github/workflows/)"
     ]
   }
 }
