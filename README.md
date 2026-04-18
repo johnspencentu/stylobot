@@ -25,22 +25,55 @@ Then run it:
 
 ```bash
 stylobot 5080 http://localhost:3000
-# ✓ Ready on http://localhost:5080
-# ✓ Upstream: http://localhost:3000
-# ✓ Dashboard: http://localhost:5080/_stylobot
+# Live detection table with color-coded BOT/HUMAN verdicts
 
-stylobot 8000 http://192.168.0.6:2040 --mode production
+stylobot 8000 http://192.168.0.6:2040 --mode production --policy block
 # Production mode with blocking enabled
+
+# Run as background daemon
+stylobot start 5080 http://localhost:3000 --policy block
+stylobot status     # Check health
+stylobot logs       # View recent logs
+stylobot stop       # Graceful shutdown
 
 # With TLS
 stylobot 443 https://api.example.com --cert cert.pfx
 
 # Cloudflare Tunnel (instant public URL, no port forwarding)
 stylobot 5080 http://localhost:3000 --tunnel
-stylobot 5080 http://localhost:3000 --tunnel eyJhIjoiNjQ2...
 ```
 
-**CLI options:** `--mode`, `--cert`, `--key`, `--cert-password`, `--tunnel`, `--config`, `--log-level`. Run `stylobot --help` for details.
+### Cloudflare Tunnel
+
+The `--tunnel` flag creates an instant public URL via Cloudflare. Requires `cloudflared`:
+
+```bash
+# macOS
+brew install cloudflared
+
+# Linux (Debian/Ubuntu)
+curl -L https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install cloudflared
+
+# Windows
+winget install Cloudflare.cloudflared
+```
+
+Then: `stylobot 5080 http://localhost:3000 --tunnel` for a quick tunnel, or `--tunnel <token>` for a pre-configured named tunnel.
+
+### As systemd service (Linux)
+
+```bash
+sudo cp scripts/stylobot.service /etc/systemd/system/
+sudo systemctl enable --now stylobot
+```
+
+### As Homebrew service (macOS)
+
+```bash
+brew services start stylobot
+```
 
 Or embed as middleware:
 

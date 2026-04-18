@@ -60,7 +60,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    --cert <path>               TLS certificate (.pfx or .pem)");
     Console.WriteLine("    --key <path>                TLS private key (required with .pem cert)");
     Console.WriteLine("    --cert-password <pass>      PFX certificate password");
-    Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (quick or named)");
+    Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (requires cloudflared)");
     Console.WriteLine("    --config <path>             Path to appsettings.json override");
     Console.WriteLine("    --log-level <level>         Minimum log level (default: Warning)");
     Console.WriteLine("    --verbose                   Show all log output (disables live table)");
@@ -787,13 +787,13 @@ static Process? LaunchCloudflaredTunnel(string port, string scheme, string? toke
         check?.WaitForExit(5000);
         if (check is null || check.ExitCode != 0)
         {
-            Log.Error("cloudflared not found. Install it: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/");
+            Log.Error("cloudflared not found. Install: brew install cloudflared (macOS) | apt install cloudflared (Linux) | winget install Cloudflare.cloudflared (Windows)");
             return null;
         }
     }
     catch
     {
-        Log.Error("cloudflared not found. Install it: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/");
+        Log.Error("cloudflared not found. Install: brew install cloudflared (macOS) | apt install cloudflared (Linux) | winget install Cloudflare.cloudflared (Windows)");
         return null;
     }
 
