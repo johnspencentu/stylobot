@@ -539,74 +539,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Update Homebrew tap formula with new version and SHA256 hashes
-  update-homebrew:
-    needs: [validate-version, create-console-release]
-    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'console-only'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Download SHA256SUMS from release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh release download "console-v${{ needs.validate-version.outputs.version }}" \
-          --repo scottgal/stylobot \
-          --pattern "SHA256SUMS.txt" \
-          --output SHA256SUMS.txt
-        cat SHA256SUMS.txt
-
-    - name: Extract platform hashes
-      id: hashes
-      run: |
-        echo "osx_arm64=$(grep 'stylobot-osx-arm64.tar.gz' SHA256SUMS.txt | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "osx_x64=$(grep 'stylobot-osx-x64.tar.gz' SHA256SUMS.txt | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "linux_arm64=$(grep 'stylobot-linux-arm64.tar.gz' SHA256SUMS.txt | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "linux_x64=$(grep 'stylobot-linux-x64.tar.gz' SHA256SUMS.txt | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-
-    - name: Checkout Homebrew tap
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      with:
-        repository: scottgal/homebrew-stylobot
-        token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        path: homebrew-tap
-
-    - name: Update formula
-      env:
-        VERSION: ${{ needs.validate-version.outputs.version }}
-        SHA_OSX_ARM64: ${{ steps.hashes.outputs.osx_arm64 }}
-        SHA_OSX_X64: ${{ steps.hashes.outputs.osx_x64 }}
-        SHA_LINUX_ARM64: ${{ steps.hashes.outputs.linux_arm64 }}
-        SHA_LINUX_X64: ${{ steps.hashes.outputs.linux_x64 }}
-      run: |
-        cd homebrew-tap
-        # Update version
-        sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/stylobot.rb
-        # Update SHA256 hashes (match the sha256 line after each platform URL)
-        # macOS ARM64
-        sed -i "/stylobot-osx-arm64/,/sha256/{s/sha256 \".*\"/sha256 \"${SHA_OSX_ARM64}\"/}" Formula/stylobot.rb
-        # macOS x64
-        sed -i "/stylobot-osx-x64/,/sha256/{s/sha256 \".*\"/sha256 \"${SHA_OSX_X64}\"/}" Formula/stylobot.rb
-        # Linux ARM64
-        sed -i "/stylobot-linux-arm64/,/sha256/{s/sha256 \".*\"/sha256 \"${SHA_LINUX_ARM64}\"/}" Formula/stylobot.rb
-        # Linux x64
-        sed -i "/stylobot-linux-x64/,/sha256/{s/sha256 \".*\"/sha256 \"${SHA_LINUX_X64}\"/}" Formula/stylobot.rb
-        echo "Updated formula:"
-        cat Formula/stylobot.rb
-
-    - name: Commit and push
-      working-directory: homebrew-tap
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add Formula/stylobot.rb
-        git diff --cached --quiet && echo "No changes to commit" && exit 0
-        git commit -m "Bump to v${{ needs.validate-version.outputs.version }}"
-        git push
+  # Homebrew tap update is handled by .github/workflows/update-homebrew.yml
+  # which triggers on the release:published event from create-console-release.
 
   # Summary
   summary:
     if: always()
-    needs: [validate-version, publish-botdetection, publish-common, publish-geodetection, publish-botdetection-ui, publish-botdetection-ui-postgresql, publish-geodetection-contributor, publish-gateway, publish-demo, publish-console, create-console-release, update-homebrew]
+    needs: [validate-version, publish-botdetection, publish-common, publish-geodetection, publish-botdetection-ui, publish-botdetection-ui-postgresql, publish-geodetection-contributor, publish-gateway, publish-demo, publish-console, create-console-release]
     runs-on: ubuntu-latest
     steps:
     - name: Create summary
@@ -625,4 +564,4 @@ jobs:
         echo "| GeoDetection.Contributor NuGet | ${{ needs.publish-geodetection-contributor.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Console Binaries | ${{ needs.publish-console.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Console Release | ${{ needs.create-console-release.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Homebrew Tap | ${{ needs.update-homebrew.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Homebrew Tap | (via update-homebrew.yml on release) |" >> $GITHUB_STEP_SUMMARY

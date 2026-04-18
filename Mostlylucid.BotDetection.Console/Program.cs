@@ -679,11 +679,14 @@ try
         Log.Information("");
     }
 
+    // Shared tunnel URL (populated by cloudflared log parser, read by live table)
+    string? tunnelUrl = null;
+
     // Launch Cloudflare tunnel if requested
     Process? tunnelProcess = null;
     if (tunnelEnabled)
     {
-        tunnelProcess = LaunchCloudflaredTunnel(port, scheme, tunnelToken);
+        tunnelProcess = LaunchCloudflaredTunnel(port, scheme, tunnelToken, url => tunnelUrl = url);
     }
 
     // Start live detection table (replaces verbose log output)
@@ -694,7 +697,7 @@ try
         liveTableCts = new CancellationTokenSource();
         var liveTable = new LiveDetectionTableService(
             detectionSink, mode, upstream, port, actionPolicy,
-            useTls, tunnelEnabled);
+            useTls, tunnelEnabled, () => tunnelUrl);
         liveTableTask = liveTable.StartAsync(liveTableCts.Token);
     }
     else
@@ -787,7 +790,7 @@ static string? GetArg(string[] args, string name)
 }
 
 // Launch cloudflared tunnel subprocess
-static Process? LaunchCloudflaredTunnel(string port, string scheme, string? token)
+static Process? LaunchCloudflaredTunnel(string port, string scheme, string? token, Action<string>? onTunnelUrl = null)
 {
     // Check cloudflared is installed
     try
@@ -861,7 +864,12 @@ static Process? LaunchCloudflaredTunnel(string port, string scheme, string? toke
             {
                 // Look for the tunnel URL in output
                 if (line.Contains(".trycloudflare.com") || line.Contains("Registered tunnel connection"))
+                {
                     Log.Information("  ✓ Tunnel: {TunnelInfo}", line.Trim());
+                    // Extract URL from the line (e.g., "https://foo-bar.trycloudflare.com")
+                    var match = System.Text.RegularExpressions.Regex.Match(line, @"(https://[^\s|]+\.trycloudflare\.com)");
+                    if (match.Success) onTunnelUrl?.Invoke(match.Groups[1].Value);
+                }
                 else if (line.Contains("ERR"))
                     Log.Warning("[cloudflared] {Line}", line.Trim());
                 else

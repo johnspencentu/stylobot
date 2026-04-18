@@ -98,6 +98,7 @@ public sealed class LiveDetectionTableService : BackgroundService
     private readonly string _policy;
     private readonly bool _useTls;
     private readonly bool _tunnelEnabled;
+    private readonly Func<string?>? _tunnelUrlGetter;
     private readonly int _maxRows;
 
     // Stats
@@ -124,7 +125,8 @@ public sealed class LiveDetectionTableService : BackgroundService
     public LiveDetectionTableService(
         DetectionEventSink sink,
         string mode, string upstream, string port, string policy,
-        bool useTls, bool tunnelEnabled, int maxRows = 15)
+        bool useTls, bool tunnelEnabled,
+        Func<string?>? tunnelUrlGetter = null, int maxRows = 15)
     {
         _sink = sink;
         _mode = mode;
@@ -133,6 +135,7 @@ public sealed class LiveDetectionTableService : BackgroundService
         _policy = policy;
         _useTls = useTls;
         _tunnelEnabled = tunnelEnabled;
+        _tunnelUrlGetter = tunnelUrlGetter;
         _maxRows = maxRows;
     }
 
@@ -218,7 +221,12 @@ public sealed class LiveDetectionTableService : BackgroundService
         configPanel.AddRow("[dim]Policy[/]", PolicyMarkup(_policy));
         configPanel.AddRow("[dim]Upstream[/]", Markup.Escape(_upstream));
         configPanel.AddRow("[dim]Listen[/]", $"{scheme}://localhost:{_port}");
-        if (_tunnelEnabled) configPanel.AddRow("[dim]Tunnel[/]", "[green]Cloudflare[/]");
+        if (_tunnelEnabled)
+        {
+            var tUrl = _tunnelUrlGetter?.Invoke();
+            configPanel.AddRow("[dim]Tunnel[/]",
+                tUrl != null ? $"[bold green]{Markup.Escape(tUrl)}[/]" : "[yellow]connecting...[/]");
+        }
         configPanel.AddRow("[dim]Dashboard[/]", $"[dim]{scheme}://localhost:{_port}/_stylobot[/]");
         configPanel.AddRow("[dim]Uptime[/]", $"[dim]{uptime:hh\\:mm\\:ss}[/]");
 
