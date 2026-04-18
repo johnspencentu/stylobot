@@ -1,0 +1,33 @@
+[Unit]
+Description=StyloBot - Self-hosted bot defense
+Documentation=https://github.com/scottgal/stylobot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/stylobot 5080 http://localhost:3000 --mode production --verbose
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+WatchdogSec=60s
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/var/lib/stylobot /var/log/stylobot
+
+# Data and log directories
+Environment=HOME=/var/lib/stylobot
+WorkingDirectory=/var/lib/stylobot
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stylobot
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -22,6 +22,21 @@ Batteries.Init();
 // Parse command-line arguments
 var cmdArgs = Environment.GetCommandLineArgs();
 
+// Route subcommands: stop, status, logs don't need the full server startup
+var firstArg = cmdArgs.Length > 1 ? cmdArgs[1].ToLowerInvariant() : null;
+switch (firstArg)
+{
+    case "stop":
+        return DaemonCommands.Stop();
+    case "status":
+        return await DaemonCommands.Status();
+    case "logs":
+        return DaemonCommands.Logs();
+    case "start":
+        // "start" launches a background process with the same args
+        return DaemonCommands.Start(cmdArgs);
+}
+
 // Show help if no args or --help
 if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
 {
@@ -32,6 +47,12 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("  Usage:");
     Console.WriteLine("    stylobot <port> <upstream>                  Proxy to upstream on port");
     Console.WriteLine("    stylobot <port> <upstream> --mode production     Enable blocking");
+    Console.WriteLine();
+    Console.WriteLine("  Commands:");
+    Console.WriteLine("    stylobot start <port> <upstream> [opts]     Start as background daemon");
+    Console.WriteLine("    stylobot stop                               Stop the running daemon");
+    Console.WriteLine("    stylobot status                             Check if daemon is running");
+    Console.WriteLine("    stylobot logs                               Show recent log output");
     Console.WriteLine();
     Console.WriteLine("  Options:");
     Console.WriteLine("    --mode <demo|production>    Detection mode (default: demo)");
@@ -48,9 +69,9 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("  Examples:");
     Console.WriteLine("    stylobot 5080 http://localhost:3000");
     Console.WriteLine("    stylobot 8000 http://192.168.0.6:2040 --mode production");
+    Console.WriteLine("    stylobot start 5080 http://localhost:3000 --policy block");
     Console.WriteLine("    stylobot 443 https://api.example.com --cert cert.pfx");
     Console.WriteLine("    stylobot 5080 http://localhost:3000 --tunnel");
-    Console.WriteLine("    stylobot 5080 http://localhost:3000 --tunnel eyJhIjoiNjQ2...");
     Console.WriteLine();
     Console.WriteLine("  Dashboard:  http://localhost:<port>/_stylobot");
     Console.WriteLine("  Health:     http://localhost:<port>/health");
