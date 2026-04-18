@@ -59,7 +59,7 @@ jobs:
   # Publish BotDetection NuGet package
   publish-botdetection:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'nuget-only'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -73,7 +73,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Create MinVer tag
-      run: git tag "botdetection-v${{ inputs.version }}"
+      run: git tag "botdetection-v${{ needs.validate-version.outputs.version }}"
 
     - name: Restore dependencies
       run: dotnet restore Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj
@@ -99,7 +99,7 @@ jobs:
   # Publish Common NuGet package
   publish-common:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'nuget-only'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -113,7 +113,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Create MinVer tag
-      run: git tag "common-v${{ inputs.version }}"
+      run: git tag "common-v${{ needs.validate-version.outputs.version }}"
 
     - name: Restore, Build, Pack
       run: |
@@ -137,7 +137,7 @@ jobs:
   # Publish GeoDetection NuGet package
   publish-geodetection:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'nuget-only'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -151,7 +151,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Create MinVer tag
-      run: git tag "geodetection-v${{ inputs.version }}"
+      run: git tag "geodetection-v${{ needs.validate-version.outputs.version }}"
 
     - name: Restore, Build, Pack
       run: |
@@ -175,7 +175,7 @@ jobs:
   # Publish BotDetection.UI NuGet package
   publish-botdetection-ui:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'nuget-only'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -203,7 +203,7 @@ jobs:
   # Publish BotDetection.UI.PostgreSQL NuGet package
   publish-botdetection-ui-postgresql:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'nuget-only'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -231,7 +231,7 @@ jobs:
   # Publish GeoDetection.Contributor NuGet package
   publish-geodetection-contributor:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'nuget-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'nuget-only'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -259,7 +259,7 @@ jobs:
   # Publish Stylobot.Gateway Docker image
   publish-gateway:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'docker-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'docker-only'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -296,7 +296,7 @@ jobs:
         file: ./Stylobot.Gateway/Dockerfile
         push: true
         tags: |
-          scottgal/stylobot-gateway:${{ inputs.version }}
+          scottgal/stylobot-gateway:${{ needs.validate-version.outputs.version }}
           scottgal/stylobot-gateway:latest
         platforms: linux/amd64,linux/arm64
         cache-from: type=gha
@@ -305,7 +305,7 @@ jobs:
   # Publish Stylobot Demo Docker image
   publish-demo:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'docker-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'docker-only'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -329,13 +329,13 @@ jobs:
         file: ./Mostlylucid.BotDetection.Demo/Dockerfile
         push: true
         tags: |
-          scottgal/stylobot-demo:${{ inputs.version }}
+          scottgal/stylobot-demo:${{ needs.validate-version.outputs.version }}
           scottgal/stylobot-demo:latest
         platforms: linux/amd64,linux/arm64
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
-          BUILD_VERSION=${{ inputs.version }}
+          BUILD_VERSION=${{ needs.validate-version.outputs.version }}
 
   # Publish Stylobot Website Docker image
   # Website publish removed - moved to stylobot-commercial repo
@@ -343,7 +343,7 @@ jobs:
   # Publish Console Gateway cross-platform binaries
   publish-console:
     needs: validate-version
-    if: inputs.components == 'all' || inputs.components == 'console-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'console-only'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -412,7 +412,7 @@ jobs:
           -p:TrimMode=full \
           -p:PublishSingleFile=true \
           -p:StripSymbols=true \
-          -p:Version=${{ inputs.version }} \
+          -p:Version=${{ needs.validate-version.outputs.version }} \
           $OBJCOPY_PARAM
 
     - name: Create distribution package
@@ -449,7 +449,7 @@ jobs:
 
   # Create GitHub Release for console gateway
   create-console-release:
-    if: inputs.components == 'all' || inputs.components == 'console-only' || inputs.components == ''
+    if: needs.validate-version.outputs.components == 'all' || needs.validate-version.outputs.components == 'console-only'
     needs: publish-console
     runs-on: ubuntu-latest
     steps:
@@ -476,10 +476,10 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
-        name: Console Gateway v${{ inputs.version }}
-        tag_name: console-v${{ inputs.version }}
+        name: Console Gateway v${{ needs.validate-version.outputs.version }}
+        tag_name: console-v${{ needs.validate-version.outputs.version }}
         body: |
-          ## Bot Detection Console Gateway v${{ inputs.version }}
+          ## Bot Detection Console Gateway v${{ needs.validate-version.outputs.version }}
 
           Published via Publish All workflow.
 
@@ -502,12 +502,12 @@ jobs:
   # Summary
   summary:
     if: always()
-    needs: [validate-version, publish-botdetection, publish-common, publish-geodetection, publish-gateway, publish-demo, publish-website, publish-console, create-console-release]
+    needs: [validate-version, publish-botdetection, publish-common, publish-geodetection, publish-botdetection-ui, publish-botdetection-ui-postgresql, publish-geodetection-contributor, publish-gateway, publish-demo, publish-console, create-console-release]
     runs-on: ubuntu-latest
     steps:
     - name: Create summary
       run: |
-        echo "## Publish All - v${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "## Publish All - v${{ needs.validate-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
@@ -516,6 +516,8 @@ jobs:
         echo "| GeoDetection NuGet | ${{ needs.publish-geodetection.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Gateway Docker | ${{ needs.publish-gateway.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Demo Docker | ${{ needs.publish-demo.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Website Docker | ${{ needs.publish-website.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| BotDetection.UI NuGet | ${{ needs.publish-botdetection-ui.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| BotDetection.UI.PostgreSQL NuGet | ${{ needs.publish-botdetection-ui-postgresql.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| GeoDetection.Contributor NuGet | ${{ needs.publish-geodetection-contributor.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Console Binaries | ${{ needs.publish-console.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Console Release | ${{ needs.create-console-release.result }} |" >> $GITHUB_STEP_SUMMARY
