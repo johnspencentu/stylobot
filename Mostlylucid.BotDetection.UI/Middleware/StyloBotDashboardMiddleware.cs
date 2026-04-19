@@ -487,7 +487,7 @@ public class StyloBotDashboardMiddleware
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/Index.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/Index.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -1787,7 +1787,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_VisitorList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_VisitorList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -1803,7 +1803,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_SummaryStats.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_SummaryStats.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -1813,7 +1813,7 @@ public class StyloBotDashboardMiddleware
         var model = BuildYourDetectionPartialModel(context);
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_YourDetection.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_YourDetection.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -1841,7 +1841,7 @@ public class StyloBotDashboardMiddleware
         var model = BuildLicenseCardModel(context);
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_LicenseCard.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_LicenseCard.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -1876,7 +1876,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_ConfigurationEditor.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_ConfigurationEditor.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2155,7 +2155,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_CountriesList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_CountriesList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2171,7 +2171,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_EndpointsList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_EndpointsList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2181,7 +2181,7 @@ public class StyloBotDashboardMiddleware
         var model = BuildClustersModel(context);
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_ClustersList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_ClustersList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2197,7 +2197,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_TopBotsList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_TopBotsList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2211,7 +2211,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_SessionsList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_SessionsList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2267,7 +2267,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_SessionDetail.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_SessionDetail.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2397,7 +2397,7 @@ public class StyloBotDashboardMiddleware
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_ApprovalForm.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_ApprovalForm.cshtml", model, context);
         context.Response.ContentType = "text/html";
         await context.Response.WriteAsync(html);
     }
@@ -2428,7 +2428,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_RecentActivity.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_RecentActivity.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2447,7 +2447,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_UserAgentsList.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_UserAgentsList.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2485,17 +2485,17 @@ public class StyloBotDashboardMiddleware
         {
             var html = widgetId switch
             {
-                "summary" => await RenderPartialAsync(context, "/Views/Dashboard/_SummaryStats.cshtml",
+                "summary" => await RenderPartialAsync(context, "/Views/StyloBot/Dashboard/_SummaryStats.cshtml",
                     new SummaryStatsModel { Summary = await _eventStore.GetSummaryAsync(), BasePath = _options.BasePath.TrimEnd('/') }),
                 "visitors" => await RenderVisitorPartialAsync(context),
                 "countries" => await RenderCountryPartialAsync(context),
                 "endpoints" => await RenderEndpointPartialAsync(context),
-                "clusters" => await RenderPartialAsync(context, "/Views/Dashboard/_ClustersList.cshtml", BuildClustersModel(context)),
+                "clusters" => await RenderPartialAsync(context, "/Views/StyloBot/Dashboard/_ClustersList.cshtml", BuildClustersModel(context)),
                 "useragents" => await RenderUaPartialAsync(context),
-                "topbots" => await RenderPartialAsync(context, "/Views/Dashboard/_TopBotsList.cshtml", BuildTopBotsModel()),
-                "sessions" => await RenderPartialAsync(context, "/Views/Dashboard/_SessionsList.cshtml", BuildSessionsModel(context)),
+                "topbots" => await RenderPartialAsync(context, "/Views/StyloBot/Dashboard/_TopBotsList.cshtml", BuildTopBotsModel()),
+                "sessions" => await RenderPartialAsync(context, "/Views/StyloBot/Dashboard/_SessionsList.cshtml", BuildSessionsModel(context)),
                 "recent" => await RenderRecentActivityPartialAsync(context),
-                "your-detection" => await RenderPartialAsync(context, "/Views/Dashboard/_YourDetection.cshtml", BuildYourDetectionPartialModel(context)),
+                "your-detection" => await RenderPartialAsync(context, "/Views/StyloBot/Dashboard/_YourDetection.cshtml", BuildYourDetectionPartialModel(context)),
                 _ => ""
             };
 
@@ -2548,21 +2548,21 @@ public class StyloBotDashboardMiddleware
             Page = page, PageSize = 24, TotalCount = totalCount,
             BasePath = _options.BasePath.TrimEnd('/')
         };
-        return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_VisitorList.cshtml", model, context);
+        return await _razorViewRenderer.RenderViewToStringAsync("/Views/StyloBot/Dashboard/_VisitorList.cshtml", model, context);
     }
 
     private async Task<string> RenderCountryPartialAsync(HttpContext context)
     {
         var data = await GetCountriesDataAsync();
         var model = BuildCountriesModel("total", "desc", 1, 20, data);
-        return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_CountriesList.cshtml", model, context);
+        return await _razorViewRenderer.RenderViewToStringAsync("/Views/StyloBot/Dashboard/_CountriesList.cshtml", model, context);
     }
 
     private async Task<string> RenderEndpointPartialAsync(HttpContext context)
     {
         var data = await GetEndpointsDataAsync(context);
         var model = BuildEndpointsModel("total", "desc", 1, 20, data);
-        return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_EndpointsList.cshtml", model, context);
+        return await _razorViewRenderer.RenderViewToStringAsync("/Views/StyloBot/Dashboard/_EndpointsList.cshtml", model, context);
     }
 
     private async Task<string> RenderRecentActivityPartialAsync(HttpContext context)
@@ -2576,7 +2576,7 @@ public class StyloBotDashboardMiddleware
             Page = 1, PageSize = 10, TotalCount = totalCount,
             BasePath = _options.BasePath.TrimEnd('/')
         };
-        return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_RecentActivity.cshtml", model, context);
+        return await _razorViewRenderer.RenderViewToStringAsync("/Views/StyloBot/Dashboard/_RecentActivity.cshtml", model, context);
     }
 
     private async Task<string> RenderUaPartialAsync(HttpContext context)
@@ -2584,7 +2584,7 @@ public class StyloBotDashboardMiddleware
         var cached = _aggregateCache.Current.UserAgents;
         var uas = cached.Count > 0 ? cached : await ComputeUserAgentsFallbackAsync();
         var model = BuildUserAgentsModel("all", "requests", "desc", 1, 25, uas);
-        return await _razorViewRenderer.RenderViewToStringAsync("/Views/Dashboard/_UserAgentsList.cshtml", model, context);
+        return await _razorViewRenderer.RenderViewToStringAsync("/Views/StyloBot/Dashboard/_UserAgentsList.cshtml", model, context);
     }
 
     /// <summary>Serve the signature detail page for a specific signature.</summary>
@@ -2893,7 +2893,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_SignatureDetail.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_SignatureDetail.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2942,7 +2942,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_UserAgentDetail.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_UserAgentDetail.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 
@@ -2989,7 +2989,7 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
-            "/Views/Dashboard/_EndpointDetail.cshtml", model, context);
+            "/Views/StyloBot/Dashboard/_EndpointDetail.cshtml", model, context);
         await context.Response.WriteAsync(html);
     }
 

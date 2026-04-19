@@ -28,7 +28,7 @@ public sealed class RazorViewRenderer
     /// <summary>
     ///     Renders the specified view with the given model and returns the HTML string.
     /// </summary>
-    /// <param name="viewPath">Absolute view path, e.g. "/Views/Dashboard/Index.cshtml"</param>
+    /// <param name="viewPath">Absolute view path, e.g. "/Views/StyloBot/Dashboard/Index.cshtml"</param>
     /// <param name="model">The view model</param>
     /// <param name="httpContext">The current HTTP context</param>
     public async Task<string> RenderViewToStringAsync(string viewPath, object model, HttpContext httpContext)
