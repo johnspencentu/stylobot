@@ -120,7 +120,7 @@ public static class BdfReplayEndpoints
 
     private static async Task<IResult> ReplayBdf(
         HttpContext httpContext,
-        IBotDetectionService detectionService)
+        Orchestration.BlackboardOrchestrator orchestrator)
     {
         var options = httpContext.RequestServices
             .GetService(typeof(IOptions<BotDetectionOptions>)) as IOptions<BotDetectionOptions>;
@@ -188,11 +188,11 @@ public static class BdfReplayEndpoints
                 }
             }
 
-            // Run detection
-            BotDetectionResult result;
+            // Run detection through the full blackboard orchestrator
+            Orchestration.AggregatedEvidence evidence;
             try
             {
-                result = await detectionService.DetectAsync(syntheticContext, httpContext.RequestAborted);
+                evidence = await orchestrator.DetectAsync(syntheticContext, httpContext.RequestAborted);
             }
             catch (Exception ex)
             {
@@ -208,22 +208,28 @@ public static class BdfReplayEndpoints
 
             var actual = new BdfReplayActual
             {
-                IsBot = result.IsBot,
-                BotProbability = Math.Round(result.ConfidenceScore, 4),
-                BotType = result.BotType?.ToString(),
-                TopReasons = result.Reasons.Select(r => r.Detail).Take(5).ToList()
+                IsBot = evidence.BotProbability >= 0.5,
+                BotProbability = Math.Round(evidence.BotProbability, 4),
+                BotType = evidence.PrimaryBotType?.ToString(),
+                TopReasons = evidence.Contributions
+                    .Where(c => !string.IsNullOrEmpty(c.Reason))
+                    .OrderByDescending(c => Math.Abs(c.ConfidenceDelta))
+                    .Take(5)
+                    .Select(c => $"{c.DetectorName}: {c.Reason}")
+                    .ToList()
             };
 
             // Compare with expected
             var isMatch = true;
+            var detectedAsBot = evidence.BotProbability >= 0.5;
             if (req.ExpectedDetection != null)
             {
-                if (req.ExpectedDetection.IsBot != result.IsBot)
+                if (req.ExpectedDetection.IsBot != detectedAsBot)
                 {
                     isMatch = false;
-                    if (result.IsBot && !req.ExpectedDetection.IsBot)
+                    if (detectedAsBot && !req.ExpectedDetection.IsBot)
                         falsePositives++;
-                    else if (!result.IsBot && req.ExpectedDetection.IsBot)
+                    else if (!detectedAsBot && req.ExpectedDetection.IsBot)
                         falseNegatives++;
                 }
             }
