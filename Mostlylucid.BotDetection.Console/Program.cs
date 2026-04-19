@@ -12,6 +12,7 @@ using Mostlylucid.BotDetection.Events;
 using Mostlylucid.BotDetection.Extensions;
 using Mostlylucid.BotDetection.Llm.Cloud.Extensions;
 using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
+using Mostlylucid.BotDetection.Llm.Ollama.Extensions;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Telemetry;
@@ -436,16 +437,17 @@ try
     // Add Bot Detection + optional LLM provider
     if (llmProvider != null)
     {
+        // Always register core detection first
+        builder.Services.AddBotDetection();
+
         if (llmProvider.Equals("ollama", StringComparison.OrdinalIgnoreCase))
         {
-            builder.Services.AddAdvancedBotDetection(
+            builder.Services.AddStylobotOllama(
                 llmUrl ?? "http://localhost:11434",
                 llmModel ?? "qwen3:0.6b");
         }
         else
         {
-            // Non-Ollama LLM: register core detection first, then LLM provider
-            builder.Services.AddBotDetection();
 
             if (llmProvider.Equals("llamasharp", StringComparison.OrdinalIgnoreCase))
             {

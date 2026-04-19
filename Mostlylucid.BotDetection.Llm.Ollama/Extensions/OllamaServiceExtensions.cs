@@ -27,6 +27,7 @@ public static class OllamaServiceExtensions
                 configure?.Invoke(opts);
             });
 
+        services.AddHttpClient("stylobot-ollama");
         services.TryAddSingleton<ILlmProvider, OllamaLlmProvider>();
 
         services.AddStylobotLlmServices();

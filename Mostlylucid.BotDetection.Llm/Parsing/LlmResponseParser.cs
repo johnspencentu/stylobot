@@ -12,7 +12,8 @@ public static partial class LlmResponseParser
 {
     private static readonly JsonSerializerOptions CaseInsensitiveJson = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
     };
 
     /// <summary>

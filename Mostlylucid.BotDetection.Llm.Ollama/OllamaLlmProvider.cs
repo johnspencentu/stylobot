@@ -1,106 +1,128 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OllamaSharp;
 
 namespace Mostlylucid.BotDetection.Llm.Ollama;
 
 /// <summary>
 ///     ILlmProvider backed by an external Ollama HTTP server.
-///     Extracted from LlmDetector.AnalyzeWithLlm().
+///     Uses raw HTTP (no OllamaSharp) for reliable think:false support.
 /// </summary>
 public class OllamaLlmProvider : ILlmProvider
 {
+    private readonly HttpClient _http;
     private readonly ILogger<OllamaLlmProvider> _logger;
     private readonly OllamaProviderOptions _options;
-    private volatile bool _ready;
 
     public OllamaLlmProvider(
+        IHttpClientFactory httpFactory,
         ILogger<OllamaLlmProvider> logger,
         IOptions<OllamaProviderOptions> options)
     {
         _logger = logger;
         _options = options.Value;
+        _http = httpFactory.CreateClient("stylobot-ollama");
+        _http.BaseAddress = new Uri(_options.Endpoint.TrimEnd('/'));
+        _http.Timeout = TimeSpan.FromSeconds(30);
     }
 
-    public bool IsReady => _ready || !string.IsNullOrEmpty(_options.Endpoint);
+    public bool IsReady => !string.IsNullOrEmpty(_options.Endpoint);
 
-    public Task InitializeAsync(CancellationToken ct = default)
-    {
-        _ready = !string.IsNullOrEmpty(_options.Endpoint);
-        return Task.CompletedTask;
-    }
+    public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
 
     public async Task<string> CompleteAsync(LlmRequest request, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(_options.Endpoint))
-            return string.Empty;
+        if (!IsReady) return string.Empty;
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(request.TimeoutMs);
 
+        var body = new OllamaChatRequest
+        {
+            Model = _options.Model,
+            Messages = [new() { Role = "user", Content = request.Prompt }],
+            Stream = false,
+            Think = false,
+            Options = new() { NumThread = _options.NumThreads, Temperature = request.Temperature }
+        };
+
+        var json = JsonSerializer.Serialize(body, JsonOpts);
+        using var req = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
         try
         {
-            var ollama = new OllamaApiClient(_options.Endpoint)
+            using var resp = await _http.SendAsync(req, cts.Token);
+            if (!resp.IsSuccessStatusCode)
             {
-                SelectedModel = _options.Model
-            };
+                var err = await resp.Content.ReadAsStringAsync(cts.Token);
+                if (resp.StatusCode == HttpStatusCode.NotFound)
+                    _logger.LogError("Ollama model '{Model}' not found. Run: ollama pull {Model}", _options.Model, _options.Model);
+                else
+                    _logger.LogWarning("[ollama] {Status}: {Error}", resp.StatusCode, err.Length > 300 ? err[..300] : err);
+                return string.Empty;
+            }
 
-            var chat = new Chat(ollama)
-            {
-                Options = new OllamaSharp.Models.RequestOptions
-                {
-                    NumThread = _options.NumThreads
-                },
-                Think = false
-            };
+            var respJson = await resp.Content.ReadAsStringAsync(cts.Token);
+            var payload = JsonSerializer.Deserialize<OllamaChatResponse>(respJson, JsonOpts);
+            var content = payload?.Message?.Content?.Trim() ?? string.Empty;
 
-            var responseBuilder = new StringBuilder();
-            await foreach (var token in chat.SendAsync(request.Prompt, cts.Token))
-                responseBuilder.Append(token);
-
-            var response = responseBuilder.ToString();
-
-            if (string.IsNullOrWhiteSpace(response))
+            if (string.IsNullOrWhiteSpace(content))
             {
                 _logger.LogWarning("Ollama returned empty response for model '{Model}'", _options.Model);
                 return string.Empty;
             }
 
-            // Check for Ollama error responses
-            if (response.Contains("error", StringComparison.OrdinalIgnoreCase) &&
-                (response.Contains("model", StringComparison.OrdinalIgnoreCase) ||
-                 response.Contains("failed", StringComparison.OrdinalIgnoreCase)))
-            {
-                _logger.LogError("Ollama returned an error: {Response}",
-                    response.Length > 500 ? response[..500] + "..." : response);
-                return string.Empty;
-            }
-
-            return response;
+            return content;
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Ollama request timed out after {Timeout}ms", request.TimeoutMs);
             return string.Empty;
         }
-        catch (HttpRequestException httpEx) when (httpEx.StatusCode == HttpStatusCode.NotFound)
-        {
-            _logger.LogError("Ollama model '{Model}' not found at {Endpoint}. Run 'ollama pull {Model}' to download it",
-                _options.Model, _options.Endpoint, _options.Model);
-            return string.Empty;
-        }
-        catch (HttpRequestException httpEx)
-        {
-            _logger.LogError(httpEx, "Ollama HTTP error ({StatusCode}) at {Endpoint}",
-                (int?)httpEx.StatusCode ?? 0, _options.Endpoint);
-            return string.Empty;
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ollama completion failed: {Message}", ex.Message);
+            _logger.LogError(ex, "Ollama completion failed");
             return string.Empty;
         }
+    }
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
+    };
+
+    internal sealed record OllamaChatRequest
+    {
+        public required string Model { get; init; }
+        public required List<OllamaMessage> Messages { get; init; }
+        public bool Stream { get; init; }
+        public bool Think { get; init; }
+        public OllamaRequestOptions? Options { get; init; }
+    }
+
+    internal sealed record OllamaMessage
+    {
+        public required string Role { get; init; }
+        public required string Content { get; init; }
+    }
+
+    internal sealed record OllamaRequestOptions
+    {
+        [JsonPropertyName("num_thread")] public int NumThread { get; init; }
+        public float Temperature { get; init; }
+    }
+
+    internal sealed record OllamaChatResponse
+    {
+        public OllamaMessage? Message { get; init; }
     }
 }

@@ -187,7 +187,7 @@ public class LlmClassificationCoordinator : BackgroundService
             {
                 var patternId = $"{vectorType}:{vectorHash}";
                 var existing = _reputationCache.Get(patternId);
-                if (vectorType == "primary" || vectorType == "ua")
+                if ((vectorType == "primary" || vectorType == "ua") && existing != null)
                     previousScore = existing.BotScore;
                 var updated = _updater.ApplyEvidence(existing, patternId, vectorType, vectorHash, llmLabel, llmEvidenceWeight);
                 _reputationCache.Update(updated);
@@ -197,7 +197,7 @@ public class LlmClassificationCoordinator : BackgroundService
         {
             var patternId = $"ua:{request.PrimarySignature}";
             var existing = _reputationCache.Get(patternId);
-            previousScore = existing.BotScore;
+            if (existing != null) previousScore = existing.BotScore;
             var updated = _updater.ApplyEvidence(existing, patternId, "UserAgent", request.PrimarySignature, llmLabel, llmEvidenceWeight);
             _reputationCache.Update(updated);
         }
