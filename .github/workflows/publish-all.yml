@@ -581,11 +581,12 @@ jobs:
         prerelease: false
         files: |
           release-assets/*
-        fail_on_unmatched_files: true
+        fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Trigger Homebrew formula update
+      if: always()
       env:
         GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         VERSION: ${{ steps.ver.outputs.version }}
@@ -595,6 +596,7 @@ jobs:
           -f "version=${VERSION}"
 
     - name: Trigger Chocolatey publish
+      if: always()
       env:
         GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         VERSION: ${{ steps.ver.outputs.version }}
