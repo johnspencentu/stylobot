@@ -12,7 +12,7 @@
 
         <!-- Package metadata -->
         <PackageId>Mostlylucid.BotDetection.UI</PackageId>
-        <Version>3.6.0</Version>
+        <Version>3.6.1</Version>
         <Authors>Mostlylucid</Authors>
         <Description>Real-time bot detection dashboard with SignalR and DaisyUI. Includes sb-badge, sb-confidence, sb-gate, sb-honeypot, sb-human, sb-risk, sb-signal, and sb-summary Tag Helpers plus View Components for embedding detection results in ASP.NET Core views.</Description>
         <PackageTags>bot-detection;ui;dashboard;signalr;daisyui;taghelper;viewcomponent;aspnetcore;security</PackageTags>
