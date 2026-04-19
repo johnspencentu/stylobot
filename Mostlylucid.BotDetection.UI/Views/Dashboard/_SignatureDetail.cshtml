@@ -556,7 +556,7 @@ else
 
         var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         var fg = isDark ? '#94a3b8' : '#475569';
-        var axisLabels = ['Navigation', 'API Usage', 'Asset Loading', 'Timing Regularity', 'Request Rate', 'Path Diversity', 'Fingerprint', 'Timing Anomaly'];
+        var axisLabels = ['UA Anomaly', 'Header', 'IP Rep', 'Behavioral', 'Adv. Behavioral', 'Cache', 'Security Tool', 'Fingerprint', 'Version Age', 'Inconsistency', 'Reputation', 'AI Class', 'Cluster', 'Country Rep', 'Rate Pattern', 'Payload Sig'];
         var sessions = [];
         var currentIdx = 0;
         var chart = null;
@@ -567,12 +567,12 @@ else
                 chart = new ApexCharts(radarEl, {
                     series: series,
                     chart: { type: 'radar', height: 280, toolbar: { show: false }, background: 'transparent', fontFamily: 'Inter, sans-serif' },
-                    xaxis: { categories: axisLabels, labels: { style: { colors: Array(8).fill(fg), fontSize: '10px' } } },
+                    xaxis: { categories: axisLabels, labels: { style: { colors: Array(16).fill(fg), fontSize: '9px' } } },
                     yaxis: { show: false, min: 0, max: 100 },
-                    fill: { opacity: 0.25 },
-                    stroke: { width: 2 },
+                    fill: { opacity: 0.2 },
+                    stroke: { width: 2, curve: 'smooth' },
                     colors: ['#5ba3a3'],
-                    markers: { size: 3 },
+                    markers: { size: 4, strokeWidth: 0, hover: { size: 6 } },
                     plotOptions: { radar: { polygons: { strokeColors: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(15,23,42,0.08)', connectorColors: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(15,23,42,0.08)' } } },
                     tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: function(v) { return v + '%'; } } },
                     dataLabels: { enabled: false }
