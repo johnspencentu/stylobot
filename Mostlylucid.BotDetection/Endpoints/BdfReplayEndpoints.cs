@@ -169,7 +169,11 @@ public static class BdfReplayEndpoints
             syntheticContext.Request.Path = req.Path ?? "/";
             syntheticContext.Request.Scheme = "https";
             syntheticContext.Request.Host = httpContext.Request.Host;
-            syntheticContext.Connection.RemoteIpAddress = IPAddress.Loopback;
+            // Use a unique synthetic IP per scenario so reputation doesn't cascade
+            // between unrelated test scenarios. Range: 198.51.100.0/24 (TEST-NET-2, RFC 5737)
+            var scenarioHash = Math.Abs((bdf.ScenarioName ?? "default").GetHashCode());
+            var syntheticIp = IPAddress.Parse($"198.51.100.{scenarioHash % 254 + 1}");
+            syntheticContext.Connection.RemoteIpAddress = syntheticIp;
 
             // Apply headers from BDF (allowlist to prevent injection of internal control headers)
             if (req.Headers != null)
