@@ -896,16 +896,21 @@ static void ShowManPage()
         [bold]man[/]       This manual page
 
     [bold]OPTIONS[/]
+        [bold]--port[/] <port>                   Listen port (alternative to positional)
+        [bold]--upstream[/] <url>                Upstream URL (alternative to positional)
         [bold]--mode[/] <demo|production>       Detection mode (default: demo)
         [bold]--policy[/] <name>                Action: logonly, block, throttle, challenge
         [bold]--threshold[/] <0.0-1.0>          Bot probability threshold (default: 0.7)
         [bold]--cert[/] <path>                  TLS certificate (.pfx or .pem)
         [bold]--key[/] <path>                   TLS private key (with .pem cert)
+        [bold]--cert-password[/] <pass>         PFX certificate password
         [bold]--tunnel[/] [[token]]               Cloudflare Tunnel (requires cloudflared)
         [bold]--llm[/] <provider>               LLM: openai, anthropic, gemini, groq, ollama...
         [bold]--llm-key[/] <key>                API key (or env STYLOBOT_LLM_KEY)
+        [bold]--llm-url[/] <url>                Custom provider base URL
         [bold]--model[/] <name>                 Override default model for provider
         [bold]--config[/] <path>                Custom appsettings.json
+        [bold]--log-level[/] <level>            Minimum log level (default: Warning)
         [bold]--verbose[/]                      Full log output (disables live table)
 
     [bold]LLM PROVIDERS[/]
