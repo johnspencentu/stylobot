@@ -14,6 +14,9 @@ tmp-*.html
 bot-signatures-v1-backup/
 test-bdf-v2/
 
+# Completed plans (kept locally, not in repo)
+docs/plans/
+
 # Playwright MCP screenshots
 .playwright-mcp/
 
@@ -464,3 +467,4 @@ BenchmarkDotNet.Artifacts/
 TestSite/
 stylobot-react/
 *.playwright-mcp/
+docs/legacy/

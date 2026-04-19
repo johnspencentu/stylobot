@@ -1,94 +1,68 @@
 # Documentation Index
 
-Canonical entry points for this repository.
-
 ## Start Here
 
-- [`README.md`](../README.md): Repo overview, architecture surface, and primary commands
-- [`QUICKSTART.md`](QUICKSTART.md): Fast local runbook for demo and gateway
-- [`DOCKER_SETUP.md`](DOCKER_SETUP.md): Containerized deployment options
-- [`GETTING_STARTED.md`](GETTING_STARTED.md): First implementation path
-- [`ARCHITECTURE.md`](ARCHITECTURE.md): Component and flow overview
-- [`OPERATIONS.md`](OPERATIONS.md): Day-2 operations and rollout pattern
-- [`TESTING.md`](TESTING.md): Test strategy and verification paths
-- [`SECURITY_AND_PRIVACY.md`](SECURITY_AND_PRIVACY.md): Security and privacy baseline
-- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md): Pre/post release checks
+- [`README.md`](../README.md) - Repo overview, install, pricing, detection surface
+- [`QUICKSTART.md`](QUICKSTART.md) - Local runbook for demo and gateway
+- [`DOCKER_SETUP.md`](DOCKER_SETUP.md) - Container deployment
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) - Component and flow overview
+- [`OPERATIONS.md`](OPERATIONS.md) - Day-2 operations and rollout pattern
+- [`TESTING.md`](TESTING.md) - Test strategy
+- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) - Pre/post release checks
 
-## Core Product Docs
+## CLI (StyloBot Console)
 
-- [`Mostlylucid.BotDetection/README.md`](../Mostlylucid.BotDetection/README.md)
-- [`Mostlylucid.BotDetection/docs/api-reference.md`](../Mostlylucid.BotDetection/docs/api-reference.md)
-- [`Mostlylucid.BotDetection/docs/configuration.md`](../Mostlylucid.BotDetection/docs/configuration.md)
-- [`Mostlylucid.BotDetection/docs/deployment-guide.md`](../Mostlylucid.BotDetection/docs/deployment-guide.md)
-- [`Mostlylucid.BotDetection/docs/learning-and-reputation.md`](../Mostlylucid.BotDetection/docs/learning-and-reputation.md)
-- [`Mostlylucid.BotDetection/docs/yarp-integration.md`](../Mostlylucid.BotDetection/docs/yarp-integration.md)
-- [`Mostlylucid.BotDetection/docs/detection-strategies.md`](../Mostlylucid.BotDetection/docs/detection-strategies.md)
-- [`Mostlylucid.BotDetection/docs/action-policies.md`](../Mostlylucid.BotDetection/docs/action-policies.md)
-- [`Mostlylucid.BotDetection/docs/response-pii-masking.md`](../Mostlylucid.BotDetection/docs/response-pii-masking.md)
+- [`Mostlylucid.BotDetection.Console/README.md`](../Mostlylucid.BotDetection.Console/README.md) - Full CLI reference, all flags, daemon mode, LLM providers
+- Run `stylobot man` for the built-in manual page
 
-## New in v5.6
+## Configuration
 
-- [`Mostlylucid.BotDetection/docs/proof-of-work-challenge.md`](../Mostlylucid.BotDetection/docs/proof-of-work-challenge.md): PoW challenge system (micro-puzzles, blackboard difficulty)
-- [`Mostlylucid.BotDetection/docs/fingerprint-approval.md`](../Mostlylucid.BotDetection/docs/fingerprint-approval.md): Fingerprint approval with locked dimensions
+- [`configuration.md`](../Mostlylucid.BotDetection/docs/configuration.md) - Configuration guide
+- [`configuration-reference.md`](../Mostlylucid.BotDetection/docs/configuration-reference.md) - Full options reference
+- [`appsettings.typical.json`](../Mostlylucid.BotDetection/docs/appsettings.typical.json) - Typical config
+- [`appsettings.full.json`](../Mostlylucid.BotDetection/docs/appsettings.full.json) - All options
+- [`action-policies.md`](../Mostlylucid.BotDetection/docs/action-policies.md) - Block, throttle, challenge, logonly
 
-## Detector Reference Docs
+## Detection
 
-- [`Mostlylucid.BotDetection/docs/user-agent-detection.md`](../Mostlylucid.BotDetection/docs/user-agent-detection.md)
-- [`Mostlylucid.BotDetection/docs/header-detection.md`](../Mostlylucid.BotDetection/docs/header-detection.md)
-- [`Mostlylucid.BotDetection/docs/ip-detection.md`](../Mostlylucid.BotDetection/docs/ip-detection.md)
-- [`Mostlylucid.BotDetection/docs/behavioral-analysis.md`](../Mostlylucid.BotDetection/docs/behavioral-analysis.md)
-- [`Mostlylucid.BotDetection/docs/advanced-behavioral-detection.md`](../Mostlylucid.BotDetection/docs/advanced-behavioral-detection.md)
-- [`Mostlylucid.BotDetection/docs/cache-behavior-detection.md`](../Mostlylucid.BotDetection/docs/cache-behavior-detection.md)
-- [`Mostlylucid.BotDetection/docs/security-tools-detection.md`](../Mostlylucid.BotDetection/docs/security-tools-detection.md)
-- [`Mostlylucid.BotDetection/docs/client-side-fingerprinting.md`](../Mostlylucid.BotDetection/docs/client-side-fingerprinting.md)
-- [`Mostlylucid.BotDetection/docs/version-age-detection.md`](../Mostlylucid.BotDetection/docs/version-age-detection.md)
-- [`Mostlylucid.BotDetection/docs/ai-detection.md`](../Mostlylucid.BotDetection/docs/ai-detection.md)
-- [`Mostlylucid.BotDetection/docs/project-honeypot.md`](../Mostlylucid.BotDetection/docs/project-honeypot.md)
-- [`Mostlylucid.BotDetection/docs/AdvancedFingerprintingDetectors.md`](../Mostlylucid.BotDetection/docs/AdvancedFingerprintingDetectors.md)
+- [`detection-strategies.md`](../Mostlylucid.BotDetection/docs/detection-strategies.md) - How detection works
+- [`learning-and-reputation.md`](../Mostlylucid.BotDetection/docs/learning-and-reputation.md) - Adaptive learning
+- [`ai-detection.md`](../Mostlylucid.BotDetection/docs/ai-detection.md) - Heuristic + LLM detection
 
-## Gateway Docs
+## Detector Reference
 
-- [`Stylobot.Gateway/README.md`](../Stylobot.Gateway/README.md)
-- [`Stylobot.Gateway/docs/DEMO_MODE.md`](../Stylobot.Gateway/docs/DEMO_MODE.md)
-- [`Stylobot.Gateway/docs/TLS_FINGERPRINTING_SETUP.md`](../Stylobot.Gateway/docs/TLS_FINGERPRINTING_SETUP.md)
-- [`Stylobot.Gateway/docs/DOCKERHUB.md`](../Stylobot.Gateway/docs/DOCKERHUB.md)
+- [`user-agent-detection.md`](../Mostlylucid.BotDetection/docs/user-agent-detection.md)
+- [`header-detection.md`](../Mostlylucid.BotDetection/docs/header-detection.md)
+- [`ip-detection.md`](../Mostlylucid.BotDetection/docs/ip-detection.md)
+- [`behavioral-analysis.md`](../Mostlylucid.BotDetection/docs/behavioral-analysis.md)
+- [`advanced-behavioral-detection.md`](../Mostlylucid.BotDetection/docs/advanced-behavioral-detection.md)
+- [`cache-behavior-detection.md`](../Mostlylucid.BotDetection/docs/cache-behavior-detection.md)
+- [`security-tools-detection.md`](../Mostlylucid.BotDetection/docs/security-tools-detection.md)
+- [`client-side-fingerprinting.md`](../Mostlylucid.BotDetection/docs/client-side-fingerprinting.md)
+- [`version-age-detection.md`](../Mostlylucid.BotDetection/docs/version-age-detection.md)
+- [`AdvancedFingerprintingDetectors.md`](../Mostlylucid.BotDetection/docs/AdvancedFingerprintingDetectors.md) - TLS/TCP/HTTP2/QUIC
+- [`proof-of-work-challenge.md`](../Mostlylucid.BotDetection/docs/proof-of-work-challenge.md) - PoW challenge system
 
-## UI and Storage Docs
+## Integration
 
-- [`Mostlylucid.BotDetection.UI/README.md`](../Mostlylucid.BotDetection.UI/README.md)
-- [`Mostlylucid.BotDetection.UI/DASHBOARD_README.md`](../Mostlylucid.BotDetection.UI/DASHBOARD_README.md)
-- [`Mostlylucid.BotDetection.UI.PostgreSQL/README.md`](../Mostlylucid.BotDetection.UI.PostgreSQL/README.md)
-- [`Mostlylucid.BotDetection.UI.PostgreSQL/TIMESCALEDB_GUIDE.md`](../Mostlylucid.BotDetection.UI.PostgreSQL/TIMESCALEDB_GUIDE.md)
-- [`Mostlylucid.BotDetection.UI.PostgreSQL/PGVECTOR_GUIDE.md`](../Mostlylucid.BotDetection.UI.PostgreSQL/PGVECTOR_GUIDE.md)
+- [`Mostlylucid.BotDetection/README.md`](../Mostlylucid.BotDetection/README.md) - NuGet middleware
+- [`yarp-integration.md`](../Mostlylucid.BotDetection/docs/yarp-integration.md) - YARP reverse proxy
+- [`deployment-guide.md`](../Mostlylucid.BotDetection/docs/deployment-guide.md) - Production deployment
 
-## Website Docs
+## Gateway & Dashboard
 
-- [`mostlylucid.stylobot.website/README.md`](../mostlylucid.stylobot.website/README.md)
-- [`mostlylucid.stylobot.website/DOCKER-QUICK-START.md`](../mostlylucid.stylobot.website/DOCKER-QUICK-START.md)
-- [`mostlylucid.stylobot.website/DEPLOYMENT.md`](../mostlylucid.stylobot.website/DEPLOYMENT.md)
-- [`mostlylucid.stylobot.website/src/Stylobot.Website/Docs/start-here.md`](../mostlylucid.stylobot.website/src/Stylobot.Website/Docs/start-here.md)
-- [`mostlylucid.stylobot.website/src/Stylobot.Website/Docs/how-stylobot-works.md`](../mostlylucid.stylobot.website/src/Stylobot.Website/Docs/how-stylobot-works.md)
-- [`mostlylucid.stylobot.website/src/Stylobot.Website/Docs/detectors-in-depth.md`](../mostlylucid.stylobot.website/src/Stylobot.Website/Docs/detectors-in-depth.md)
-- [`mostlylucid.stylobot.website/src/Stylobot.Website/Docs/github-docs-map.md`](../mostlylucid.stylobot.website/src/Stylobot.Website/Docs/github-docs-map.md)
+- [`Stylobot.Gateway/README.md`](../Stylobot.Gateway/README.md) - Docker YARP gateway
+- [`Stylobot.Gateway/docs/DOCKERHUB.md`](../Stylobot.Gateway/docs/DOCKERHUB.md) - Docker Hub
+- [`Mostlylucid.BotDetection.UI/README.md`](../Mostlylucid.BotDetection.UI/README.md) - Dashboard + SignalR
 
-## Additional Component READMEs
+## Other Components
 
-- [`Mostlylucid.BotDetection.Console/README.md`](../Mostlylucid.BotDetection.Console/README.md)
-- [`Mostlylucid.BotDetection.Demo/README.md`](../Mostlylucid.BotDetection.Demo/README.md)
-- [`Mostlylucid.BotDetection.BdfGenerator/README.md`](../Mostlylucid.BotDetection.BdfGenerator/README.md)
-- [`Mostlylucid.BotDetection.SignatureStore/README.md`](../Mostlylucid.BotDetection.SignatureStore/README.md)
-- [`Mostlylucid.Common/README.md`](../Mostlylucid.Common/README.md)
-- [`Mostlylucid.GeoDetection/README.md`](../Mostlylucid.GeoDetection/README.md)
-- [`Mostlylucid.GeoDetection.Contributor/README.md`](../Mostlylucid.GeoDetection.Contributor/README.md)
-- [`bot-signatures/README.md`](../bot-signatures/README.md)
+- [`Mostlylucid.BotDetection.Demo/README.md`](../Mostlylucid.BotDetection.Demo/README.md) - Interactive demo
+- [`Mostlylucid.Common/README.md`](../Mostlylucid.Common/README.md) - Shared utilities
+- [`Mostlylucid.GeoDetection/README.md`](../Mostlylucid.GeoDetection/README.md) - Geographic routing
+- [`bot-signatures/README.md`](../bot-signatures/README.md) - BDF test scenarios
 
 ## Notes
 
-- Some historical design notes and session summaries in the repo are intentionally kept for context but are not the primary operational references.
 - For runtime behavior, trust `Program.cs`, appsettings files, and compose files first, then docs.
-- [`LEGACY_TECHNICAL_NOTES.md`](LEGACY_TECHNICAL_NOTES.md): How to read historical notes and implementation summaries.
-- Temporal intelligence details and ephemeral semantics:
-  - [`Mostlylucid.BotDetection/docs/signature-coordinator-integration.md`](../Mostlylucid.BotDetection/docs/signature-coordinator-integration.md)
-  - [`Mostlylucid.BotDetection/docs/ephemeral-refactoring-summary.md`](../Mostlylucid.BotDetection/docs/ephemeral-refactoring-summary.md)
-  - [`Mostlylucid.BotDetection/docs/ResponseDetection_EphemeralSemantics.md`](../Mostlylucid.BotDetection/docs/ResponseDetection_EphemeralSemantics.md)
-
+- Website and portal docs are in the [`stylobot-commercial`](https://github.com/scottgal/stylobot-commercial) repo.
