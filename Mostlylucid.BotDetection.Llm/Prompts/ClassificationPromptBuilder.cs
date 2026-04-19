@@ -7,21 +7,16 @@ namespace Mostlylucid.BotDetection.Llm.Prompts;
 public static class ClassificationPromptBuilder
 {
     /// <summary>
-    ///     Default compact prompt template for bot detection.
-    ///     Optimized for minimal token usage with small models.
+    ///     Default prompt template. Presents detector findings as plain facts.
+    ///     The LLM evaluates evidence and classifies - no rules or opinions from us.
     /// </summary>
-    public const string DefaultPrompt = @"Bot detector. JSON only.
+    public const string DefaultPrompt = @"You are a bot detection analyst. Below are the factual findings from automated detectors examining an HTTP request. Evaluate the evidence and classify this request.
+
 {REQUEST_INFO}
-RULES(priority order):
-1. prob<0.3->human (trust H model)
-2. prob>0.7->bot (trust H model)
-3. ua~bot/crawler/spider/scraper->bot
-4. ua~curl/wget/python/headless/sqlmap->bot
-5. referer+lang+cookies->human
-6. Chrome/Firefox/Safari+hdrs>=10->human
-7. unsure->human,conf=0.3
-TYPE:scraper|searchengine|monitor|malicious|social|good|unknown
-{""isBot"":false,""confidence"":0.8,""reasoning"":""..."",""botType"":""unknown""}";
+Based on these findings, respond with JSON only:
+{""isBot"":true/false,""confidence"":0.0-1.0,""botType"":""scraper|searchengine|monitor|malicious|social|good|unknown"",""name"":""short descriptive name"",""reasoning"":""one sentence explaining your conclusion"",""escalate"":false}
+
+Set escalate=true if the evidence is ambiguous and you want more detectors to run.";
 
     /// <summary>
     ///     Build the classification prompt from pre-built request info.

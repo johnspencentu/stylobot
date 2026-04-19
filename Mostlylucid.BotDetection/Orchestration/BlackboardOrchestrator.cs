@@ -1228,44 +1228,45 @@ public class BlackboardOrchestrator
     private static string BuildSnapshotRequestInfo(HttpContext httpContext, AggregatedEvidence evidence)
     {
         var sb = new StringBuilder();
-        sb.Append($"prob={evidence.BotProbability:F2}\n");
 
+        // Facts only - no opinions, no probability steering
         var ua = httpContext.Request.Headers.UserAgent.ToString();
-        sb.Append($"ua=\"{(ua.Length > 100 ? ua[..97] + "..." : ua)}\"\n");
+        sb.AppendLine($"User-Agent: {(ua.Length > 120 ? ua[..117] + "..." : ua)}");
+        sb.AppendLine($"Method: {httpContext.Request.Method} {httpContext.Request.Path}");
+        sb.AppendLine($"Headers: {httpContext.Request.Headers.Count} total");
 
         var lang = httpContext.Request.Headers.AcceptLanguage.ToString();
-        if (!string.IsNullOrEmpty(lang))
-            sb.Append($"lang=\"{(lang.Length > 30 ? lang[..27] + "..." : lang)}\"\n");
+        sb.AppendLine(string.IsNullOrEmpty(lang) ? "Accept-Language: missing" : $"Accept-Language: {lang}");
 
-        var hasCookies = httpContext.Request.Cookies.Any();
-        if (hasCookies) sb.Append("cookies=1\n");
-        sb.Append($"hdrs={httpContext.Request.Headers.Count}\n");
+        var referer = httpContext.Request.Headers.Referer.ToString();
+        sb.AppendLine(string.IsNullOrEmpty(referer) ? "Referer: missing" : "Referer: present");
 
-        // Top detector signals
-        var topHits = evidence.Contributions
-            .Where(c => Math.Abs(c.ConfidenceDelta) >= 0.1)
+        sb.AppendLine(httpContext.Request.Cookies.Any() ? "Cookies: present" : "Cookies: none");
+
+        // Detector findings - plain English, full reasons
+        var findings = evidence.Contributions
+            .Where(c => Math.Abs(c.ConfidenceDelta) >= 0.05 && !string.IsNullOrEmpty(c.Reason))
             .OrderByDescending(c => Math.Abs(c.ConfidenceDelta) * c.Weight)
-            .Take(3)
+            .Take(6)
             .ToList();
 
-        if (topHits.Count != 0)
+        if (findings.Count != 0)
         {
-            sb.Append("[top]\n");
-            foreach (var c in topHits)
+            sb.AppendLine();
+            sb.AppendLine("Detector findings:");
+            foreach (var c in findings)
             {
-                var name = c.DetectorName switch
-                {
-                    "Heuristic" => "H", "UserAgent" => "UA", "Header" => "Hdr",
-                    "Ip" => "IP", "Behavioral" => "Beh", "SecurityTool" => "Sec",
-                    _ => c.DetectorName.Length > 3 ? c.DetectorName[..3] : c.DetectorName
-                };
-                var reason = c.Reason.Length > 20 ? c.Reason[..17] + "..." : c.Reason;
-                sb.Append($"{name}={c.ConfidenceDelta:+0.0;-0.0}|\"{reason}\"\n");
+                var direction = c.ConfidenceDelta > 0 ? "suspicious" : "normal";
+                sb.AppendLine($"- {c.DetectorName}: {c.Reason} ({direction})");
             }
         }
 
+        sb.AppendLine();
+        sb.AppendLine($"Heuristic model score: {evidence.BotProbability:F2} (0=human, 1=bot)");
+        sb.AppendLine($"Detectors that ran: {evidence.ContributingDetectors?.Count ?? 0}");
+
         if (evidence.PrimaryBotType.HasValue && evidence.PrimaryBotType != BotType.Unknown)
-            sb.Append($"type={evidence.PrimaryBotType}\n");
+            sb.AppendLine($"Preliminary type: {evidence.PrimaryBotType}");
 
         return sb.ToString();
     }

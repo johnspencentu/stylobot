@@ -12,4 +12,10 @@ public class LlmAnalysisResult
     public required string Reasoning { get; set; }
     public BotType BotType { get; set; }
     public string? Pattern { get; set; }
+
+    /// <summary>Short descriptive name for the bot (e.g., "Python API Scraper").</summary>
+    public string? BotName { get; set; }
+
+    /// <summary>LLM requests more detectors run (evidence was ambiguous).</summary>
+    public bool Escalate { get; set; }
 }

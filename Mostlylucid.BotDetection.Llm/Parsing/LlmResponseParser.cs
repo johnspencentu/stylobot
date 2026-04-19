@@ -148,7 +148,9 @@ public static partial class LlmResponseParser
             Confidence = Math.Clamp(json.Confidence, 0.0, 1.0),
             Reasoning = json.Reasoning ?? "No reasoning provided",
             BotType = ParseBotType(json.BotType),
-            Pattern = json.Pattern
+            Pattern = json.Pattern,
+            BotName = json.Name,
+            Escalate = json.Escalate
         };
     }
 
@@ -199,5 +201,7 @@ public static partial class LlmResponseParser
         public string? Reasoning { get; set; }
         public string? BotType { get; set; }
         public string? Pattern { get; set; }
+        public string? Name { get; set; }
+        public bool Escalate { get; set; }
     }
 }
