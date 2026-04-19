@@ -34,9 +34,10 @@ public static class ProviderPresets
         ["gemini"] = new("https://generativelanguage.googleapis.com", "gemini-2.0-flash", AuthStyle.GeminiQuery,
             "Google Gemini - free tier available, fast"),
 
-        // Local providers (no API key needed)
+        // Ollama via OpenAI-compatible API (for remote Ollama instances)
+        // Local ollama uses the dedicated OllamaLlmProvider (AddStylobotOllama) via CLI --llm ollama
         ["ollama"] = new("http://localhost:11434", "qwen3:0.6b", AuthStyle.None,
-            "Ollama - local, free, GPU-accelerated. Install: ollama.com"),
+            "Ollama - local or remote, free, GPU-accelerated. OpenAI-compatible API"),
     };
 
     /// <summary>Resolve a preset by name, applying overrides from options.</summary>

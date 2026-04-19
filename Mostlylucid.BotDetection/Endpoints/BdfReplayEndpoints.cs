@@ -172,7 +172,9 @@ public static class BdfReplayEndpoints
             // Use a unique synthetic IP per scenario so reputation doesn't cascade.
             // Each scenario gets a unique /24 subnet from TEST-NET ranges (RFC 5737).
             // This prevents subnet-level reputation from bleeding between scenarios.
-            var scenarioHash = (uint)Math.Abs((bdf.ScenarioName ?? "default").GetHashCode());
+            // Deterministic hash (not string.GetHashCode which is randomized per process)
+            var scenarioBytes = System.Text.Encoding.UTF8.GetBytes(bdf.ScenarioName ?? "default");
+            var scenarioHash = (uint)System.IO.Hashing.XxHash32.HashToUInt32(scenarioBytes);
             var octet2 = (int)((scenarioHash >> 8) % 254) + 1;
             var octet3 = (int)(scenarioHash % 254) + 1;
             var syntheticIp = IPAddress.Parse($"192.0.{octet2}.{octet3}");

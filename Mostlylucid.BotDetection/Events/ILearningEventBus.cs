@@ -65,7 +65,7 @@ public enum LearningEventType
     /// <summary>Request for model inference (async)</summary>
     InferenceRequest,
 
-    /// <summary>Model update available</summary>
+    /// <summary>Model update available (reserved for future use)</summary>
     ModelUpdated,
 
     // ==========================================
@@ -85,8 +85,7 @@ public enum LearningEventType
     SignatureFeedback,
 
     /// <summary>
-    ///     Request to update fast-path rules based on learned patterns.
-    ///     Consumed by the rule update service.
+    ///     Request to update fast-path rules based on learned patterns (reserved for future use).
     /// </summary>
     FastPathRuleUpdate,
 

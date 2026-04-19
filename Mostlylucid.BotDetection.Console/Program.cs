@@ -486,13 +486,6 @@ try
             .AddAspNetCoreInstrumentation()
             .AddSource(BotDetectionTelemetry.ActivitySourceName));
 
-    // Apply CLI overrides on top of config
-    builder.Services.PostConfigure<Mostlylucid.BotDetection.Models.BotDetectionOptions>(opts =>
-    {
-        opts.DefaultActionPolicyName = actionPolicy;
-        if (botThreshold.HasValue) opts.BotThreshold = botThreshold.Value;
-    });
-
     // Detection event sink for live table
     var detectionSink = new DetectionEventSink();
     builder.Services.AddSingleton(detectionSink);

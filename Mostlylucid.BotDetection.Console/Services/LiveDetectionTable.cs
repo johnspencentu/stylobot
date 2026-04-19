@@ -238,7 +238,7 @@ public sealed class LiveDetectionTableService : BackgroundService
         statsPanel.AddRow("[dim]Bots[/]", $"[bold red]{_totalBots}[/]");
         statsPanel.AddRow("[dim]Threats[/]", _totalThreats > 0 ? $"[bold red on black] {_totalThreats} [/]" : "[dim]0[/]");
         statsPanel.AddRow("[dim]Avg time[/]", $"{avgDetectionMs:F1}ms");
-        statsPanel.AddRow("[dim]P95 max[/]", $"{_maxDetectionTimeMs:F1}ms");
+        statsPanel.AddRow("[dim]Max time[/]", $"{_maxDetectionTimeMs:F1}ms");
 
         // Top endpoints (top 5)
         var endpointsTable = new Table { Border = TableBorder.Simple, Expand = true };

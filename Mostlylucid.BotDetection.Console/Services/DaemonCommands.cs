@@ -36,10 +36,8 @@ public static class DaemonCommands
         // Build args for the child process: remove "start" subcommand, add --verbose
         // (background process should log to file, not render Spectre table)
         var childArgs = new List<string>();
-        var skipNext = false;
         for (var i = 1; i < originalArgs.Length; i++)
         {
-            if (skipNext) { skipNext = false; continue; }
             if (originalArgs[i].Equals("start", StringComparison.OrdinalIgnoreCase)) continue;
             childArgs.Add(originalArgs[i]);
         }
