@@ -12,7 +12,7 @@
         LicenseStatusKind.Active             => ("text-success", "var(--sb-signal-pos)",    $"Active - {claims?.Tier ?? "?"} tier"),
         LicenseStatusKind.Trial              => ("text-warning", "var(--sb-signal-warn)",   $"Trial - {Model.DaysUntilExpiry?.ToString() ?? "?"} days remaining"),
         LicenseStatusKind.Grace              => ("text-warning", "var(--sb-signal-warn)",   $"Grace - {Model.DaysUntilGraceEnds?.ToString() ?? "?"} days until premium features lock"),
-        LicenseStatusKind.Expired            => ("text-error",   "var(--sb-signal-danger)", "Expired - premium features disabled; core detection continues"),
+        LicenseStatusKind.Expired            => ("text-info",    "var(--sb-signal-info,var(--sb-signal-danger))", "FOSS mode - all detectors active. Upgrade anytime to restore premium features."),
         LicenseStatusKind.DomainMismatchOnly => ("text-error",   "var(--sb-signal-danger)", "License domain mismatch - running on unlicensed host"),
         _                                    => ("text-base-content/50", "var(--sb-card-subtle)", "OSS tier - no license")
     };
