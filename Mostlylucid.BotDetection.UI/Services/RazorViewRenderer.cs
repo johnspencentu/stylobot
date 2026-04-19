@@ -31,7 +31,7 @@ public sealed class RazorViewRenderer
     /// <param name="viewPath">Absolute view path, e.g. "/Views/StyloBot/Dashboard/Index.cshtml"</param>
     /// <param name="model">The view model</param>
     /// <param name="httpContext">The current HTTP context</param>
-    public async Task<string> RenderViewToStringAsync(string viewPath, object model, HttpContext httpContext)
+    public async Task<string> RenderViewToStringAsync(string viewPath, object model, HttpContext httpContext, bool isMainPage = false)
     {
         // Ensure endpoint routing is available for AnchorTagHelper.
         // When rendering from middleware, no MVC endpoint is matched, so UrlHelperFactory
@@ -46,7 +46,7 @@ public sealed class RazorViewRenderer
             var routeData = httpContext.GetRouteData() ?? new RouteData();
             var actionContext = new ActionContext(httpContext, routeData, new ActionDescriptor());
 
-            var viewResult = _viewEngine.GetView(executingFilePath: null, viewPath: viewPath, isMainPage: true);
+            var viewResult = _viewEngine.GetView(executingFilePath: null, viewPath: viewPath, isMainPage: isMainPage);
             if (!viewResult.Success)
                 throw new InvalidOperationException(
                     $"Could not find Razor view '{viewPath}'. Searched: {string.Join(", ", viewResult.SearchedLocations ?? [])}");
