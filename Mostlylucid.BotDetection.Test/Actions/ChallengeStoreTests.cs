@@ -183,7 +183,8 @@ public class ChallengeStoreTests : IAsyncDisposable
             TokenValidityMinutes = 30
         };
 
-        var token = ChallengeActionPolicy.GenerateChallengeToken(options);
+        var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        var token = ChallengeActionPolicy.GenerateChallengeToken(httpContext, options);
 
         Assert.NotNull(token);
         Assert.NotEmpty(token);
