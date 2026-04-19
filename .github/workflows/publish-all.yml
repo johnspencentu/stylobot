@@ -587,7 +587,7 @@ jobs:
 
     - name: Trigger Homebrew formula update
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         VERSION: ${{ steps.ver.outputs.version }}
       run: |
         gh workflow run update-homebrew.yml \
@@ -596,7 +596,7 @@ jobs:
 
     - name: Trigger Chocolatey publish
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         VERSION: ${{ steps.ver.outputs.version }}
       run: |
         gh workflow run publish-chocolatey.yml \
