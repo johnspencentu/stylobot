@@ -873,7 +873,7 @@ static void ShowManPage()
     [bold blue]STYLOBOT(1)[/]                    [dim]Self-hosted bot defense[/]                    [bold blue]STYLOBOT(1)[/]
 
     [bold]NAME[/]
-        stylobot - reverse proxy with 31-detector bot defense. Free forever.
+        stylobot - reverse proxy with 32-detector bot defense. Free forever.
 
     [bold]SYNOPSIS[/]
         [bold]stylobot[/] <port> <upstream> [[options]]
@@ -882,7 +882,8 @@ static void ShowManPage()
 
     [bold]DESCRIPTION[/]
         StyloBot proxies HTTP traffic to an upstream server while running real-time
-        bot detection. 31 detectors analyze every request in <1ms. Results display
+        bot detection. 32 detectors, including the new Threat Intelligence detector, analyze
+        every request in <1ms. Results display
         in a live terminal table with color-coded verdicts.
 
         Detection works fully without any LLM. LLM enrichment (optional) adds bot

@@ -1,6 +1,6 @@
 # StyloBot CLI
 
-**Self-hosted bot defense. Free forever.** Single binary, live detection table, daemon mode, Cloudflare Tunnel support. AOT-compiled for sub-30MB footprint across 6 platforms.
+**Self-hosted bot defense. Free forever.** Single binary, 32 detectors including the new `Threat Intelligence` detector, live detection table, daemon mode, Cloudflare Tunnel support. AOT-compiled for sub-30MB footprint across 6 platforms.
 
 ## Install
 
@@ -31,6 +31,35 @@ stylobot 5080 http://localhost:3000 --tunnel
 stylobot 5080 http://localhost:3000 --llm openai --llm-key sk-...
 stylobot 5080 http://localhost:3000 --llm ollama
 ```
+
+The current detector set is 32 detectors total, including the new `Threat Intelligence` detector.
+
+## Threat Intelligence
+
+The `Threat Intelligence` detector correlates live traffic against CVE-derived fingerprints generated from security
+advisories. The goal is to recognize exploit traffic by shape and behavior, not just by a static payload string.
+
+In practice this means:
+
+- advisories are converted into normalized CVE fingerprints
+- those fingerprints live alongside normal traffic fingerprints in the same comparison space
+- traffic can be matched against known exploit families and advisory-derived clusters
+
+Plan behavior:
+
+- **Free / FOSS**: consumes a hosted, signed, pre-processed threat-intelligence feed
+- **Paid plans**: can do the same, or run local ingestion and processing themselves
+
+Paid plans are designed for **zero phone-home** operation when you want it:
+
+- ingest advisories locally
+- generate CVE fingerprints locally
+- store and match locally
+- keep the threat-intelligence pipeline entirely self-hosted
+
+The important distinction is that paid does **not** mean better intelligence by default. It means **independence and
+local control**: the same detector concept, but with the option to keep feed ingestion and fingerprint generation fully
+inside your own environment.
 
 ## CLI Reference
 

@@ -23,6 +23,7 @@
         <!-- Not AOT/trimming compatible due to SQLite and dynamic JSON usage -->
         <IsTrimmable>false</IsTrimmable>
         <NoWarn>$(NoWarn);IL2026;IL3050</NoWarn>
+        <UserSecretsId>0c2c1992-7d5d-4581-ada1-8af3d1aee8fc</UserSecretsId>
     </PropertyGroup>
     <PropertyGroup>
         <MinVerTagPrefix>botdetection-v</MinVerTagPrefix>
