@@ -109,6 +109,7 @@ public static class BdfReplayEndpoints
 
         group.MapPost("/replay", ReplayBdf)
             .WithName("ReplayBdf")
+            .WithMetadata(new Attributes.BotPolicyAttribute("default") { BlockThreshold = 0.95 })
             .WithSummary("Replay a BDF v2 document through the detection pipeline and compare results")
             .Accepts<BdfReplayRequest>("application/json")
             .Produces<BdfReplayResponse>()
