@@ -2752,7 +2752,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig IsBot { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://raw.githubusercontent.com/omrilotan/isbot/main/src/patterns.json",
         Description = "IsBot patterns from omrilotan/isbot - comprehensive bot regex patterns (JSON array)"
     };
@@ -2792,7 +2792,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig AwsIpRanges { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://ip-ranges.amazonaws.com/ip-ranges.json",
         Description = "AWS IP ranges - official Amazon cloud IP ranges (JSON)"
     };
@@ -2803,7 +2803,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig GcpIpRanges { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://www.gstatic.com/ipranges/cloud.json",
         Description = "Google Cloud IP ranges - official GCP IP ranges (JSON)"
     };
@@ -2827,7 +2827,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig CloudflareIpv4 { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://www.cloudflare.com/ips-v4",
         Description = "Cloudflare IPv4 ranges - official Cloudflare IPs (text, one CIDR per line)"
     };
@@ -2837,7 +2837,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig CloudflareIpv6 { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://www.cloudflare.com/ips-v6",
         Description = "Cloudflare IPv6 ranges - official Cloudflare IPs (text, one CIDR per line)"
     };
@@ -2853,7 +2853,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig BrowserVersions { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://www.browsers.fyi/api",
         Description = "Browser versions from browsers.fyi - current browser versions (JSON)"
     };
@@ -2869,7 +2869,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig ScannerUserAgents { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://raw.githubusercontent.com/digininja/scanner_user_agents/main/list.json",
         Description = "Security scanner user agents from digininja - JSON format with tool metadata"
     };
@@ -2881,7 +2881,7 @@ public class DataSourcesOptions
     /// </summary>
     public DataSourceConfig CoreRuleSetScanners { get; set; } = new()
     {
-        Enabled = true,
+        Enabled = false,
         Url = "https://raw.githubusercontent.com/coreruleset/coreruleset/main/rules/scanners-user-agents.data",
         Description = "OWASP CoreRuleSet scanner patterns - text format, one per line"
     };
@@ -3952,6 +3952,12 @@ public class QdrantOptions
 
     /// <summary>ONNX model file name for embeddings (default: all-MiniLM-L6-v2.onnx)</summary>
     public string EmbeddingModel { get; set; } = "all-MiniLM-L6-v2.onnx";
+
+    /// <summary>
+    ///     Allow automatic download of ONNX model assets when they are missing.
+    ///     Disabled by default to keep runtime behavior offline by default.
+    /// </summary>
+    public bool AutoDownloadEmbeddingModel { get; set; }
 
     /// <summary>Embedding vector dimension (384 for all-MiniLM-L6-v2)</summary>
     public int EmbeddingDimension { get; set; } = 384;

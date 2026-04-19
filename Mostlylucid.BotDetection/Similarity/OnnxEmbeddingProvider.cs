@@ -11,8 +11,8 @@ namespace Mostlylucid.BotDetection.Similarity;
 ///     ONNX-based embedding provider using a CPU-quantized all-MiniLM-L6-v2 model.
 ///     Runs pure CPU inference (~1-5ms per embedding for short text).
 ///     Thread-safe singleton - model loaded once on first use.
-///     Model and vocab are auto-downloaded from HuggingFace on first startup.
-///     In Docker, the models directory should be a mapped volume for persistence.
+///     Model assets are loaded from disk by default. Optional auto-download from HuggingFace
+///     can be enabled explicitly via Qdrant.AutoDownloadEmbeddingModel.
 /// </summary>
 public sealed class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
 {
@@ -27,6 +27,7 @@ public sealed class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
     private readonly string _vocabPath;
     private readonly string _modelsDir;
     private readonly int _dimension;
+    private readonly bool _autoDownloadEmbeddingModel;
     private readonly Lock _initLock = new();
 
     private InferenceSession? _session;
@@ -41,6 +42,7 @@ public sealed class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
     {
         _logger = logger;
         _dimension = qdrantOptions.EmbeddingDimension;
+        _autoDownloadEmbeddingModel = qdrantOptions.AutoDownloadEmbeddingModel;
 
         _modelsDir = Path.Combine(
             databasePath ?? Path.Combine(AppContext.BaseDirectory, "botdetection-data"),
@@ -143,8 +145,7 @@ public sealed class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
 
             try
             {
-                // Auto-download model + vocab if not present (Docker volume persistence)
-                if (!File.Exists(_modelPath))
+                if (!File.Exists(_modelPath) && _autoDownloadEmbeddingModel)
                 {
                     _logger.LogInformation(
                         "ONNX model not found at {Path}. Auto-downloading from HuggingFace (this is a one-time download, ~90MB)...",
@@ -152,7 +153,7 @@ public sealed class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
                     DownloadFileAsync(ModelUrl, _modelPath).GetAwaiter().GetResult();
                 }
 
-                if (!File.Exists(_vocabPath))
+                if (!File.Exists(_vocabPath) && _autoDownloadEmbeddingModel)
                 {
                     _logger.LogInformation("Vocab file not found at {Path}. Auto-downloading...", _vocabPath);
                     DownloadFileAsync(VocabUrl, _vocabPath).GetAwaiter().GetResult();
@@ -163,7 +164,7 @@ public sealed class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
                     _logger.LogWarning(
                         "ONNX model or vocab not available at {Dir}. Embeddings disabled. " +
                         "To enable: place all-MiniLM-L6-v2.onnx and vocab.txt in the models directory, " +
-                        "or ensure the container has internet access for auto-download.",
+                        "or explicitly set BotDetection:Qdrant:AutoDownloadEmbeddingModel=true.",
                         _modelsDir);
                     _available = false;
                     return;

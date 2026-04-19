@@ -339,7 +339,7 @@ Complete reference with all available options:
     // ==========================================
     "DataSources": {
       "IsBot": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://raw.githubusercontent.com/omrilotan/isbot/main/src/patterns.json"
       },
       "Matomo": {
@@ -351,11 +351,11 @@ Complete reference with all available options:
         "Url": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json"
       },
       "AwsIpRanges": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://ip-ranges.amazonaws.com/ip-ranges.json"
       },
       "GcpIpRanges": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://www.gstatic.com/ipranges/cloud.json"
       },
       "AzureIpRanges": {
@@ -363,19 +363,19 @@ Complete reference with all available options:
         "Url": ""
       },
       "CloudflareIpv4": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://www.cloudflare.com/ips-v4"
       },
       "CloudflareIpv6": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://www.cloudflare.com/ips-v6"
       },
       "ScannerUserAgents": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://raw.githubusercontent.com/digininja/scanner_user_agents/main/list.json"
       },
       "CoreRuleSetScanners": {
-        "Enabled": true,
+        "Enabled": false,
         "Url": "https://raw.githubusercontent.com/coreruleset/coreruleset/main/rules/scanners-user-agents.data"
       }
     },
@@ -435,6 +435,9 @@ Complete reference with all available options:
   }
 }
 ```
+
+Remote bot-list, IP-range, browser-version, and scanner feeds are now opt-in by default. If you want zero phone-home
+behavior, leave the `DataSources:*:Enabled` flags off and rely on the built-in fallback data or your own local feeds.
 
 ---
 
@@ -836,7 +839,7 @@ Add detection results to response headers for debugging and integration.
 
 | Option                       | Type | Default | Description                   |
 |------------------------------|------|---------|-------------------------------|
-| `EnableBackgroundUpdates`    | bool | `true`  | Enable automatic list updates |
+| `EnableBackgroundUpdates`    | bool | `true`  | Enable automatic list updates for any remote data sources you explicitly turn on |
 | `UpdateIntervalHours`        | int  | `24`    | Hours between updates (1-168) |
 | `UpdateCheckIntervalMinutes` | int  | `60`    | Minutes between update checks |
 | `StartupDelaySeconds`        | int  | `5`     | Delay before first update     |

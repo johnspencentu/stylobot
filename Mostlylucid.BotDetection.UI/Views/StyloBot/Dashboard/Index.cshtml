@@ -129,15 +129,15 @@
     <main class="max-w-7xl mx-auto px-2 py-4">
 
         <!-- Summary stats - always visible -->
-        @await Html.PartialAsync("~/Views/Dashboard/_SummaryStats.cshtml", Model.Summary)
+        @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_SummaryStats.cshtml", Model.Summary)
 
         <!-- License + Your Detection: compact row below stats -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
             <div>
-                @await Html.PartialAsync("~/Views/Dashboard/_LicenseCard.cshtml", Model.License)
+                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_LicenseCard.cshtml", Model.License)
             </div>
             <div>
-                @await Html.PartialAsync("~/Views/Dashboard/_YourDetection.cshtml", Model.YourDetection)
+                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_YourDetection.cshtml", Model.YourDetection)
             </div>
         </div>
 
@@ -160,7 +160,7 @@
 
                 <!-- TOP THREATS: 2/3 width - this is what users care about -->
                 <div class="lg:col-span-2">
-                    @await Html.PartialAsync("~/Views/Dashboard/_TopBotsList.cshtml", Model.TopBots)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_TopBotsList.cshtml", Model.TopBots)
                 </div>
 
                 <!-- TRAFFIC CHART: 1/3 width - context for the threats -->
@@ -174,7 +174,7 @@
                             <div id="time-chart" style="height: 160px;"></div>
                         </div>
                     </div>
-                    @await Html.PartialAsync("~/Views/Dashboard/_RecentActivity.cshtml", Model.Visitors)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_RecentActivity.cshtml", Model.Visitors)
                 </div>
             </div>
 
@@ -193,7 +193,7 @@
         }
         else if (tab == "visitors")
         {
-            @await Html.PartialAsync("~/Views/Dashboard/_VisitorList.cshtml", Model.Visitors)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_VisitorList.cshtml", Model.Visitors)
         }
         else if (tab == "countries")
         {
@@ -207,28 +207,28 @@
                 </div>
                 <div id="countries-map" class="relative" style="height: 440px;"></div>
             </div>
-            @await Html.PartialAsync("~/Views/Dashboard/_CountriesList.cshtml", Model.Countries)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_CountriesList.cshtml", Model.Countries)
         }
         else if (tab == "endpoints")
         {
-            @await Html.PartialAsync("~/Views/Dashboard/_EndpointsList.cshtml", Model.Endpoints)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_EndpointsList.cshtml", Model.Endpoints)
         }
         else if (tab == "sessions")
         {
-            @await Html.PartialAsync("~/Views/Dashboard/_SessionsList.cshtml", Model.Sessions)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_SessionsList.cshtml", Model.Sessions)
         }
         else if (tab == "clusters")
         {
-            @await Html.PartialAsync("~/Views/Dashboard/_ClustersList.cshtml", Model.Clusters)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_ClustersList.cshtml", Model.Clusters)
         }
         else if (tab == "useragents")
         {
-            @await Html.PartialAsync("~/Views/Dashboard/_UserAgentsList.cshtml", Model.UserAgents)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_UserAgentsList.cshtml", Model.UserAgents)
         }
         else if (tab == "configuration" && Model.Configuration is not null)
         {
             ViewBag.CspNonce = Model.CspNonce;
-            @await Html.PartialAsync("~/Views/Dashboard/_ConfigurationEditor.cshtml", Model.Configuration)
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_ConfigurationEditor.cshtml", Model.Configuration)
         }
 
     </main>

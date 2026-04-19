@@ -117,7 +117,7 @@ public static class ChallengeEndpoints
 
         // Issue signed challenge token cookie using the auto-generated or configured secret
         var tokenOptions = new ChallengeActionOptions { TokenValidityMinutes = 30 };
-        var token = ChallengeActionPolicy.GenerateChallengeToken(tokenOptions);
+        var token = ChallengeActionPolicy.GenerateChallengeToken(context, tokenOptions);
 
         context.Response.Cookies.Append(tokenOptions.TokenCookieName, token, new CookieOptions
         {

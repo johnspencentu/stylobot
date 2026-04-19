@@ -121,6 +121,13 @@ public partial class CommonUserAgentService : BackgroundService, ICommonUserAgen
             return;
         }
 
+        if (!_options.DataSources.BrowserVersions.Enabled)
+        {
+            _logger.LogInformation(
+                "Remote browser version feeds are disabled. Common user agent scraping skipped; using configured fallback versions only.");
+            return;
+        }
+
         _logger.LogInformation(
             "Common user agent service started. Update interval: {Hours}h",
             _options.VersionAge.UpdateIntervalHours);

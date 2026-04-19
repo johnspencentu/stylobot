@@ -18,11 +18,11 @@ curl -fsSL https://raw.githubusercontent.com/scottgal/stylobot/main/scripts/inst
 ## Quick Start
 
 ```bash
-# Interactive mode with live detection table
+# Production mode with live detection table
 stylobot 5080 http://localhost:3000
 
-# Production mode with blocking
-stylobot 5080 http://localhost:3000 --mode production --policy block
+# Demo mode with local test surfaces enabled
+stylobot 5080 http://localhost:3000 --mode demo
 
 # With Cloudflare Tunnel (instant public URL)
 stylobot 5080 http://localhost:3000 --tunnel
@@ -61,6 +61,9 @@ The important distinction is that paid does **not** mean better intelligence by 
 local control**: the same detector concept, but with the option to keep feed ingestion and fingerprint generation fully
 inside your own environment.
 
+The CLI now ships with runtime list/model downloads disabled by default as well, so remote feeds and ONNX model fetches
+are explicit opt-ins instead of surprise first-run network behavior.
+
 ## CLI Reference
 
 ```
@@ -78,8 +81,8 @@ stylobot <port> <upstream> [options]
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--mode <name>` | Detection mode: `demo`, `production` | `demo` |
-| `--policy <name>` | Action policy: `logonly`, `block`, `throttle`, `challenge` | `logonly` |
+| `--mode <name>` | Detection mode: `demo`, `production` | `production` |
+| `--policy <name>` | Action policy: `logonly`, `block`, `throttle`, `challenge` | `block` in production, `logonly` in demo |
 | `--threshold <0.0-1.0>` | Bot probability threshold | `0.7` |
 | `--cert <path>` | TLS certificate (.pfx or .pem) | - |
 | `--key <path>` | TLS private key (with .pem cert) | - |
@@ -107,6 +110,7 @@ All options can also be set via environment variables:
 | `STYLOBOT_LLM_KEY` | `--llm-key` |
 | `KNOWN_NETWORKS` | Trusted proxy networks (CIDR, comma-separated) |
 | `KNOWN_PROXIES` | Trusted proxy IPs (comma-separated) |
+| `STYLOBOT_ALLOW_PUBLIC_METRICS` | Allow remote scraping of `/metrics` |
 | `STYLOBOT_*` | Any config via environment variable prefix |
 
 ## Daemon Mode
@@ -205,8 +209,11 @@ Example appsettings: [`Mostlylucid.BotDetection/docs/appsettings.typical.json`](
 
 | Path | Description |
 |------|-------------|
-| `/health` | Health check (JSON: status, mode, upstream, port) |
-| `/metrics` | Prometheus metrics (when OpenTelemetry enabled) |
+| `/health` | Health check (minimal JSON: `{"status":"healthy"}`) |
+| `/metrics` | Prometheus metrics, loopback-only by default |
+| `/test-client-side.html` | Demo/learning mode browser test page |
+| `/api/bot-detection/test-status` | Demo/learning mode server verdict + one-time callback token |
+| `/api/bot-detection/client-result` | Demo/learning mode signed callback endpoint |
 | `/**` | All other paths proxied to upstream with bot detection |
 
 ## Platforms

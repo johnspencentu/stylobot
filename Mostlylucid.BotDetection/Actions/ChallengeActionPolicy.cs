@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Mostlylucid.BotDetection.Dashboard;
 using Mostlylucid.BotDetection.Orchestration;
 
 namespace Mostlylucid.BotDetection.Actions;
@@ -128,30 +129,37 @@ public class ChallengeActionPolicy : IActionPolicy
             || string.IsNullOrEmpty(token))
             return false;
 
-        // Token format: base64(expiry_unix_seconds:signature)
-        // Signature = HMAC-SHA256(expiry_unix_seconds, key)
+        // Token format: base64(expiry_unix_seconds:request_binding:host_hash:signature)
+        // Signature = HMAC-SHA256(expiry_unix_seconds:request_binding:host_hash, key)
         try
         {
             var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(token));
-            var colonIndex = decoded.IndexOf(':');
-            if (colonIndex < 0) return false;
+            var parts = decoded.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length != 4) return false;
 
-            var expiryStr = decoded[..colonIndex];
-            var providedSignature = decoded[(colonIndex + 1)..];
+            var expiryStr = parts[0];
+            var providedBinding = parts[1];
+            var providedHostHash = parts[2];
+            var providedSignature = parts[3];
 
             // Check expiry
             if (!long.TryParse(expiryStr, out var expiryUnix)) return false;
             var expiry = DateTimeOffset.FromUnixTimeSeconds(expiryUnix);
             if (DateTimeOffset.UtcNow > expiry) return false;
 
+            var currentBinding = ResolveRequestBinding(context);
+            var currentHostHash = ComputeHostHash(context);
+            if (!FixedTimeEqualsHex(providedBinding, currentBinding) ||
+                !FixedTimeEqualsHex(providedHostHash, currentHostHash))
+                return false;
+
             // Verify HMAC signature
+            var signedPayload = $"{expiryStr}:{providedBinding}:{providedHostHash}";
             var key = Encoding.UTF8.GetBytes(_options.EffectiveTokenSecret);
             var expectedSignature = Convert.ToHexString(
-                HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(expiryStr)));
+                HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(signedPayload)));
 
-            return CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(providedSignature),
-                Encoding.UTF8.GetBytes(expectedSignature));
+            return FixedTimeEqualsHex(providedSignature, expectedSignature);
         }
         catch
         {
@@ -160,15 +168,52 @@ public class ChallengeActionPolicy : IActionPolicy
     }
 
     /// <summary>
-    ///     Generates a signed challenge token with expiry.
+    ///     Generates a signed challenge token bound to the current request context.
     /// </summary>
-    internal static string GenerateChallengeToken(ChallengeActionOptions options)
+    internal static string GenerateChallengeToken(HttpContext context, ChallengeActionOptions options)
     {
         var expiry = DateTimeOffset.UtcNow.AddMinutes(options.TokenValidityMinutes).ToUnixTimeSeconds();
         var expiryStr = expiry.ToString();
+        var binding = ResolveRequestBinding(context);
+        var hostHash = ComputeHostHash(context);
+        var signedPayload = $"{expiryStr}:{binding}:{hostHash}";
         var key = Encoding.UTF8.GetBytes(options.EffectiveTokenSecret);
-        var signature = Convert.ToHexString(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(expiryStr)));
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes($"{expiryStr}:{signature}"));
+        var signature = Convert.ToHexString(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(signedPayload)));
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes($"{signedPayload}:{signature}"));
+    }
+
+    private static string ResolveRequestBinding(HttpContext context)
+    {
+        if (context.Items.TryGetValue("BotDetection:Signature", out var signatureObj) &&
+            signatureObj is string signature &&
+            !string.IsNullOrWhiteSpace(signature))
+            return signature;
+
+        if (context.Items.TryGetValue("BotDetection.Signatures", out var signaturesObj) &&
+            signaturesObj is MultiFactorSignatures signatures &&
+            !string.IsNullOrWhiteSpace(signatures.PrimarySignature))
+            return signatures.PrimarySignature;
+
+        var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var userAgent = context.Request.Headers.UserAgent.ToString();
+        var fallback = $"{remoteIp}\n{userAgent}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fallback)));
+    }
+
+    private static string ComputeHostHash(HttpContext context)
+    {
+        var host = context.Request.Host.Host;
+        if (string.IsNullOrWhiteSpace(host))
+            host = "unknown";
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(host.ToLowerInvariant())));
+    }
+
+    private static bool FixedTimeEqualsHex(string left, string right)
+    {
+        var leftBytes = Encoding.UTF8.GetBytes(left);
+        var rightBytes = Encoding.UTF8.GetBytes(right);
+        return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 
     private Task<ActionResult> HandleRedirectChallenge(

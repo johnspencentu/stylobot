@@ -197,34 +197,35 @@
 
 <script>
     // Global results storage
-    let serverHeaders = {};
+    let serverDetection = {};
     let clientChecks = {};
     let callbackUrl = null;
+    let callbackToken = null;
 
     async function runDetection() {
         document.getElementById('status').className = 'status loading';
         document.getElementById('status').textContent = '⏳ Running detection...';
 
         try {
-            // Step 1: Get server-side detection headers
-            const response = await fetch(window.location.href, {
-                method: 'HEAD',
+            // Step 1: Get demo server-side detection status
+            const response = await fetch('/api/bot-detection/test-status', {
                 cache: 'no-cache'
             });
 
-            // Extract server-side detection results from headers
-            serverHeaders = {
-                isBot: response.headers.get('X-Bot-Detection'),
-                probability: response.headers.get('X-Bot-Probability'),
-                botName: response.headers.get('X-Bot-Name'),
-                botType: response.headers.get('X-Bot-Type')
-            };
-            callbackUrl = response.headers.get('X-Bot-Detection-Callback-Url');
+            if (!response.ok) {
+                throw new Error(`Status request failed: ${response.status}`);
+            }
+
+            const statusPayload = await response.json();
+
+            serverDetection = statusPayload.serverDetection || {};
+            callbackUrl = statusPayload.callbackUrl || null;
+            callbackToken = statusPayload.callbackToken || null;
 
             // Update server-side display
-            document.getElementById('server-isbot').textContent = serverHeaders.isBot || 'Not detected';
-            document.getElementById('server-probability').textContent = serverHeaders.probability || 'N/A';
-            document.getElementById('server-botname').textContent = serverHeaders.botName || 'None';
+            document.getElementById('server-isbot').textContent = String(serverDetection.isBot ?? 'Not detected');
+            document.getElementById('server-probability').textContent = serverDetection.probability ?? 'N/A';
+            document.getElementById('server-botname').textContent = serverDetection.botName || 'None';
             document.getElementById('callback-url').textContent = callbackUrl || 'Not provided';
 
             // Step 2: Run client-side checks
@@ -234,10 +235,9 @@
             document.getElementById('client-result').textContent = JSON.stringify(clientChecks, null, 2);
 
             // Step 3: Send results to callback URL
-            if (callbackUrl) {
+            if (callbackUrl && callbackToken) {
                 const callbackPayload = {
                     timestamp: new Date().toISOString(),
-                    serverDetection: serverHeaders,
                     clientChecks: clientChecks,
                     userAgent: navigator.userAgent,
                     referrer: document.referrer
@@ -246,25 +246,30 @@
                 const callbackResponse = await fetch(callbackUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Stylobot-Test-Token': callbackToken
                     },
                     body: JSON.stringify(callbackPayload)
                 });
+
+                if (!callbackResponse.ok) {
+                    throw new Error(`Callback failed: ${callbackResponse.status}`);
+                }
 
                 const callbackResult = await callbackResponse.json();
                 document.getElementById('callback-response').textContent = JSON.stringify(callbackResult, null, 2);
 
                 // Update final status
-                const isBot = serverHeaders.isBot === 'True';
+                const isBot = !!serverDetection.isBot;
                 document.getElementById('status').className = isBot ? 'status bot' : 'status human';
                 document.getElementById('status').textContent = isBot
-                    ? `🤖 Server detected you as a BOT (confidence: ${serverHeaders.probability})`
-                    : `✅ Server detected you as HUMAN (confidence: ${1 - parseFloat(serverHeaders.probability || 0)})`;
+                    ? `🤖 Server detected you as a BOT (confidence: ${serverDetection.probability})`
+                    : `✅ Server detected you as HUMAN (confidence: ${(1 - parseFloat(serverDetection.probability || 0)).toFixed(2)})`;
 
             } else {
-                document.getElementById('callback-response').textContent = 'No callback URL provided by server';
+                document.getElementById('callback-response').textContent = 'Demo callback status endpoint did not provide a usable callback token';
                 document.getElementById('status').className = 'status error';
-                document.getElementById('status').textContent = '❌ No callback URL - cannot send client-side results';
+                document.getElementById('status').textContent = '❌ Demo callback token missing - cannot send client-side results';
             }
 
         } catch (error) {

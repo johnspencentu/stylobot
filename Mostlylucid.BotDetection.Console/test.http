@@ -89,10 +89,6 @@ User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 ###
 
-### Check Detection Headers from Previous Request
-# Look for these headers in responses:
-# - X-Bot-Detection: True/False
-# - X-Bot-Probability: 0.00-1.00
-# - X-Bot-RiskBand: VeryLow/Low/Elevated/Medium/High/VeryHigh
-# - X-Bot-Name: (bot name if detected)
-# - X-Bot-DetectionTime: (ms)
+### Demo-Only Client-Side Status
+# Available only in --mode demo / learning
+GET http://localhost:5080/api/bot-detection/test-status HTTP/1.1

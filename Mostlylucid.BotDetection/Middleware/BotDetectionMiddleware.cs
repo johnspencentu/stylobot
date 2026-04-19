@@ -883,6 +883,7 @@ public class BotDetectionMiddleware(
 
         var sigs = sigService.GenerateSignatures(context);
         context.Items["BotDetection.Signatures"] = sigs;
+        context.Items["BotDetection:Signature"] = sigs.PrimarySignature;
     }
 
     /// <summary>

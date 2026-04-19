@@ -620,6 +620,7 @@ services:
       BotDetection__Qdrant__Enabled: true
       BotDetection__Qdrant__Endpoint: http://qdrant:6334
       BotDetection__Qdrant__EnableEmbeddings: true
+      BotDetection__Qdrant__AutoDownloadEmbeddingModel: false
       # CPU-only LLM for bot classification
       BotDetection__AiDetection__Provider: LlamaSharp
       BotDetection__AiDetection__LlamaSharp__ModelPath: "Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf"

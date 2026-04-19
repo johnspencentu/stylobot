@@ -204,22 +204,6 @@ public class BrowserTokenService : IBrowserTokenService
 
     private static string GetClientIp(HttpContext context)
     {
-        // Check common proxy headers
-        var headers = context.Request.Headers;
-
-        if (headers.TryGetValue("CF-Connecting-IP", out var cfIp) && !string.IsNullOrEmpty(cfIp))
-            return cfIp.ToString();
-
-        if (headers.TryGetValue("X-Forwarded-For", out var xff) && !string.IsNullOrEmpty(xff))
-        {
-            var firstIp = xff.ToString().Split(',')[0].Trim();
-            if (!string.IsNullOrEmpty(firstIp))
-                return firstIp;
-        }
-
-        if (headers.TryGetValue("X-Real-IP", out var realIp) && !string.IsNullOrEmpty(realIp))
-            return realIp.ToString();
-
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }

@@ -287,17 +287,19 @@ Each data source has the same sub-properties (`Enabled`, `Url`, `Description`, `
 
 | Source | Config Path | Enabled by Default | Description |
 |--------|------------|-------------------|-------------|
-| `IsBot` | `DataSources:IsBot` | `true` | Comprehensive bot regex patterns from omrilotan/isbot |
+| `IsBot` | `DataSources:IsBot` | `false` | Comprehensive bot regex patterns from omrilotan/isbot |
 | `Matomo` | `DataSources:Matomo` | `false` | Categorized bot patterns with metadata |
 | `CrawlerUserAgents` | `DataSources:CrawlerUserAgents` | `false` | Community-maintained crawler patterns |
-| `AwsIpRanges` | `DataSources:AwsIpRanges` | `true` | Official Amazon IP ranges |
-| `GcpIpRanges` | `DataSources:GcpIpRanges` | `true` | Official Google Cloud IP ranges |
+| `AwsIpRanges` | `DataSources:AwsIpRanges` | `false` | Official Amazon IP ranges |
+| `GcpIpRanges` | `DataSources:GcpIpRanges` | `false` | Official Google Cloud IP ranges |
 | `AzureIpRanges` | `DataSources:AzureIpRanges` | `false` | Azure IP ranges (URL changes weekly) |
-| `CloudflareIpv4` | `DataSources:CloudflareIpv4` | `true` | Cloudflare IPv4 ranges |
-| `CloudflareIpv6` | `DataSources:CloudflareIpv6` | `true` | Cloudflare IPv6 ranges |
-| `BrowserVersions` | `DataSources:BrowserVersions` | `true` | Current browser versions from browsers.fyi |
-| `ScannerUserAgents` | `DataSources:ScannerUserAgents` | `true` | Security scanner user agents |
-| `CoreRuleSetScanners` | `DataSources:CoreRuleSetScanners` | `true` | OWASP CoreRuleSet scanner patterns |
+| `CloudflareIpv4` | `DataSources:CloudflareIpv4` | `false` | Cloudflare IPv4 ranges |
+| `CloudflareIpv6` | `DataSources:CloudflareIpv6` | `false` | Cloudflare IPv6 ranges |
+| `BrowserVersions` | `DataSources:BrowserVersions` | `false` | Current browser versions from browsers.fyi |
+| `ScannerUserAgents` | `DataSources:ScannerUserAgents` | `false` | Security scanner user agents |
+| `CoreRuleSetScanners` | `DataSources:CoreRuleSetScanners` | `false` | OWASP CoreRuleSet scanner patterns |
+
+Remote data sources are opt-in by default so self-hosted deployments do not perform surprise first-run downloads.
 
 Each `DataSourceConfig` has:
 
@@ -459,6 +461,7 @@ Section path: `BotDetection:Qdrant`
 | `VectorDimension` | `int` | `64` | Vector dimension for heuristic features |
 | `EnableEmbeddings` | `bool` | `false` | Enable ML embeddings via ONNX |
 | `EmbeddingModel` | `string` | `"all-MiniLM-L6-v2.onnx"` | ONNX model file for embeddings |
+| `AutoDownloadEmbeddingModel` | `bool` | `false` | Allow automatic download of missing ONNX model assets |
 | `EmbeddingDimension` | `int` | `384` | Embedding vector dimension |
 
 ## Whitelists and Customization

@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Net;
+using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Mostlylucid.BotDetection.Console.Helpers;
@@ -8,7 +10,6 @@ using Mostlylucid.BotDetection.Console.Logging;
 using Mostlylucid.BotDetection.Console.Models;
 using Mostlylucid.BotDetection.Console.Services;
 using Mostlylucid.BotDetection.Console.Transforms;
-using Mostlylucid.BotDetection.Events;
 using Mostlylucid.BotDetection.Extensions;
 using Mostlylucid.BotDetection.Llm.Cloud.Extensions;
 using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
@@ -69,8 +70,9 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("  Options:");
     Console.WriteLine("    --port <port>               Port to listen on (default: 5080)");
     Console.WriteLine("    --upstream <url>            Upstream server URL");
-    Console.WriteLine("    --mode <demo|production>    Detection mode (default: demo)");
-    Console.WriteLine("    --policy <name>             Default action policy (default: logonly)");
+    Console.WriteLine("    --mode <demo|production>    Detection mode (default: production)");
+    Console.WriteLine("    --policy <name>             Default action policy");
+    Console.WriteLine("                                (default: block in production, logonly in demo)");
     Console.WriteLine("    --cert <path>               TLS certificate (.pfx or .pem)");
     Console.WriteLine("    --key <path>                TLS private key (required with .pem cert)");
     Console.WriteLine("    --cert-password <pass>      PFX certificate password");
@@ -88,6 +90,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine();
     Console.WriteLine("  Examples:");
     Console.WriteLine("    stylobot 5080 http://localhost:3000");
+    Console.WriteLine("    stylobot 5080 http://localhost:3000 --mode demo");
     Console.WriteLine("    stylobot 8000 http://192.168.0.6:2040 --mode production");
     Console.WriteLine("    stylobot start 5080 http://localhost:3000 --policy block");
     Console.WriteLine("    stylobot 443 https://api.example.com --cert cert.pfx");
@@ -148,8 +151,11 @@ else if (positionals.Count == 1)
 
 var port = cliPort ?? positionalPort ?? envPort ?? "5080";
 var upstream = cliUpstream ?? positionalUpstream ?? envUpstream ?? "http://localhost:8080";
-var mode = GetArg(cmdArgs, "--mode") ?? Environment.GetEnvironmentVariable("MODE") ?? "demo";
-var actionPolicy = GetArg(cmdArgs, "--policy") ?? Environment.GetEnvironmentVariable("STYLOBOT_POLICY") ?? "logonly";
+var mode = GetArg(cmdArgs, "--mode") ?? Environment.GetEnvironmentVariable("MODE") ?? "production";
+var isDemoLikeMode = mode.Equals("demo", StringComparison.OrdinalIgnoreCase) ||
+                     mode.Equals("learning", StringComparison.OrdinalIgnoreCase);
+var defaultActionPolicy = mode.Equals("production", StringComparison.OrdinalIgnoreCase) ? "block" : "logonly";
+var actionPolicy = GetArg(cmdArgs, "--policy") ?? Environment.GetEnvironmentVariable("STYLOBOT_POLICY") ?? defaultActionPolicy;
 var certPath = GetArg(cmdArgs, "--cert");
 var keyPath = GetArg(cmdArgs, "--key");
 var certPassword = GetArg(cmdArgs, "--cert-password");
@@ -405,7 +411,7 @@ try
 
     // Create YARP transforms
     var requestTransform = new BotDetectionRequestTransform(mode, sigLoggingConfig, signatureLogger);
-    var responseTransform = new BotDetectionResponseTransform(mode);
+    var responseTransform = new BotDetectionResponseTransform();
 
     // Add YARP
     var yarpBuilder = builder.Services.AddReverseProxy()
@@ -540,6 +546,24 @@ try
     // Use Forwarded Headers middleware FIRST to extract real client IP
     app.UseForwardedHeaders();
 
+    var allowPublicMetrics = builder.Configuration.GetValue("Telemetry:AllowPublicMetricsEndpoint", false) ||
+                             bool.TryParse(Environment.GetEnvironmentVariable("STYLOBOT_ALLOW_PUBLIC_METRICS"),
+                                 out var allowPublicMetricsEnv) &&
+                             allowPublicMetricsEnv;
+
+    app.Use(async (context, next) =>
+    {
+        if (string.Equals(context.Request.Path.Value, "/metrics", StringComparison.OrdinalIgnoreCase) &&
+            !allowPublicMetrics &&
+            !IsLoopbackRequest(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await next();
+    });
+
     // Tap detection results for the live table (placed BEFORE bot detection
     // so it wraps around it and always sees the evidence in Items after _next completes)
     if (!verbose)
@@ -549,32 +573,55 @@ try
     app.UseBotDetection();
 
     // Health check endpoint (AOT-compatible) - mapped BEFORE YARP to avoid being proxied
-    app.MapGet("/health",
-        () => Results.Text(
-            $"{{\"status\":\"healthy\",\"mode\":\"{mode}\",\"upstream\":\"{upstream}\",\"port\":\"{port}\"}}",
-            "application/json"));
+    app.MapGet("/health", () => Results.Text("{\"status\":\"healthy\"}", "application/json"));
 
     app.MapPrometheusScrapingEndpoint("/metrics");
 
-    // Serve embedded test page - mapped BEFORE YARP to avoid being proxied
-    app.MapGet("/test-client-side.html", async (HttpContext context) =>
+    // Demo-only local surfaces must be mapped BEFORE YARP to avoid being proxied.
+    if (isDemoLikeMode)
     {
-        var assembly = typeof(Program).Assembly;
-        var resourceName = "wwwroot.test-client-side.html";
+        // Serve embedded test page
+        app.MapGet("/test-client-side.html", async (HttpContext context) =>
+        {
+            var assembly = typeof(Program).Assembly;
+            var resourceName = "wwwroot.test-client-side.html";
 
-        await using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null) return Results.NotFound($"Embedded resource '{resourceName}' not found");
+            await using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null) return Results.NotFound($"Embedded resource '{resourceName}' not found");
 
-        using var reader = new StreamReader(stream);
-        var content = await reader.ReadToEndAsync();
-        return Results.Content(content, "text/html");
-    });
+            using var reader = new StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Content(content, "text/html");
+        });
 
-    // Learning endpoint - Active in demo and learning modes (demo is default)
-    // MUST be mapped BEFORE YARP to avoid being proxied
-    if (mode.Equals("demo", StringComparison.OrdinalIgnoreCase) ||
-        mode.Equals("learning", StringComparison.OrdinalIgnoreCase))
-    {
+        app.MapGet("/api/bot-detection/test-status", (HttpContext context, IMemoryCache cache) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+
+            var callbackToken = Guid.NewGuid().ToString("N");
+            cache.Set(
+                GetDemoClientSideSessionCacheKey(callbackToken),
+                new DemoClientSideSession(
+                    context.IsBot(),
+                    context.BotConfidenceScore(),
+                    context.BotName(),
+                    NormalizeRemoteIp(context),
+                    DateTimeOffset.UtcNow),
+                TimeSpan.FromMinutes(5));
+
+            var callbackUrl =
+                $"{context.Request.Scheme}://{context.Request.Host}/api/bot-detection/client-result";
+            var responseJson = BuildDemoTestStatusJson(
+                context.IsBot(),
+                context.BotConfidenceScore(),
+                context.BotName(),
+                callbackUrl,
+                callbackToken);
+
+            return Results.Text(responseJson, "application/json");
+        });
+
         Log.Information("Signature learning endpoint enabled - /stylobot-learning/ active (mode: {Mode})", mode);
 
         // Supports status code simulation via path markers: /404/, /403/, /500/, etc.
@@ -676,105 +723,110 @@ try
                 context.Response.StatusCode = statusCode;
                 return Results.Content(responseJson, "application/json");
             });
-    }
 
-    // Client-side detection callback endpoint (AOT-compatible)
-    app.MapPost("/api/bot-detection/client-result", async (HttpContext context, ILearningEventBus? eventBus) =>
-    {
-        try
+        app.MapPost("/api/bot-detection/client-result", async (HttpContext context, IMemoryCache cache) =>
         {
-            using var reader = new StreamReader(context.Request.Body);
-            var body = await reader.ReadToEndAsync();
+            const long maxRequestBytes = 16 * 1024;
 
-            Log.Information("[CLIENT-SIDE-CALLBACK] Received client-side detection result");
+            context.Response.Headers.CacheControl = "no-store";
 
-            // Parse JSON (AOT-compatible using JsonDocument)
-            using var jsonDoc = JsonDocument.Parse(body);
-            var root = jsonDoc.RootElement;
+            if (!string.Equals(context.Request.ContentType, "application/json", StringComparison.OrdinalIgnoreCase) &&
+                !(context.Request.ContentType?.StartsWith("application/json;", StringComparison.OrdinalIgnoreCase) ??
+                  false))
+                return Results.Text("{\"status\":\"error\",\"message\":\"Content-Type must be application/json\"}",
+                    "application/json", statusCode: StatusCodes.Status415UnsupportedMediaType);
 
-            // Extract server detection results (echoed back from client)
-            var serverDetection = root.TryGetProperty("serverDetection", out var serverDet)
-                ? serverDet
-                : (JsonElement?)null;
-            var serverIsBot = serverDetection?.TryGetProperty("isBot", out var isBotProp) == true &&
-                              isBotProp.GetString() == "True";
-            var serverProbability = serverDetection?.TryGetProperty("probability", out var probProp) == true
-                ? double.Parse(probProp.GetString() ?? "0")
-                : 0.0;
+            if (context.Request.ContentLength is > maxRequestBytes)
+                return Results.Text("{\"status\":\"error\",\"message\":\"Request body too large\"}", "application/json",
+                    statusCode: StatusCodes.Status413PayloadTooLarge);
 
-            // Extract client-side checks
-            var clientChecks = root.TryGetProperty("clientChecks", out var checks) ? checks : (JsonElement?)null;
-            if (clientChecks.HasValue)
+            if (!context.Request.Headers.TryGetValue("X-Stylobot-Test-Token", out var testTokenValues) ||
+                string.IsNullOrWhiteSpace(testTokenValues))
+                return Results.Text("{\"status\":\"error\",\"message\":\"Missing demo callback token\"}",
+                    "application/json", statusCode: StatusCodes.Status400BadRequest);
+
+            var callbackToken = testTokenValues.ToString();
+            var cacheKey = GetDemoClientSideSessionCacheKey(callbackToken);
+            if (!cache.TryGetValue<DemoClientSideSession>(cacheKey, out var session) || session is null)
+                return Results.Text("{\"status\":\"error\",\"message\":\"Invalid or expired demo callback token\"}",
+                    "application/json", statusCode: StatusCodes.Status400BadRequest);
+
+            cache.Remove(cacheKey);
+
+            if (!string.Equals(session.RemoteIp, NormalizeRemoteIp(context), StringComparison.Ordinal))
             {
-                var hasCanvas = clientChecks.Value.TryGetProperty("hasCanvas", out var canvas) && canvas.GetBoolean();
-                var hasWebGL = clientChecks.Value.TryGetProperty("hasWebGL", out var webgl) && webgl.GetBoolean();
-                var hasAudioContext = clientChecks.Value.TryGetProperty("hasAudioContext", out var audio) &&
-                                      audio.GetBoolean();
-                var pluginCount = clientChecks.Value.TryGetProperty("pluginCount", out var plugins)
-                    ? plugins.GetInt32()
-                    : 0;
-                var hardwareConcurrency = clientChecks.Value.TryGetProperty("hardwareConcurrency", out var hardware)
+                Log.Warning("[CLIENT-SIDE-CALLBACK] Demo callback token IP mismatch");
+                return Results.Text("{\"status\":\"error\",\"message\":\"Demo callback token did not match this client\"}",
+                    "application/json", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            try
+            {
+                using var jsonDoc = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+                var root = jsonDoc.RootElement;
+
+                if (!root.TryGetProperty("clientChecks", out var clientChecks) ||
+                    clientChecks.ValueKind != JsonValueKind.Object)
+                    return Results.Text("{\"status\":\"error\",\"message\":\"Missing clientChecks payload\"}",
+                        "application/json", statusCode: StatusCodes.Status400BadRequest);
+
+                var hasCanvas = clientChecks.TryGetProperty("hasCanvas", out var canvas) && canvas.GetBoolean();
+                var hasWebGL = clientChecks.TryGetProperty("hasWebGL", out var webgl) && webgl.GetBoolean();
+                var hasAudioContext = clientChecks.TryGetProperty("hasAudioContext", out var audio) && audio.GetBoolean();
+                var pluginCount = clientChecks.TryGetProperty("pluginCount", out var plugins) ? plugins.GetInt32() : 0;
+                var hardwareConcurrency = clientChecks.TryGetProperty("hardwareConcurrency", out var hardware)
                     ? hardware.GetInt32()
                     : 0;
 
-                // Calculate client-side "bot score" based on checks
-                var clientBotScore = CalculateClientBotScore(hasCanvas, hasWebGL, hasAudioContext, pluginCount,
+                var clientBotScore = CalculateClientBotScore(
+                    hasCanvas,
+                    hasWebGL,
+                    hasAudioContext,
+                    pluginCount,
                     hardwareConcurrency);
 
-                Log.Information(
-                    "[CLIENT-SIDE-VALIDATION] Server: IsBot={ServerIsBot} (prob={ServerProb:F2}), Client: Score={ClientScore:F2}",
-                    serverIsBot, serverProbability, clientBotScore);
+                var mismatch = (session.ServerIsBot && clientBotScore < 0.3) ||
+                               (!session.ServerIsBot && clientBotScore > 0.7);
 
-                // Detect mismatches (server says bot, but client looks human - or vice versa)
-                var mismatch = (serverIsBot && clientBotScore < 0.3) || (!serverIsBot && clientBotScore > 0.7);
                 if (mismatch)
                     Log.Warning(
-                        "[CLIENT-SIDE-MISMATCH] Server detection ({ServerIsBot}) conflicts with client score ({ClientScore:F2})",
-                        serverIsBot, clientBotScore);
+                        "[CLIENT-SIDE-MISMATCH] Demo server verdict ({ServerIsBot}, {ServerProb:F2}) conflicts with client score ({ClientScore:F2})",
+                        session.ServerIsBot,
+                        session.ServerProbability,
+                        clientBotScore);
+                else
+                    Log.Information(
+                        "[CLIENT-SIDE-CALLBACK] Demo client-side validation accepted: server={ServerIsBot} ({ServerProb:F2}), client={ClientScore:F2}",
+                        session.ServerIsBot,
+                        session.ServerProbability,
+                        clientBotScore);
 
-                // Publish learning event for pattern improvement
-                if (eventBus != null)
-                {
-                    var learningEvent = new LearningEvent
-                    {
-                        Type = LearningEventType.ClientSideValidation,
-                        Source = "ClientSideCallback",
-                        Timestamp = DateTimeOffset.UtcNow,
-                        Label = serverIsBot, // Server's verdict
-                        Confidence = clientBotScore, // Client-side bot score
-                        Metadata = new Dictionary<string, object>
-                        {
-                            ["ipAddress"] = context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                            ["userAgent"] = root.TryGetProperty("userAgent", out var ua) ? ua.GetString() ?? "" : "",
-                            ["serverIsBot"] = serverIsBot,
-                            ["serverProbability"] = serverProbability,
-                            ["clientBotScore"] = clientBotScore,
-                            ["hasCanvas"] = hasCanvas,
-                            ["hasWebGL"] = hasWebGL,
-                            ["hasAudioContext"] = hasAudioContext,
-                            ["pluginCount"] = pluginCount,
-                            ["hardwareConcurrency"] = hardwareConcurrency,
-                            ["mismatch"] = mismatch
-                        }
-                    };
+                var responseJson = BuildDemoClientCallbackJson(
+                    session,
+                    clientBotScore,
+                    hasCanvas,
+                    hasWebGL,
+                    hasAudioContext,
+                    pluginCount,
+                    hardwareConcurrency,
+                    mismatch);
 
-                    if (eventBus.TryPublish(learningEvent))
-                        Log.Debug("[CLIENT-SIDE-CALLBACK] Published learning event for client-side validation");
-                    else
-                        Log.Warning("[CLIENT-SIDE-CALLBACK] Failed to publish learning event (channel full?)");
-                }
+                return Results.Text(responseJson, "application/json");
             }
-
-            return Results.Text("{\"status\":\"accepted\",\"message\":\"Client-side detection result processed\"}",
-                "application/json");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to process client-side detection callback");
-            return Results.Text("{\"status\":\"error\",\"message\":\"Invalid request\"}", "application/json",
-                statusCode: 400);
-        }
-    });
+            catch (JsonException ex)
+            {
+                Log.Warning(ex, "Failed to parse client-side demo callback payload");
+                return Results.Text("{\"status\":\"error\",\"message\":\"Invalid JSON payload\"}", "application/json",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to process client-side demo callback");
+                return Results.Text("{\"status\":\"error\",\"message\":\"Invalid request\"}", "application/json",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+        });
+    }
 
     // Map YARP reverse proxy (catch-all, should be LAST)
     app.MapReverseProxy();
@@ -899,8 +951,9 @@ static void ShowManPage()
     [bold]OPTIONS[/]
         [bold]--port[/] <port>                   Listen port (alternative to positional)
         [bold]--upstream[/] <url>                Upstream URL (alternative to positional)
-        [bold]--mode[/] <demo|production>       Detection mode (default: demo)
+        [bold]--mode[/] <demo|production>       Detection mode (default: production)
         [bold]--policy[/] <name>                Action: logonly, block, throttle, challenge
+                                               (default: block in production, logonly in demo)
         [bold]--threshold[/] <0.0-1.0>          Bot probability threshold (default: 0.7)
         [bold]--cert[/] <path>                  TLS certificate (.pfx or .pem)
         [bold]--key[/] <path>                   TLS private key (with .pem cert)
@@ -935,6 +988,8 @@ static void ShowManPage()
         STYLOBOT_LLM_KEY     LLM API key
         KNOWN_NETWORKS       Trusted proxy CIDRs (comma-separated)
         KNOWN_PROXIES        Trusted proxy IPs (comma-separated)
+        STYLOBOT_ALLOW_PUBLIC_METRICS
+                             Allow remote scraping of /metrics
 
     [bold]CONFIGURATION[/]
         Config priority (highest first):
@@ -948,14 +1003,18 @@ static void ShowManPage()
 
     [bold]EXAMPLES[/]
         stylobot 5080 http://localhost:3000
+        stylobot 5080 http://localhost:3000 --mode demo
         stylobot 8000 http://api.mysite.com --mode production --policy block
         stylobot 5080 http://localhost:3000 --tunnel
         stylobot 5080 http://localhost:3000 --llm groq --llm-key gsk-...
         stylobot start 443 https://backend:8080 --cert cert.pfx --policy block
 
     [bold]ENDPOINTS[/]
-        /health          Health check (JSON)
-        /metrics         Prometheus metrics
+        /health          Health check (minimal JSON)
+        /metrics         Prometheus metrics (loopback-only by default)
+        /test-client-side.html, /api/bot-detection/test-status,
+        /api/bot-detection/client-result
+                         Demo/learning mode only
         /**              All other paths proxied with detection
 
     [bold]FILES[/]
@@ -1026,6 +1085,99 @@ static bool TryParseNetwork(string value, out System.Net.IPNetwork network)
 
     network = new System.Net.IPNetwork(prefix, prefixLength);
     return true;
+}
+
+static bool IsLoopbackRequest(HttpContext context)
+{
+    var remoteIp = context.Connection.RemoteIpAddress;
+    if (remoteIp == null)
+        return false;
+
+    if (remoteIp.IsIPv4MappedToIPv6)
+        remoteIp = remoteIp.MapToIPv4();
+
+    return IPAddress.IsLoopback(remoteIp);
+}
+
+static string NormalizeRemoteIp(HttpContext context)
+{
+    var remoteIp = context.Connection.RemoteIpAddress;
+    if (remoteIp == null)
+        return "unknown";
+
+    if (remoteIp.IsIPv4MappedToIPv6)
+        remoteIp = remoteIp.MapToIPv4();
+
+    return remoteIp.ToString();
+}
+
+static string GetDemoClientSideSessionCacheKey(string callbackToken) =>
+    $"Stylobot:DemoClientSide:{callbackToken}";
+
+static string BuildDemoTestStatusJson(
+    bool isBot,
+    double probability,
+    string? botName,
+    string callbackUrl,
+    string callbackToken)
+{
+    using var stream = new MemoryStream();
+    using var writer = new Utf8JsonWriter(stream);
+
+    writer.WriteStartObject();
+    writer.WriteString("status", "ready");
+    writer.WriteStartObject("serverDetection");
+    writer.WriteBoolean("isBot", isBot);
+    writer.WriteNumber("probability", Math.Round(probability, 4));
+    if (!string.IsNullOrWhiteSpace(botName))
+        writer.WriteString("botName", botName);
+    writer.WriteEndObject();
+    writer.WriteString("callbackUrl", callbackUrl);
+    writer.WriteString("callbackToken", callbackToken);
+    writer.WriteEndObject();
+    writer.Flush();
+
+    return Encoding.UTF8.GetString(stream.ToArray());
+}
+
+static string BuildDemoClientCallbackJson(
+    DemoClientSideSession session,
+    double clientBotScore,
+    bool hasCanvas,
+    bool hasWebGL,
+    bool hasAudioContext,
+    int pluginCount,
+    int hardwareConcurrency,
+    bool mismatch)
+{
+    using var stream = new MemoryStream();
+    using var writer = new Utf8JsonWriter(stream);
+
+    writer.WriteStartObject();
+    writer.WriteString("status", "accepted");
+    writer.WriteString("message", "Demo client-side result processed");
+
+    writer.WriteStartObject("serverDetection");
+    writer.WriteBoolean("isBot", session.ServerIsBot);
+    writer.WriteNumber("probability", Math.Round(session.ServerProbability, 4));
+    if (!string.IsNullOrWhiteSpace(session.BotName))
+        writer.WriteString("botName", session.BotName);
+    writer.WriteEndObject();
+
+    writer.WriteStartObject("clientEvaluation");
+    writer.WriteNumber("botScore", Math.Round(clientBotScore, 4));
+    writer.WriteBoolean("mismatch", mismatch);
+    writer.WriteBoolean("hasCanvas", hasCanvas);
+    writer.WriteBoolean("hasWebGL", hasWebGL);
+    writer.WriteBoolean("hasAudioContext", hasAudioContext);
+    writer.WriteNumber("pluginCount", pluginCount);
+    writer.WriteNumber("hardwareConcurrency", hardwareConcurrency);
+    writer.WriteEndObject();
+
+    writer.WriteEndObject();
+    writer.Flush();
+
+    return Encoding.UTF8.GetString(stream.ToArray());
 }
 
 // Launch cloudflared tunnel subprocess
@@ -1119,3 +1271,10 @@ static Process? LaunchCloudflaredTunnel(string port, string scheme, string? toke
 
     return process;
 }
+
+file sealed record DemoClientSideSession(
+    bool ServerIsBot,
+    double ServerProbability,
+    string? BotName,
+    string RemoteIp,
+    DateTimeOffset IssuedAt);
