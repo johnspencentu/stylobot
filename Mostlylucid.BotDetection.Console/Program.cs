@@ -10,6 +10,7 @@ using Mostlylucid.BotDetection.Console.Services;
 using Mostlylucid.BotDetection.Console.Transforms;
 using Mostlylucid.BotDetection.Events;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Llm.Cloud.Extensions;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Telemetry;
@@ -70,8 +71,11 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    --cert-password <pass>      PFX certificate password");
     Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (requires cloudflared)");
     Console.WriteLine("    --threshold <0.0-1.0>       Bot probability threshold (default: 0.7)");
-    Console.WriteLine("    --llm <url>                 Ollama URL for LLM enrichment");
-    Console.WriteLine("    --model <name>              LLM model name (default: qwen3:0.6b)");
+    Console.WriteLine("    --llm <provider>            LLM provider (openai, anthropic, gemini, groq,");
+    Console.WriteLine("                                mistral, deepseek, ollama, or custom URL)");
+    Console.WriteLine("    --llm-key <key>             API key (or env: STYLOBOT_LLM_KEY)");
+    Console.WriteLine("    --llm-url <url>             Custom provider base URL");
+    Console.WriteLine("    --model <name>              Model name (overrides provider default)");
     Console.WriteLine("    --config <path>             Path to appsettings.json override");
     Console.WriteLine("    --log-level <level>         Minimum log level (default: Warning)");
     Console.WriteLine("    --verbose                   Show all log output (disables live table)");
@@ -95,7 +99,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
 // Parse: stylobot <port> <upstream> [--mode demo|production]
 // Collect positional args, skipping values that belong to known flags
 var flagsWithValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    { "--port", "--upstream", "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level", "--threshold", "--llm", "--model" };
+    { "--port", "--upstream", "--mode", "--policy", "--cert", "--key", "--cert-password", "--config", "--log-level", "--threshold", "--llm", "--llm-key", "--llm-url", "--model" };
 var positionals = new List<string>();
 for (var i = 1; i < cmdArgs.Length; i++)
 {
@@ -147,8 +151,10 @@ var certPassword = GetArg(cmdArgs, "--cert-password");
 var configPath = GetArg(cmdArgs, "--config");
 var logLevel = GetArg(cmdArgs, "--log-level");
 var thresholdArg = GetArg(cmdArgs, "--threshold");
-var llmUrl = GetArg(cmdArgs, "--llm");
-var llmModel = GetArg(cmdArgs, "--model") ?? "qwen3:0.6b";
+var llmProvider = GetArg(cmdArgs, "--llm");
+var llmKey = GetArg(cmdArgs, "--llm-key") ?? Environment.GetEnvironmentVariable("STYLOBOT_LLM_KEY");
+var llmUrl = GetArg(cmdArgs, "--llm-url");
+var llmModel = GetArg(cmdArgs, "--model");
 var useTls = certPath != null;
 var verbose = cmdArgs.Contains("--verbose");
 double? botThreshold = thresholdArg != null && double.TryParse(thresholdArg, out var t) ? t : null;
@@ -424,13 +430,21 @@ try
             });
 
     // Add Bot Detection (configured via appsettings.json + CLI overrides)
-    if (llmUrl != null)
+    builder.Services.AddBotDetection();
+
+    // Add LLM provider if specified
+    if (llmProvider != null)
     {
-        builder.Services.AddAdvancedBotDetection(llmUrl, llmModel);
-    }
-    else
-    {
-        builder.Services.AddBotDetection();
+        if (llmProvider.Equals("ollama", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddAdvancedBotDetection(
+                llmUrl ?? "http://localhost:11434",
+                llmModel ?? "qwen3:0.6b");
+        }
+        else
+        {
+            builder.Services.AddStylobotCloudLlm(llmProvider, llmKey, llmModel, llmUrl);
+        }
     }
 
     builder.Services.AddBotDetectionTelemetry();

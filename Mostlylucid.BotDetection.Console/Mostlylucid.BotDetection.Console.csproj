@@ -47,6 +47,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Mostlylucid.BotDetection\Mostlylucid.BotDetection.csproj" />
+        <ProjectReference Include="..\Mostlylucid.BotDetection.Llm.Cloud\Mostlylucid.BotDetection.Llm.Cloud.csproj" />
     </ItemGroup>
 
     <ItemGroup>
