@@ -433,10 +433,7 @@ try
                 }
             });
 
-    // Add Bot Detection (configured via appsettings.json + CLI overrides)
-    builder.Services.AddBotDetection();
-
-    // Add LLM provider if specified
+    // Add Bot Detection + optional LLM provider
     if (llmProvider != null)
     {
         if (llmProvider.Equals("ollama", StringComparison.OrdinalIgnoreCase))
@@ -445,18 +442,36 @@ try
                 llmUrl ?? "http://localhost:11434",
                 llmModel ?? "qwen3:0.6b");
         }
-        else if (llmProvider.Equals("llamasharp", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.Services.AddStylobotLlamaSharp(opts =>
-            {
-                if (llmModel != null) opts.ModelPath = llmModel;
-            });
-        }
         else
         {
-            builder.Services.AddStylobotCloudLlm(llmProvider, llmKey, llmModel, llmUrl);
+            // Non-Ollama LLM: register core detection first, then LLM provider
+            builder.Services.AddBotDetection();
+
+            if (llmProvider.Equals("llamasharp", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Services.AddStylobotLlamaSharp(opts =>
+                {
+                    if (llmModel != null) opts.ModelPath = llmModel;
+                });
+            }
+            else
+            {
+                builder.Services.AddStylobotCloudLlm(llmProvider, llmKey, llmModel, llmUrl);
+            }
         }
     }
+    else
+    {
+        builder.Services.AddBotDetection();
+    }
+
+    // Apply CLI overrides
+    builder.Services.PostConfigure<Mostlylucid.BotDetection.Models.BotDetectionOptions>(opts =>
+    {
+        opts.DefaultActionPolicyName = actionPolicy;
+        if (botThreshold.HasValue) opts.BotThreshold = botThreshold.Value;
+        if (llmProvider != null) opts.EnableLlmDetection = true;
+    });
 
     builder.Services.AddBotDetectionTelemetry();
     builder.Services.AddOpenTelemetry()

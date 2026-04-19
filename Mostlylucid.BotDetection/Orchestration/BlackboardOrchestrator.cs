@@ -1097,9 +1097,16 @@ public class BlackboardOrchestrator
             var coordOptions = _fullOptions.LlmCoordinator;
             var prob = result.BotProbability;
 
-            // Read TimescaleDB signals
+            // Check if this is a new or known signature
+            // TimescaleDB sets ts.is_new/ts.is_conclusive; SQLite uses reputation cache
             var isNew = signals.TryGetValue("ts.is_new", out var newVal) && newVal is true;
             var isConclusive = signals.TryGetValue("ts.is_conclusive", out var concVal) && concVal is true;
+
+            // Fallback for SQLite (no TimescaleDB): if neither signal is set,
+            // treat all detections above threshold as worth classifying
+            var hasReputationSignals = signals.ContainsKey("ts.is_new") || signals.ContainsKey("ts.is_conclusive");
+            if (!hasReputationSignals && prob >= coordOptions.MinProbabilityToEnqueue)
+                isNew = true; // No external reputation data → treat as new
 
             // Determine enqueue reason and sampling decision
             string? enqueueReason = null;
