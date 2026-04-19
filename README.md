@@ -159,7 +159,7 @@ stylobot 5080 http://localhost:3000 --llm ollama                    # local, fre
 | `llamasharp` | qwen2.5:0.5b | Free | In-process CPU, air-gapped |
 | `azure` | (deployment) | Azure pricing | Enterprise Azure |
 
-Advanced: fallback chains, budget controls, and per-use-case routing via `appsettings.json`. See [docs/llm-providers.md](Mostlylucid.BotDetection/docs/llm-providers.md).
+Advanced: fallback chains, budget controls, and per-use-case routing via `appsettings.json`. See [configuration guide](Mostlylucid.BotDetection/docs/configuration.md).
 
 ## Dashboard
 

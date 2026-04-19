@@ -143,7 +143,7 @@ app.MapPost("/api/submit", () => "ok")
 public IActionResult Index() => View();
 ```
 
-## Detection Methods (29 Detectors)
+## Detection Methods (31 Detectors)
 
 All detectors execute in a wave-based pipeline. Fast-path detectors run in parallel in <1ms. Advanced detectors fire only when triggered by upstream signals.
 

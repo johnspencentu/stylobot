@@ -28,6 +28,7 @@
 - [`detection-strategies.md`](../Mostlylucid.BotDetection/docs/detection-strategies.md) - How detection works
 - [`learning-and-reputation.md`](../Mostlylucid.BotDetection/docs/learning-and-reputation.md) - Adaptive learning
 - [`ai-detection.md`](../Mostlylucid.BotDetection/docs/ai-detection.md) - Heuristic + LLM detection
+- [`bdf-system-guide.md`](../Mostlylucid.BotDetection/docs/bdf-system-guide.md) - Bot Detection Format scenarios and replay
 
 ## Detector Reference
 
