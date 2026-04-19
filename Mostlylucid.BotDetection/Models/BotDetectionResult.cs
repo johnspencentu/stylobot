@@ -71,5 +71,6 @@ public enum BotType
     GoodBot,
     VerifiedBot,
     AiBot,
-    Tool
+    Tool,
+    ExploitScanner
 }

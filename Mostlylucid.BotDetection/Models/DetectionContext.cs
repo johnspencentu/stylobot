@@ -1057,4 +1057,27 @@ public static class SignalKeys
 
     /// <summary>String: the normalized request host that triggered the mismatch.</summary>
     public const string LicenseRequestHost = "license.request_host";
+
+    // ==========================================
+    // CVE / Threat Intelligence signals
+    // Set by CveFingerprintContributor when traffic matches CVE-derived fingerprints
+    // ==========================================
+
+    /// <summary>Int: number of CVE fingerprints that matched the session shape.</summary>
+    public const string CveMatchCount = "cve.match_count";
+
+    /// <summary>String: advisory ID of the top CVE match (e.g., "GHSA-xxxx" or "CVE-2026-1234").</summary>
+    public const string CveTopAdvisoryId = "cve.top_advisory_id";
+
+    /// <summary>Double: cosine similarity of the top CVE match (0-1).</summary>
+    public const string CveTopSimilarity = "cve.top_similarity";
+
+    /// <summary>String: severity of the top CVE match (critical/high/medium/low).</summary>
+    public const string CveTopSeverity = "cve.top_severity";
+
+    /// <summary>String: Leiden cluster label if the match belongs to an exploit family.</summary>
+    public const string CveClusterLabel = "cve.cluster_label";
+
+    /// <summary>String: comma-separated list of all matched CVE advisory IDs.</summary>
+    public const string CveMatchedIds = "cve.matched_ids";
 }

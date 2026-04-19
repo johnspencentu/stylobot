@@ -17,6 +17,7 @@ using Mostlylucid.BotDetection.Events.Listeners;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Telemetry;
+using Mostlylucid.BotDetection.ThreatIntel;
 using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
@@ -573,6 +574,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SignatureDescriptionService>();
         services.AddHostedService(sp => sp.GetRequiredService<SignatureDescriptionService>());
 
+        // CVE fingerprint matching - runs after Heuristic (priority 55) to match traffic against CVE-derived shapes
+        services.TryAddSingleton<ICveFingerprintMatcher, NullCveFingerprintMatcher>();
+        services.AddSingleton<IContributingDetector, CveFingerprintContributor>();
         // Similarity search - runs after Heuristic (priority 60) to leverage feature extraction
         services.AddSingleton<IContributingDetector, SimilarityContributor>();
         // AI/LLM detectors (run when escalation triggered or in demo mode)
