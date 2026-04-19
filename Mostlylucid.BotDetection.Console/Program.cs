@@ -40,8 +40,10 @@ switch (firstArg)
     case "logs":
         return DaemonCommands.Logs();
     case "start":
-        // "start" launches a background process with the same args
         return DaemonCommands.Start(cmdArgs);
+    case "man":
+        ShowManPage();
+        return 0;
 }
 
 // Show help if no args or --help
@@ -61,6 +63,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    stylobot stop                               Stop the running daemon");
     Console.WriteLine("    stylobot status                             Check if daemon is running");
     Console.WriteLine("    stylobot logs                               Show recent log output");
+    Console.WriteLine("    stylobot man                                Full reference manual");
     Console.WriteLine();
     Console.WriteLine("  Options:");
     Console.WriteLine("    --port <port>               Port to listen on (default: 5080)");
@@ -70,7 +73,7 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    --cert <path>               TLS certificate (.pfx or .pem)");
     Console.WriteLine("    --key <path>                TLS private key (required with .pem cert)");
     Console.WriteLine("    --cert-password <pass>      PFX certificate password");
-    Console.WriteLine("    --tunnel [token]            Cloudflare Tunnel (requires cloudflared)");
+    Console.WriteLine("    --tunnel [[token]]            Cloudflare Tunnel (requires cloudflared)");
     Console.WriteLine("    --threshold <0.0-1.0>       Bot probability threshold (default: 0.7)");
     Console.WriteLine("    --llm <provider>            LLM provider (openai, anthropic, gemini, groq,");
     Console.WriteLine("                                mistral, deepseek, ollama, or custom URL)");
@@ -853,6 +856,108 @@ finally
 }
 
 return 0;
+
+static void ShowManPage()
+{
+    var man = """
+    [bold blue]STYLOBOT(1)[/]                    [dim]Self-hosted bot defense[/]                    [bold blue]STYLOBOT(1)[/]
+
+    [bold]NAME[/]
+        stylobot - reverse proxy with 31-detector bot defense. Free forever.
+
+    [bold]SYNOPSIS[/]
+        [bold]stylobot[/] <port> <upstream> [[options]]
+        [bold]stylobot[/] start <port> <upstream> [[options]]
+        [bold]stylobot[/] stop | status | logs | man
+
+    [bold]DESCRIPTION[/]
+        StyloBot proxies HTTP traffic to an upstream server while running real-time
+        bot detection. 31 detectors analyze every request in <1ms. Results display
+        in a live terminal table with color-coded verdicts.
+
+        Detection works fully without any LLM. LLM enrichment (optional) adds bot
+        naming and intent classification asynchronously.
+
+    [bold]COMMANDS[/]
+        [bold]start[/]     Start as a background daemon (writes PID file)
+        [bold]stop[/]      Stop the running daemon (SIGTERM)
+        [bold]status[/]    Check if daemon is running + hit /health
+        [bold]logs[/]      Show recent log output
+        [bold]man[/]       This manual page
+
+    [bold]OPTIONS[/]
+        [bold]--mode[/] <demo|production>       Detection mode (default: demo)
+        [bold]--policy[/] <name>                Action: logonly, block, throttle, challenge
+        [bold]--threshold[/] <0.0-1.0>          Bot probability threshold (default: 0.7)
+        [bold]--cert[/] <path>                  TLS certificate (.pfx or .pem)
+        [bold]--key[/] <path>                   TLS private key (with .pem cert)
+        [bold]--tunnel[/] [[token]]               Cloudflare Tunnel (requires cloudflared)
+        [bold]--llm[/] <provider>               LLM: openai, anthropic, gemini, groq, ollama...
+        [bold]--llm-key[/] <key>                API key (or env STYLOBOT_LLM_KEY)
+        [bold]--model[/] <name>                 Override default model for provider
+        [bold]--config[/] <path>                Custom appsettings.json
+        [bold]--verbose[/]                      Full log output (disables live table)
+
+    [bold]LLM PROVIDERS[/]
+        Any provider, any tier. Bring your own API key.
+
+        [dim]Provider     Model               Cost[/]
+        openai       gpt-4o-mini         ~$0.15/1M tokens
+        anthropic    claude-haiku-4-5     ~$0.25/1M tokens
+        gemini       gemini-2.0-flash     Free tier
+        groq         llama-3.3-70b        Free tier
+        mistral      mistral-small        ~$0.10/1M tokens
+        deepseek     deepseek-chat        ~$0.07/1M tokens
+        ollama       qwen3:0.6b           Free (local)
+        llamasharp   qwen2.5:0.5b         Free (in-process CPU)
+
+    [bold]ENVIRONMENT[/]
+        PORT                 Listen port
+        UPSTREAM             Upstream URL
+        MODE                 Detection mode
+        STYLOBOT_POLICY      Default action policy
+        STYLOBOT_LLM_KEY     LLM API key
+        KNOWN_NETWORKS       Trusted proxy CIDRs (comma-separated)
+        KNOWN_PROXIES        Trusted proxy IPs (comma-separated)
+
+    [bold]CONFIGURATION[/]
+        Config priority (highest first):
+          1. CLI flags
+          2. Environment variables (STYLOBOT_* prefix)
+          3. --config <file>
+          4. appsettings.{mode}.json
+          5. appsettings.json
+
+        Full reference: https://github.com/scottgal/stylobot/blob/main/Mostlylucid.BotDetection/docs/configuration.md
+
+    [bold]EXAMPLES[/]
+        stylobot 5080 http://localhost:3000
+        stylobot 8000 http://api.mysite.com --mode production --policy block
+        stylobot 5080 http://localhost:3000 --tunnel
+        stylobot 5080 http://localhost:3000 --llm groq --llm-key gsk-...
+        stylobot start 443 https://backend:8080 --cert cert.pfx --policy block
+
+    [bold]ENDPOINTS[/]
+        /health          Health check (JSON)
+        /metrics         Prometheus metrics
+        /**              All other paths proxied with detection
+
+    [bold]FILES[/]
+        ~/.config/stylobot/stylobot.pid     Daemon PID file
+        ~/.config/stylobot/stylobot.port    Daemon port file
+        ./appsettings.json                  Default configuration
+        ./logs/                             Log output directory
+
+    [bold]SEE ALSO[/]
+        https://stylobot.net
+        https://github.com/scottgal/stylobot
+
+    [dim]StyloBot Community Edition                Free forever                    v5.6[/]
+    """;
+
+    Spectre.Console.AnsiConsole.Write(new Spectre.Console.Markup(man));
+    Console.WriteLine();
+}
 
 // Calculate client-side bot score based on browser fingerprinting checks
 static double CalculateClientBotScore(bool hasCanvas, bool hasWebGL, bool hasAudioContext, int pluginCount,
