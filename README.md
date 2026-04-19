@@ -98,7 +98,7 @@ app.UseBotDetection();
 | **Session similarity** | Local (in-memory) | pgvector HNSW | pgvector HNSW |
 | **Protected identities** | - | 5 per-user policy overrides | Unlimited |
 | **Endpoint policies** | Unlimited (via YAML) | 5 live overrides | Unlimited |
-| **LLM (optional)** | Local Ollama | Local Ollama | Any (OpenAI, Anthropic, Azure) |
+| **LLM (optional)** | Any (OpenAI, Anthropic, Gemini, Groq, Ollama...) | Any + budget controls | Any + orchestration + live dashboard |
 | **SSO** | Local accounts | OIDC | OIDC/SAML |
 | **Backplane** | - | - | Redis (multi-node coordination) |
 | **Add-ons** | - | Multi-node +$100/mo | Included |

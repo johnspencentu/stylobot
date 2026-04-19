@@ -534,6 +534,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, BehavioralWaveformContributor>();
         // Session vector analysis - Markov chain compression for inter-session anomaly detection
         services.TryAddSingleton<Analysis.SessionStore>();
+        services.TryAddSingleton<SessionEscalationService>();
         services.AddSingleton<IContributingDetector, SessionVectorContributor>();
         // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
         services.TryAddSingleton<Data.ISessionStore, Data.SqliteSessionStore>();
