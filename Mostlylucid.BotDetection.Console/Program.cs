@@ -11,6 +11,7 @@ using Mostlylucid.BotDetection.Console.Transforms;
 using Mostlylucid.BotDetection.Events;
 using Mostlylucid.BotDetection.Extensions;
 using Mostlylucid.BotDetection.Llm.Cloud.Extensions;
+using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Telemetry;
@@ -440,6 +441,13 @@ try
             builder.Services.AddAdvancedBotDetection(
                 llmUrl ?? "http://localhost:11434",
                 llmModel ?? "qwen3:0.6b");
+        }
+        else if (llmProvider.Equals("llamasharp", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddStylobotLlamaSharp(opts =>
+            {
+                if (llmModel != null) opts.ModelPath = llmModel;
+            });
         }
         else
         {

@@ -136,6 +136,31 @@ See [`CHANGELOG.md`](CHANGELOG.md) for full details.
 - **LLM-enhanced (optional)** - enriches decisions with bot names and cluster descriptions. Never makes detection decisions. Works fully without any LLM
 - **Zero PII** - all persistence uses HMAC-SHA256 signatures. No raw IPs or user agents stored
 
+## LLM Providers
+
+Any provider, any tier. Bring your own API key. Detection works fully without LLM - it only enriches bot names and intent classification.
+
+```bash
+stylobot 5080 http://localhost:3000 --llm openai --llm-key sk-...
+stylobot 5080 http://localhost:3000 --llm groq --llm-key gsk-...
+stylobot 5080 http://localhost:3000 --llm gemini --llm-key AIza...
+stylobot 5080 http://localhost:3000 --llm ollama                    # local, free
+```
+
+| Provider | Default model | Cost | Notes |
+|----------|---------------|------|-------|
+| `openai` | gpt-4o-mini | ~$0.15/1M tokens | Best value |
+| `anthropic` | claude-haiku-4-5 | ~$0.25/1M tokens | Best reasoning |
+| `gemini` | gemini-2.0-flash | Free tier | Google |
+| `groq` | llama-3.3-70b | Free tier | Fastest inference |
+| `mistral` | mistral-small | ~$0.10/1M tokens | EU-hosted |
+| `deepseek` | deepseek-chat | ~$0.07/1M tokens | Cheapest |
+| `ollama` | qwen3:0.6b | Free | Local, GPU-accelerated |
+| `llamasharp` | qwen2.5:0.5b | Free | In-process CPU, air-gapped |
+| `azure` | (deployment) | Azure pricing | Enterprise Azure |
+
+Advanced: fallback chains, budget controls, and per-use-case routing via `appsettings.json`. See [docs/llm-providers.md](Mostlylucid.BotDetection/docs/llm-providers.md).
+
 ## Dashboard
 
 Real-time monitoring via SignalR. All data persists to SQLite (FOSS) or PostgreSQL (commercial).
