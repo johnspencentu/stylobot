@@ -475,6 +475,24 @@ public static class SignalKeys
     /// <summary>String (JSON): HMAC hashes of discriminatory headers. Written by SignatureContributor.</summary>
     public const string HeaderHashes = "signature.header_hashes";
 
+    // Periodicity Detection
+    // ==========================================
+
+    /// <summary>Double: Coefficient of variation of inter-request intervals (low = periodic bot).</summary>
+    public const string PeriodicityCV = "periodicity.cv";
+
+    /// <summary>Double: Mean inter-request interval in seconds.</summary>
+    public const string PeriodicityMeanInterval = "periodicity.mean_interval";
+
+    /// <summary>Int: Dominant period lag from autocorrelation analysis.</summary>
+    public const string PeriodicityDominantPeriod = "periodicity.dominant_period";
+
+    /// <summary>Double: Autocorrelation peak strength (0-1, high = strong periodic signal).</summary>
+    public const string PeriodicityPeakStrength = "periodicity.peak_strength";
+
+    /// <summary>Double: Shannon entropy of hour-of-day distribution (low = concentrated/scheduled).</summary>
+    public const string PeriodicityHourEntropy = "periodicity.hour_entropy";
+
     /// <summary>String: Client waveform signature (IP:UA hash)</summary>
     [Obsolete("Use PrimarySignature instead. WaveformSignature will be removed in 7.0.")]
     public const string WaveformSignature = "waveform.signature";

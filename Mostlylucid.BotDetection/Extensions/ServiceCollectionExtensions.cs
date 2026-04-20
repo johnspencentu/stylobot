@@ -545,6 +545,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Analysis.SessionStore>();
         services.TryAddSingleton<SessionEscalationService>();
         services.AddSingleton<IContributingDetector, SessionVectorContributor>();
+        // Periodicity detection - temporal pattern analysis for identity resolution
+        services.AddSingleton<IContributingDetector, PeriodicityContributor>();
         // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
         services.TryAddSingleton<Data.ISessionStore, Data.SqliteSessionStore>();
         services.AddHostedService<Data.SessionPersistenceService>();

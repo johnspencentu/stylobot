@@ -51,7 +51,8 @@ public static class DetectionNarrativeBuilder
         ["ChallengeVerification"] = "proof-of-work verification",
         ["FingerprintApproval"] = "fingerprint approval check",
         ["CveProbe"] = "CVE probe detection",
-        ["PiiQueryString"] = "PII query string detection"
+        ["PiiQueryString"] = "PII query string detection",
+        ["Periodicity"] = "temporal periodicity analysis"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -97,7 +98,8 @@ public static class DetectionNarrativeBuilder
         ["ChallengeVerification"] = "Challenge",
         ["FingerprintApproval"] = "Access Control",
         ["CveProbe"] = "Security",
-        ["PiiQueryString"] = "Privacy"
+        ["PiiQueryString"] = "Privacy",
+        ["Periodicity"] = "Identity"
     };
 
     private static readonly Dictionary<string, string> BotTypeFriendlyNames = new(StringComparer.OrdinalIgnoreCase)
