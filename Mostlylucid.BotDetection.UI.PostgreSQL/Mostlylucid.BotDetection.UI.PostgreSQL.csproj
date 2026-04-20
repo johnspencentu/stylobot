@@ -13,6 +13,7 @@
     <Authors>Mostlylucid</Authors>
     <Description>PostgreSQL storage provider for Stylobot Dashboard with GIN-indexed signature search, TimescaleDB time-series optimizations, and pgvector ML-based similarity search using Dapper</Description>
     <PackageTags>bot-detection;dashboard;postgresql;timescaledb;pgvector;dapper;gin-index;vector-search;ml;storage</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,6 +33,13 @@
     <EmbeddedResource Include="Schema\schema.sql" />
     <EmbeddedResource Include="Schema\comprehensive_schema.sql" />
     <EmbeddedResource Include="Schema\timescaledb_enhancements.sql" />
+  </ItemGroup>
+
+  <!-- Package icon -->
+  <ItemGroup>
+    <None Include=".\icon.png" Pack="true" PackagePath="">
+      <Link>Properties\icon.png</Link>
+    </None>
   </ItemGroup>
 
   <!-- Include documentation -->
