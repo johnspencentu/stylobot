@@ -15,17 +15,42 @@
     static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
     static string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 }
+@{
+    var filter = Model.Filter ?? "all";
+    string FilterUrl(string f) => $"{bp}/partials/recent?filter={f}&sort={Model.SortField}&dir={Model.SortDir}&page=1&pageSize={Model.PageSize}";
+    string FilterClass(string f) => filter == f
+        ? "btn-active font-bold"
+        : "btn-ghost text-base-content/50";
+}
 <div id="recent-activity"
      data-sb-widget="recent"
      data-sb-depends="signature,summary"
+     hx-get="@bp/partials/recent?filter=@filter&sort=@Model.SortField&dir=@Model.SortDir&page=@Model.Page&pageSize=@Model.PageSize"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML"
      class="card bg-base-200 transition-all duration-200">
     <div class="card-body p-3">
         <div class="flex items-center justify-between mb-1">
-            <h3 class="text-sm font-bold text-base-content">Recent Activity</h3>
-            @if (Model.TotalPages > 1)
-            {
-                <span class="text-[10px] text-base-content/40">@Model.Page/@Model.TotalPages</span>
-            }
+            <div class="flex items-center gap-2">
+                <h3 class="text-sm font-bold text-base-content">Recent Activity</h3>
+                <span class="text-[9px] px-1 py-0.5 rounded status-badge-danger font-medium">LIVE</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <div class="join join-horizontal">
+                    <button class="join-item btn btn-xs @FilterClass("all")"
+                            hx-get="@FilterUrl("all")" hx-target="#recent-activity" hx-swap="outerHTML">All</button>
+                    <button class="join-item btn btn-xs @FilterClass("bots")"
+                            hx-get="@FilterUrl("bots")" hx-target="#recent-activity" hx-swap="outerHTML">Bots</button>
+                    <button class="join-item btn btn-xs @FilterClass("humans")"
+                            hx-get="@FilterUrl("humans")" hx-target="#recent-activity" hx-swap="outerHTML">Humans</button>
+                    <button class="join-item btn btn-xs @FilterClass("threats")"
+                            hx-get="@FilterUrl("threats")" hx-target="#recent-activity" hx-swap="outerHTML">Threats</button>
+                </div>
+                @if (Model.TotalPages > 1)
+                {
+                    <span class="text-[10px] text-base-content/40 ml-2">@Model.Page/@Model.TotalPages</span>
+                }
+            </div>
         </div>
 
         @if (Model.Visitors.Count == 0)

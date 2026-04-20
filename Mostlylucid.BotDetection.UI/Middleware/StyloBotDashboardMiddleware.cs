@@ -66,6 +66,7 @@ public class StyloBotDashboardMiddleware
         "api/topbots",
         "api/sessions",
         "api/sessions/recent",
+        "api/threats",
         "api/license",
         "api/config/manifests",
         "api/config/schema"
@@ -204,6 +205,10 @@ public class StyloBotDashboardMiddleware
                 await ServeTopBotsApiAsync(context);
                 break;
 
+            case "api/threats":
+                await ServeThreatsApiAsync(context);
+                break;
+
             case "api/me":
                 await ServeMeApiAsync(context);
                 break;
@@ -330,6 +335,10 @@ public class StyloBotDashboardMiddleware
 
             case "partials/sessions":
                 await ServeSessionsPartialAsync(context);
+                break;
+
+            case "partials/threats":
+                await ServeThreatsPartialAsync(context);
                 break;
 
             case "partials/session-detail":
@@ -482,6 +491,7 @@ public class StyloBotDashboardMiddleware
             UserAgents = BuildUserAgentsModel("all", "requests", "desc", 1, 25, allUserAgents),
             TopBots = BuildTopBotsModel(page: 1, pageSize: 10, sortBy: "default", sortDir: "desc"),
             Sessions = BuildSessionsModel(context),
+            Threats = await BuildThreatsModelAsync(),
             License = BuildLicenseCardModel(context),
             // Only build the editor model when the operator is on the Configuration tab —
             // listing all 30+ embedded manifests on every dashboard render is wasteful.
@@ -1367,6 +1377,7 @@ public class StyloBotDashboardMiddleware
             s.ErrorCount,
             timingEntropy = Math.Round(s.TimingEntropy, 3),
             s.Maturity,
+            live = false,
             // Markov chain for drill-in visualization
             transitionCounts = s.TransitionCountsJson != null
                 ? JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson)
@@ -1379,7 +1390,44 @@ public class StyloBotDashboardMiddleware
                 ? BotDetection.Analysis.VectorRadarProjection.Project(
                     BotDetection.Data.SqliteSessionStore.DeserializeVector(s.Vector)!)
                 : null
-        }).ToList();
+        }).ToList<object>();
+
+        // Include live in-progress session from write-through cache if available.
+        // This ensures there's always a behavioral shape, even before session finalization.
+        var liveSessionStore = context.RequestServices.GetService<BotDetection.Analysis.SessionStore>();
+        if (liveSessionStore != null)
+        {
+            var liveSession = liveSessionStore.GetCurrentSession(decodedSignature);
+            if (liveSession is { Count: >= 2 })
+            {
+                var liveVector = BotDetection.Analysis.SessionVectorizer.Encode(liveSession);
+                var liveRadar = BotDetection.Analysis.VectorRadarProjection.Project(liveVector);
+                var dominantState = liveSession
+                    .GroupBy(r => r.State)
+                    .OrderByDescending(g => g.Count())
+                    .First().Key;
+
+                result.Insert(0, new
+                {
+                    Id = "live",
+                    StartedAt = liveSession[0].Timestamp,
+                    EndedAt = liveSession[^1].Timestamp,
+                    durationMinutes = Math.Round((liveSession[^1].Timestamp - liveSession[0].Timestamp).TotalMinutes, 1),
+                    RequestCount = liveSession.Count,
+                    DominantState = dominantState.ToString(),
+                    IsBot = false,
+                    avgBotProbability = 0.0,
+                    RiskBand = "Unknown",
+                    ErrorCount = 0,
+                    timingEntropy = 0.0,
+                    Maturity = BotDetection.Analysis.SessionVectorizer.ComputeMaturity(liveSession),
+                    live = true,
+                    transitionCounts = (Dictionary<string, int>?)null,
+                    paths = liveSession.Select(r => r.PathTemplate).Distinct().ToList(),
+                    radarAxes = liveRadar
+                });
+            }
+        }
 
         context.Response.ContentType = "application/json";
         await JsonSerializer.SerializeAsync(context.Response.Body, result, CamelCaseJson);
@@ -2211,14 +2259,42 @@ public class StyloBotDashboardMiddleware
     }
 
     /// <summary>Render the endpoints list partial with server-side sort and pagination.</summary>
+    // Static resource extensions to exclude from live endpoint views (like Chrome DevTools filter)
+    private static readonly HashSet<string> StaticExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".css", ".js", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".avif",
+        ".woff", ".woff2", ".ttf", ".eot", ".otf",
+        ".mp4", ".webm", ".mp3", ".ogg",
+        ".pdf", ".zip", ".gz", ".br",
+        ".json", ".xml", ".txt", ".webmanifest"
+    };
+
+    private static bool IsStaticResource(string path)
+    {
+        var ext = Path.GetExtension(path);
+        if (!string.IsNullOrEmpty(ext) && StaticExtensions.Contains(ext)) return true;
+        // Common static prefixes
+        return path.StartsWith("/dist/", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/_content/", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/lib/", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/img/", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task ServeEndpointsPartialAsync(HttpContext context)
     {
         var sortField = context.Request.Query["sort"].FirstOrDefault() ?? "total";
         var sortDir = context.Request.Query["dir"].FirstOrDefault() ?? "desc";
         var page = int.TryParse(context.Request.Query["page"].FirstOrDefault(), out var p) && p > 0 ? p : 1;
         var pageSize = int.TryParse(context.Request.Query["pageSize"].FirstOrDefault(), out var ps) && ps is > 0 and <= 100 ? ps : 20;
+        var excludeStatic = context.Request.Query["excludeStatic"].FirstOrDefault() == "true";
 
-        var model = BuildEndpointsModel(sortField, sortDir, page, pageSize, await GetEndpointsDataAsync(context));
+        var endpoints = await GetEndpointsDataAsync(context);
+
+        if (excludeStatic)
+            endpoints = endpoints.Where(e => !IsStaticResource(e.Path)).ToList();
+
+        var model = BuildEndpointsModel(sortField, sortDir, page, pageSize, endpoints);
 
         context.Response.ContentType = "text/html";
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -2250,6 +2326,42 @@ public class StyloBotDashboardMiddleware
         var html = await _razorViewRenderer.RenderViewToStringAsync(
             "/Views/StyloBot/Dashboard/_TopBotsList.cshtml", model, context);
         await context.Response.WriteAsync(html);
+    }
+
+    private async Task ServeThreatsApiAsync(HttpContext context)
+    {
+        var countStr = context.Request.Query["count"].FirstOrDefault();
+        var count = int.TryParse(countStr, out var c) ? Math.Clamp(c, 1, 50) : 20;
+
+        var threats = await _eventStore.GetThreatsAsync(count);
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, threats, CamelCaseJson);
+    }
+
+    private async Task ServeThreatsPartialAsync(HttpContext context)
+    {
+        var threats = await _eventStore.GetThreatsAsync(20);
+        var model = new ThreatsListModel { Threats = threats, TotalCount = threats.Count };
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/StyloBot/Dashboard/_ThreatsList.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
+    private async Task<ThreatsListModel> BuildThreatsModelAsync()
+    {
+        List<ThreatEntry> threats;
+        try { threats = await _eventStore.GetThreatsAsync(20); }
+        catch { threats = []; }
+
+        return new ThreatsListModel
+        {
+            Threats = threats,
+            TotalCount = threats.Count,
+            ActiveHoneypotSessions = threats.Count(t => t.InHoneypot)
+        };
     }
 
     /// <summary>Render the recent activity partial with server-side sort and pagination.</summary>
@@ -2456,19 +2568,39 @@ public class StyloBotDashboardMiddleware
     private async Task ServeRecentActivityPartialAsync(HttpContext context)
     {
         var visitorCache = context.RequestServices.GetRequiredService<VisitorListCache>();
+        var filter = context.Request.Query["filter"].FirstOrDefault() ?? "all";
         var sortField = context.Request.Query["sort"].FirstOrDefault() ?? "lastSeen";
         var sortDir = context.Request.Query["dir"].FirstOrDefault() ?? "desc";
         var page = int.TryParse(context.Request.Query["page"].FirstOrDefault(), out var p) && p > 0 ? p : 1;
         var pageSize = int.TryParse(context.Request.Query["pageSize"].FirstOrDefault(), out var ps) && ps is > 0 and <= 50 ? ps : 10;
 
-        var (items, totalCount, _, _) = visitorCache.GetFiltered("all", sortField, sortDir, page, pageSize);
+        // Map recent activity filters to visitor cache filter categories
+        var cacheFilter = filter switch
+        {
+            "bots" => "bot",
+            "humans" => "human",
+            "threats" => "bot", // threats = bots with high threat scores, filtered below
+            _ => "all"
+        };
+
+        var (items, totalCount, _, _) = visitorCache.GetFiltered(cacheFilter, sortField, sortDir, page, pageSize);
+
+        // For "threats" filter, further narrow to high threat scores
+        if (filter == "threats")
+        {
+            items = items.Where(v =>
+                (!string.IsNullOrEmpty(v.ThreatBand) && v.ThreatBand is not ("None" or "Low"))
+                || v.BotProbability > 0.8).ToList();
+            totalCount = items.Count;
+        }
+
         var counts = visitorCache.GetCounts();
 
         var model = new VisitorListModel
         {
             Visitors = items,
             Counts = counts,
-            Filter = "all",
+            Filter = filter,
             SortField = sortField,
             SortDir = sortDir,
             Page = page,
