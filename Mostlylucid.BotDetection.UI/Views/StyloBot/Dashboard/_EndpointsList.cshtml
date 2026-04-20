@@ -37,12 +37,14 @@
                             <th class="py-1 text-right @ThClass("latency") cursor-pointer hidden md:table-cell" hx-get="@SortUrl("latency")" hx-target="#endpoints-list" hx-swap="outerHTML transition:true">Ms@(Html.Raw(SortIcon("latency")))</th>
                             <th class="py-1 text-right @ThClass("threat") cursor-pointer hidden md:table-cell" hx-get="@SortUrl("threat")" hx-target="#endpoints-list" hx-swap="outerHTML transition:true">Threat@(Html.Raw(SortIcon("threat")))</th>
                             <th class="py-1 hidden lg:table-cell text-base-content/40">Policy</th>
+                            <th class="py-1 text-xs" style="min-width:80px">Split</th>
                         </tr>
                         </thead>
                         <tbody>
                         @foreach (var endpoint in Model.Endpoints)
                         {
                             var botClass = endpoint.BotRate > 0.5 ? "text-error" : endpoint.BotRate > 0.2 ? "text-warning" : "text-success";
+                            var humanPct = endpoint.TotalCount > 0 ? Math.Round((1.0 - endpoint.BotRate) * 100, 0) : 100;
                             <tr class="hover:bg-base-200/50 transition-colors cursor-pointer"
                                 hx-get="@bp/partials/endpoint-detail?method=@Uri.EscapeDataString(endpoint.Method)&path=@Uri.EscapeDataString(endpoint.Path)"
                                 hx-target="#endpoint-detail-panel"
@@ -59,6 +61,12 @@
                                     {
                                         <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-base-300 text-base-content/60 font-medium">@endpoint.ActivePolicyName</span>
                                     }
+                                </td>
+                                <td class="py-1">
+                                    <div class="flex h-2 rounded-full overflow-hidden bg-base-300" style="min-width:60px">
+                                        <div class="bg-success" style="width:@(humanPct)%"></div>
+                                        <div class="bg-error" style="width:@(100 - humanPct)%"></div>
+                                    </div>
                                 </td>
                             </tr>
                         }
