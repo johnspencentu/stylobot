@@ -48,7 +48,7 @@ public class ClusterContributor : ConfiguredContributorBase
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
-        new SignalExistsTrigger(SignalKeys.WaveformSignature)
+        new SignalExistsTrigger(SignalKeys.PrimarySignature)
     ];
 
     // Config-driven parameters (no magic numbers)
@@ -68,7 +68,7 @@ public class ClusterContributor : ConfiguredContributorBase
         try
         {
             // 1. Check cluster membership
-            var signature = state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
             var inCluster = false;
 
             if (!string.IsNullOrEmpty(signature))

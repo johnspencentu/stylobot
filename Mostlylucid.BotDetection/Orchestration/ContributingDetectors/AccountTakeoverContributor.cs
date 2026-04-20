@@ -64,7 +64,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     // have had a chance to accumulate before ATO scoring runs.
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
-        Triggers.WhenSignalExists(SignalKeys.WaveformSignature)
+        Triggers.WhenSignalExists(SignalKeys.PrimarySignature)
     ];
 
     // Config-driven parameters
@@ -100,7 +100,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     {
         try
         {
-            var signature = state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
             if (string.IsNullOrEmpty(signature))
                 return EmptyResult;
 

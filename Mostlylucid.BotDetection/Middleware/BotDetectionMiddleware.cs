@@ -278,17 +278,8 @@ public class BotDetectionMiddleware(
         // Compute multi-vector signatures for dashboard and bot identity tracking
         ComputeAndStoreSignature(context);
 
-        // Bridge signature spaces: map multi-factor ID ↔ waveform signature
-        // so dashboard lookups (by multi-factor ID) can find sessions (keyed by waveform signature)
-        var signatureMapper = context.RequestServices.GetService<Dashboard.SignatureMapper>();
-        if (signatureMapper != null)
-        {
-            var waveformSig = aggregatedResult.Signals?.TryGetValue(
-                Models.SignalKeys.WaveformSignature, out var wfObj) == true ? wfObj as string : null;
-            var multiFactorSigs = context.Items["BotDetection.Signatures"] as Dashboard.MultiFactorSignatures;
-            if (waveformSig != null && multiFactorSigs?.PrimarySignature != null)
-                signatureMapper.Map(multiFactorSigs.PrimarySignature, waveformSig);
-        }
+        // Signatures are unified — PrimarySignature is used by both dashboard and session store.
+        // No mapping needed (SignatureMapper was removed as part of signature unification).
 
         // Record OTel telemetry (spans, metrics, score journey) if instrumentation is registered
         telemetryInstrumentation?.Record(

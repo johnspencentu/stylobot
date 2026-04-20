@@ -179,14 +179,14 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                     dominant_state, is_bot, avg_bot_probability, avg_confidence, risk_band,
                     action, bot_name, bot_type, country_code, top_reasons_json,
                     transition_counts_json, paths_json, avg_processing_time_ms,
-                    error_count, timing_entropy, narrative, dashboard_signature_id,
+                    error_count, timing_entropy, narrative,
                     header_hashes_json
                 ) VALUES (
                     @sig, @started, @ended, @reqCount, @vector, @maturity,
                     @domState, @isBot, @avgProb, @avgConf, @risk,
                     @action, @botName, @botType, @country, @reasons,
                     @transitions, @paths, @avgTime,
-                    @errors, @entropy, @narrative, @dashSig,
+                    @errors, @entropy, @narrative,
                     @headerHashes
                 )
             """;
@@ -212,7 +212,6 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             cmd.Parameters.AddWithValue("@errors", session.ErrorCount);
             cmd.Parameters.AddWithValue("@entropy", session.TimingEntropy);
             cmd.Parameters.AddWithValue("@narrative", (object?)session.Narrative ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@dashSig", (object?)session.DashboardSignatureId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@headerHashes", (object?)session.HeaderHashesJson ?? DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync(ct);
@@ -321,7 +320,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         await conn.OpenAsync(ct);
         await using var cmd = conn.CreateCommand();
         // Query by either waveform signature OR dashboard multi-factor signature ID
-        cmd.CommandText = "SELECT * FROM sessions WHERE signature = @sig OR dashboard_signature_id = @sig ORDER BY ended_at DESC LIMIT @limit";
+        cmd.CommandText = "SELECT * FROM sessions WHERE signature = @sig ORDER BY ended_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@sig", signature);
         cmd.Parameters.AddWithValue("@limit", limit);
         return await ReadSessionsAsync(cmd, ct);

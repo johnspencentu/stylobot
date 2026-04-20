@@ -73,7 +73,7 @@ public class GeoChangeContributor : ConfiguredContributorBase
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
 
             // Use waveform signature as the stable visitor identity for drift tracking
-            var signature = state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
 
             // Always feed country reputation tracker
             var countryName = state.GetSignal<string>("geo.country_name") ?? countryCode;

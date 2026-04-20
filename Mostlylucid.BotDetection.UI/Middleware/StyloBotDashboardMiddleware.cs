@@ -1399,12 +1399,8 @@ public class StyloBotDashboardMiddleware
         var decodedSignature = Uri.UnescapeDataString(signature);
         var limit = int.TryParse(context.Request.Query["limit"], out var l) ? Math.Min(l, 50) : 20;
 
-        // The dashboard uses multi-factor signature IDs, but the session store uses
-        // waveform signatures (IP:HASH(UA)). Use the SignatureMapper to bridge them.
-        var signatureMapper = context.RequestServices.GetService<BotDetection.Dashboard.SignatureMapper>();
-        var lookupKey = signatureMapper?.GetWaveformSignature(decodedSignature) ?? decodedSignature;
-
-        var sessions = await sessionStore.GetSessionsAsync(lookupKey, limit);
+        // Unified signature: PrimarySignature is used by both dashboard and session store
+        var sessions = await sessionStore.GetSessionsAsync(decodedSignature, limit);
 
         // Compute inter-session velocity (behavioral drift between consecutive sessions)
         var sessionVectors = sessions
@@ -1452,7 +1448,7 @@ public class StyloBotDashboardMiddleware
         var liveSessionStore = context.RequestServices.GetService<BotDetection.Analysis.SessionStore>();
         if (liveSessionStore != null)
         {
-            var liveSession = liveSessionStore.GetCurrentSession(lookupKey);
+            var liveSession = liveSessionStore.GetCurrentSession(decodedSignature);
             if (liveSession is { Count: >= 2 })
             {
                 var liveVector = BotDetection.Analysis.SessionVectorizer.Encode(liveSession);
@@ -2534,10 +2530,7 @@ public class StyloBotDashboardMiddleware
         var decodedSig = Uri.UnescapeDataString(signature);
 
         // Bridge signature key spaces (multi-factor → waveform)
-        var sigMapper = context.RequestServices.GetService<BotDetection.Dashboard.SignatureMapper>();
-        var lookupSig = sigMapper?.GetWaveformSignature(decodedSig) ?? decodedSig;
-
-        var sessions = await sessionStore.GetSessionsAsync(lookupSig, 20);
+        var sessions = await sessionStore.GetSessionsAsync(decodedSig, 20);
 
         context.Response.ContentType = "text/html";
 

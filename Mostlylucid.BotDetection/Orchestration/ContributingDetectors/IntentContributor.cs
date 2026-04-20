@@ -135,7 +135,7 @@ public class IntentContributor : ConfiguredContributorBase
                     var enqueued = _intentCoordinator.TryEnqueue(new IntentClassificationRequest
                     {
                         RequestId = state.RequestId,
-                        PrimarySignature = state.GetSignal<string>(SignalKeys.WaveformSignature) ?? state.RequestId,
+                        PrimarySignature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature) ?? state.RequestId,
                         IntentVector = vector,
                         IntentFeatures = new Dictionary<string, float>(features, StringComparer.OrdinalIgnoreCase),
                         Signals = new Dictionary<string, object>(state.Signals, StringComparer.OrdinalIgnoreCase),
