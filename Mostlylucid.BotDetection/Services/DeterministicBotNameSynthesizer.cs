@@ -37,29 +37,49 @@ public sealed class DeterministicBotNameSynthesizer : IBotNameSynthesizer
         var botType = GetString(signals, "ua.bot_type");
         var intent = GetString(signals, "intent.category");
         var threatBand = GetString(signals, "intent.threat_band");
+        var signature = GetString(signals, "signature.primary");
+        var country = GetString(signals, "geo.country_code");
 
-        // If we have a known bot name from UA parsing, use it
+        // Known bot name from UA parsing -- highest confidence signal
         if (!string.IsNullOrEmpty(botName) && botName != "unknown")
-            return botName;
+            return Unique(botName, signature, country);
 
-        // Build a descriptive name from signals
+        // Build from highest-signal evidence
         var behavior = GetBehaviorAdjective(signals);
         var tool = GetToolNoun(family, botType, intent);
 
         if (!string.IsNullOrEmpty(behavior) && !string.IsNullOrEmpty(tool))
-            return $"{behavior} {tool}";
+            return Unique($"{behavior} {tool}", signature, country);
 
         if (!string.IsNullOrEmpty(tool))
-            return tool;
+            return Unique(tool, signature, country);
 
-        // Last resort: use threat band + type
         if (!string.IsNullOrEmpty(threatBand) && threatBand != "None")
-            return $"{threatBand}-Threat {botType ?? "Visitor"}";
+            return Unique($"{threatBand}-threat {botType ?? "client"}", signature, country);
 
         if (!string.IsNullOrEmpty(botType))
-            return botType;
+            return Unique(botType, signature, country);
 
-        return "Unclassified Visitor";
+        // Temporary label from whatever we have -- the LLM will replace this
+        // with a proper centroid-derived name once it processes the signature
+        if (!string.IsNullOrEmpty(family))
+            return Unique(family, signature, country);
+
+        return Unique("analysing", signature, country);
+    }
+
+    /// <summary>
+    ///     Make every name unique using signature hash + geography.
+    ///     "curl" becomes "curl (DE:a8f2)" -- unique, recognizable, geographically contextual.
+    ///     The LLM will later replace this with a centroid-derived descriptive name.
+    /// </summary>
+    private static string Unique(string baseName, string? signature, string? country)
+    {
+        var parts = new List<string>(2);
+        if (!string.IsNullOrEmpty(country)) parts.Add(country);
+        if (!string.IsNullOrEmpty(signature) && signature.Length >= 4) parts.Add(signature[..4]);
+
+        return parts.Count > 0 ? $"{baseName} ({string.Join(":", parts)})" : baseName;
     }
 
     private static string GetBehaviorAdjective(IReadOnlyDictionary<string, object?> signals)
