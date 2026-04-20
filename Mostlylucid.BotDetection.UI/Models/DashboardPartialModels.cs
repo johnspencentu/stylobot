@@ -349,6 +349,13 @@ public sealed class ConfigurationEditorModel
     ///     upsell rail. Read off the LicenseCardModel that's already on the shell.
     /// </summary>
     public required bool IsCommercialLicensed { get; init; }
+
+    /// <summary>
+    ///     When true, config editing (save/delete) is disabled in the UI.
+    ///     Requires EnableConfigEditing + WriteAuthorizationFilter/Policy to be false.
+    ///     Default: true (read-only).
+    /// </summary>
+    public bool ReadOnly { get; init; } = true;
 }
 
 /// <summary>

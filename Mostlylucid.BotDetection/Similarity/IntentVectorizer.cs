@@ -3,7 +3,7 @@ using System.Numerics.Tensors;
 namespace Mostlylucid.BotDetection.Similarity;
 
 /// <summary>
-///     Converts session activity signals into a 32-dimensional intent vector
+///     Converts session activity signals into a 36-dimensional intent vector
 ///     capturing WHAT the session is doing (not who it is).
 ///     Used by IntentContributor to query the intent HNSW index for known
 ///     threat patterns. Orthogonal to the identity-based FeatureVectorizer.
@@ -14,12 +14,12 @@ public sealed class IntentVectorizer
     ///     Current schema version. Increment when the schema changes
     ///     to invalidate saved intent vectors that are no longer compatible.
     /// </summary>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>
     ///     Fixed vector dimension for intent HNSW index.
     /// </summary>
-    public const int VectorDimension = 32;
+    public const int VectorDimension = 36;
 
     /// <summary>
     ///     Ordered feature names that define the intent vector schema.
@@ -77,8 +77,14 @@ public sealed class IntentVectorizer
         "response:honeypot_hits",   // 29 - normalized honeypot hit count
         "response:error_harvesting", // 30 - error harvesting flag (0 or 1)
 
+        // Stream-abuse features (4 features) - protocol misuse patterns
+        "stream:handshake_storm",        // 31 - repeated reconnect/handshake storms
+        "stream:cross_endpoint_mixing",  // 32 - mixed stream endpoint access
+        "stream:reconnect_rate",         // 33 - normalized reconnect frequency
+        "stream:concurrent_streams",     // 34 - normalized concurrent stream breadth
+
         // Reserved (1 feature)
-        "reserved:0"              // 31 - reserved for future expansion
+        "reserved:0"              // 35 - reserved for future expansion
     };
 
     /// <summary>
@@ -94,11 +100,11 @@ public sealed class IntentVectorizer
     }
 
     /// <summary>
-    ///     Convert an intent feature dictionary to a fixed-length float vector.
-    ///     Missing features default to 0.0f. The vector is L2-normalized.
-    /// </summary>
+     ///     Convert an intent feature dictionary to a fixed-length float vector.
+     ///     Missing features default to 0.0f. The vector is L2-normalized.
+     /// </summary>
     /// <param name="features">Intent feature dictionary built from blackboard signals</param>
-    /// <returns>Fixed-length normalized float vector (32 dimensions)</returns>
+    /// <returns>Fixed-length normalized float vector (36 dimensions)</returns>
     public float[] Vectorize(Dictionary<string, float> features)
     {
         var vector = new float[VectorDimension];

@@ -82,6 +82,13 @@ public sealed record PersistedSession
 
     /// <summary>Narrative summary</summary>
     public string? Narrative { get; init; }
+
+    /// <summary>
+    ///     Multi-factor signature ID used by the dashboard for lookups.
+    ///     Different from Signature (waveform key = IP:HASH(UA)) — this is HMAC(IP+UA).
+    ///     Null for sessions persisted before this field was added.
+    /// </summary>
+    public string? DashboardSignatureId { get; init; }
 }
 
 /// <summary>

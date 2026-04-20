@@ -12,11 +12,20 @@
     var probPct = (Model.BotProbability * 100).ToString("F0");
     var confPct = (Model.Confidence * 100).ToString("F0");
     var actionClass = Model.Action switch {
-        "Block" => "bg-error/20 text-error",
-        "Throttle" => "bg-warning/20 text-warning",
-        "Challenge" => "bg-info/20 text-info",
+        "Block" or "block" or "block-hard" => "bg-error/20 text-error",
+        "Throttle" or "throttle" or "throttle-stealth" => "bg-warning/20 text-warning",
+        "Challenge" or "challenge" => "bg-info/20 text-info",
         "TarPit" => "bg-error/20 text-error",
+        "simulation-pack" => "bg-error/20 text-error",
         _ => ""
+    };
+    var friendlyAction = Model.Action switch {
+        "throttle-stealth" => "Silent Throttle",
+        "block-hard" => "Hard Block",
+        "logonly" => "Monitor Only",
+        "redirect-honeypot" => "Honeypot",
+        "simulation-pack" => "Honeypot",
+        _ => Model.Action
     };
     var threatClass = Model.ThreatBand switch {
         "Critical" or "High" => "bg-error/20 text-error",
@@ -31,14 +40,16 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
                 <span class="text-sm font-bold truncate max-w-[180px]">@displayName</span>
-                @if (Model.IsBot)
-                {
-                    <span class="badge badge-sm badge-error">Bot</span>
+                @{
+                    var (vBadge, vBadgeClass) = Model.BotProbability switch
+                    {
+                        >= 0.8 => ("Bot", "badge-error"),
+                        >= 0.5 => ("Suspicious", "badge-warning"),
+                        >= 0.3 => ("Uncertain", "badge-info"),
+                        _ => ("Human", "badge-success")
+                    };
                 }
-                else
-                {
-                    <span class="badge badge-sm badge-success">Human</span>
-                }
+                <span class="badge badge-sm @vBadgeClass">@vBadge</span>
             </div>
             <span class="text-xs text-base-content/40">@Model.TimeAgo</span>
         </div>
@@ -52,7 +63,7 @@
             }
             @if (!string.IsNullOrEmpty(Model.Action) && Model.Action != "Allow")
             {
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold @actionClass">@Model.Action</span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold @actionClass">@friendlyAction</span>
             }
             @if (!string.IsNullOrEmpty(Model.BotType))
             {

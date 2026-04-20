@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,7 +9,8 @@ namespace Mostlylucid.BotDetection.Llm.Ollama;
 
 /// <summary>
 ///     ILlmProvider backed by an external Ollama HTTP server.
-///     Uses raw HTTP (no OllamaSharp) for reliable think:false support.
+///     Uses raw HTTP (no OllamaSharp) for reliable think support.
+///     Thinking mode is configurable per-options and per-request.
 /// </summary>
 public class OllamaLlmProvider : ILlmProvider
 {
@@ -36,7 +36,16 @@ public class OllamaLlmProvider : ILlmProvider
 
     public async Task<string> CompleteAsync(LlmRequest request, CancellationToken ct = default)
     {
-        if (!IsReady) return string.Empty;
+        var response = await CompleteWithThinkingAsync(request, ct);
+        return response.Content;
+    }
+
+    public async Task<LlmResponse> CompleteWithThinkingAsync(LlmRequest request, CancellationToken ct = default)
+    {
+        if (!IsReady) return new LlmResponse { Content = string.Empty };
+
+        // Thinking is enabled if the request asks for it OR if options default it on
+        var enableThinking = request.EnableThinking || _options.EnableThinking;
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(request.TimeoutMs);
@@ -46,7 +55,7 @@ public class OllamaLlmProvider : ILlmProvider
             Model = _options.Model,
             Messages = [new() { Role = "user", Content = request.Prompt }],
             Stream = false,
-            Think = false,
+            Think = enableThinking,
             Options = new() { NumThread = _options.NumThreads, Temperature = request.Temperature }
         };
 
@@ -66,30 +75,38 @@ public class OllamaLlmProvider : ILlmProvider
                     _logger.LogError("Ollama model '{Model}' not found. Run: ollama pull {Model}", _options.Model, _options.Model);
                 else
                     _logger.LogWarning("[ollama] {Status}: {Error}", resp.StatusCode, err.Length > 300 ? err[..300] : err);
-                return string.Empty;
+                return new LlmResponse { Content = string.Empty };
             }
 
             var respJson = await resp.Content.ReadAsStringAsync(cts.Token);
             var payload = JsonSerializer.Deserialize<OllamaChatResponse>(respJson, JsonOpts);
             var content = payload?.Message?.Content?.Trim() ?? string.Empty;
+            var thinking = payload?.Message?.Thinking?.Trim();
 
             if (string.IsNullOrWhiteSpace(content))
             {
                 _logger.LogWarning("Ollama returned empty response for model '{Model}'", _options.Model);
-                return string.Empty;
+                return new LlmResponse { Content = string.Empty };
             }
 
-            return content;
+            if (!string.IsNullOrWhiteSpace(thinking))
+                _logger.LogDebug("Ollama thinking ({Model}): {ThinkingLength} chars", _options.Model, thinking.Length);
+
+            return new LlmResponse
+            {
+                Content = content,
+                Thinking = string.IsNullOrWhiteSpace(thinking) ? null : thinking
+            };
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Ollama request timed out after {Timeout}ms", request.TimeoutMs);
-            return string.Empty;
+            return new LlmResponse { Content = string.Empty };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ollama completion failed");
-            return string.Empty;
+            return new LlmResponse { Content = string.Empty };
         }
     }
 
@@ -113,6 +130,9 @@ public class OllamaLlmProvider : ILlmProvider
     {
         public required string Role { get; init; }
         public required string Content { get; init; }
+
+        /// <summary>Thinking/chain-of-thought content returned when think:true.</summary>
+        public string? Thinking { get; init; }
     }
 
     internal sealed record OllamaRequestOptions

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mostlylucid.BotDetection.Llm.Extensions;
+using Mostlylucid.BotDetection.Models;
 
 namespace Mostlylucid.BotDetection.Llm.Ollama.Extensions;
 
@@ -14,8 +15,8 @@ public static class OllamaServiceExtensions
     /// </summary>
     public static IServiceCollection AddStylobotOllama(
         this IServiceCollection services,
-        string endpoint = "http://localhost:11434",
-        string model = "qwen3:0.6b",
+        string endpoint = LlmDefaults.DefaultEndpoint,
+        string model = LlmDefaults.DefaultModel,
         Action<OllamaProviderOptions>? configure = null)
     {
         services.AddOptions<OllamaProviderOptions>()

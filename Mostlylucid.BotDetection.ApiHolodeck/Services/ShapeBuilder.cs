@@ -475,9 +475,9 @@ public class ShapeBuilderOptions
 
     /// <summary>
     ///     LLM model name for shape analysis.
-    ///     Default: qwen3:0.6b
+    ///     Uses LlmDefaults.DefaultModel by default.
     /// </summary>
-    public string LlmModel { get; set; } = "qwen3:0.6b";
+    public string LlmModel { get; set; } = Mostlylucid.BotDetection.Models.LlmDefaults.DefaultModel;
 
     /// <summary>
     ///     Confidence threshold below which to use LLM analysis.

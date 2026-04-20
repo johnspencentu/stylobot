@@ -1,3 +1,5 @@
+using Mostlylucid.BotDetection.Models;
+
 namespace Mostlylucid.BotDetection.Llm.Cloud;
 
 /// <summary>
@@ -36,7 +38,7 @@ public static class ProviderPresets
 
         // Ollama via OpenAI-compatible API (for remote Ollama instances)
         // Local ollama uses the dedicated OllamaLlmProvider (AddStylobotOllama) via CLI --llm ollama
-        ["ollama"] = new("http://localhost:11434", "qwen3:0.6b", AuthStyle.None,
+        ["ollama"] = new(LlmDefaults.DefaultEndpoint, LlmDefaults.DefaultModel, AuthStyle.None,
             "Ollama - local or remote, free, GPU-accelerated. OpenAI-compatible API"),
     };
 
@@ -44,7 +46,7 @@ public static class ProviderPresets
     public static (string BaseUrl, string Model, AuthStyle Auth) Resolve(CloudLlmOptions options)
     {
         if (!All.TryGetValue(options.Provider, out var preset))
-            preset = new(options.BaseUrl ?? "http://localhost:11434", options.Model ?? "qwen3:0.6b", AuthStyle.Bearer, "Custom");
+            preset = new(options.BaseUrl ?? LlmDefaults.DefaultEndpoint, options.Model ?? LlmDefaults.DefaultModel, AuthStyle.Bearer, "Custom");
 
         return (
             options.BaseUrl ?? preset.BaseUrl,

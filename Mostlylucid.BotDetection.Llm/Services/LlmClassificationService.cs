@@ -8,7 +8,7 @@ namespace Mostlylucid.BotDetection.Llm.Services;
 
 /// <summary>
 ///     Uses ILlmProvider + prompt builder + parser for bot/human classification.
-///     Replaces the old LlmDetector's AnalyzeWithLlm + DetectFromSnapshotAsync.
+///     Supports thinking-aware models (gemma4, qwen3, etc.) when configured.
 /// </summary>
 public class LlmClassificationService
 {
@@ -39,29 +39,44 @@ public class LlmClassificationService
             return result;
         }
 
+        var enableThinking = _options.AiDetection.Ollama.EnableThinking;
+
         try
         {
             var prompt = ClassificationPromptBuilder.Build(
                 preBuiltRequestInfo,
                 _options.AiDetection.Ollama.CustomPrompt);
 
-            var response = await _provider.CompleteAsync(new LlmRequest
+            var request = new LlmRequest
             {
                 Prompt = prompt,
-                Temperature = 0.1f,
-                MaxTokens = 150,
-                TimeoutMs = _options.AiDetection.TimeoutMs
-            }, ct);
+                Temperature = LlmDefaults.DefaultTemperature,
+                MaxTokens = enableThinking ? LlmDefaults.ThinkingMaxTokens : LlmDefaults.DefaultMaxTokens,
+                TimeoutMs = _options.AiDetection.TimeoutMs,
+                EnableThinking = enableThinking
+            };
 
-            if (string.IsNullOrWhiteSpace(response))
+            var response = await _provider.CompleteWithThinkingAsync(request, ct);
+
+            if (string.IsNullOrWhiteSpace(response.Content))
             {
                 _logger.LogWarning("LLM returned empty response for classification");
                 return result;
             }
 
-            var analysis = LlmResponseParser.ParseClassification(response);
+            if (!string.IsNullOrWhiteSpace(response.Thinking))
+                _logger.LogDebug("LLM thinking: {Thinking}", response.Thinking.Length > 200
+                    ? response.Thinking[..200] + "..."
+                    : response.Thinking);
+
+            var analysis = LlmResponseParser.ParseClassification(response.Content);
             if (analysis == null || analysis.Reasoning == "Analysis failed")
                 return result;
+
+            // Enrich reasoning with thinking summary if available
+            var reasoning = analysis.Reasoning;
+            if (!string.IsNullOrWhiteSpace(response.Thinking))
+                reasoning = $"{reasoning} [thinking: {TruncateThinking(response.Thinking)}]";
 
             if (analysis.IsBot)
             {
@@ -69,7 +84,7 @@ public class LlmClassificationService
                 result.Reasons.Add(new DetectionReason
                 {
                     Category = "LLM Analysis",
-                    Detail = analysis.Reasoning,
+                    Detail = reasoning,
                     ConfidenceImpact = analysis.Confidence
                 });
                 result.BotType = analysis.BotType;
@@ -80,7 +95,7 @@ public class LlmClassificationService
                 result.Reasons.Add(new DetectionReason
                 {
                     Category = "LLM Analysis",
-                    Detail = $"LLM classified as human: {analysis.Reasoning}",
+                    Detail = $"LLM classified as human: {reasoning}",
                     ConfidenceImpact = -analysis.Confidence
                 });
             }
@@ -95,5 +110,11 @@ public class LlmClassificationService
         }
 
         return result;
+    }
+
+    private static string TruncateThinking(string thinking)
+    {
+        const int maxLen = 100;
+        return thinking.Length <= maxLen ? thinking : thinking[..maxLen] + "...";
     }
 }

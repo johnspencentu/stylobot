@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
@@ -61,6 +62,9 @@ public static class HeuristicFeatureExtractor
 
         // === Signal Presence (named by actual signal type) ===
         ExtractSignalPresence(evidence, features);
+
+        // === High-signal structured values (preserve magnitudes, not just presence) ===
+        ExtractStructuredSignalValues(evidence, features);
 
         // === AI/LLM Results (extract actual values, not just presence) ===
         ExtractAiResults(evidence, features);
@@ -320,6 +324,50 @@ public static class HeuristicFeatureExtractor
     }
 
     /// <summary>
+    ///     Extracts high-signal structured values so the late heuristic can use actual magnitudes
+    ///     from newer detectors instead of only seeing that the signal key happened to exist.
+    /// </summary>
+    private static void ExtractStructuredSignalValues(AggregatedEvidence evidence, Dictionary<string, float> features)
+    {
+        var signals = evidence.Signals;
+
+        AddBooleanSignalFeature(signals, features, SignalKeys.HeadersSuspicious, "sigv:headers_suspicious");
+        AddBooleanSignalFeature(signals, features, SignalKeys.GeoChangeDriftDetected, "sigv:geo_change_drift");
+        AddBooleanSignalFeature(signals, features, SignalKeys.StreamHandshakeStorm, "sigv:stream_handshake_storm");
+        AddBooleanSignalFeature(signals, features, SignalKeys.StreamCrossEndpointMixing, "sigv:stream_cross_endpoint_mixing");
+        AddBooleanSignalFeature(signals, features, SignalKeys.SimilarityKnownBot, "sigv:similarity_known_bot");
+        AddBooleanSignalFeature(signals, features, SignalKeys.AtoDetected, "sigv:ato_detected");
+
+        AddNumericSignalFeature(signals, features, SignalKeys.SimilarityTopScore, "sigv:similarity_top_score");
+        AddNumericSignalFeature(signals, features, SignalKeys.CveTopSimilarity, "sigv:cve_top_similarity");
+        AddNumericSignalFeature(signals, features, SignalKeys.SessionSelfSimilarity, "sigv:session_self_similarity");
+        AddNumericSignalFeature(signals, features, SignalKeys.SessionVelocityMagnitude, "sigv:session_velocity_magnitude");
+        AddNumericSignalFeature(signals, features, SignalKeys.SessionVectorMaturity, "sigv:session_vector_maturity");
+        AddNumericSignalFeature(signals, features, SignalKeys.IntentThreatScore, "sigv:intent_threat_score");
+        AddNumericSignalFeature(signals, features, SignalKeys.GeoCountryBotRate, "sigv:geo_country_bot_rate");
+        AddNumericSignalFeature(signals, features, SignalKeys.ClusterAvgSimilarity, "sigv:cluster_avg_similarity");
+        AddNumericSignalFeature(signals, features, SignalKeys.ResponseHistoricalScore, "sigv:response_historical_score");
+        AddNumericSignalFeature(signals, features, SignalKeys.WaveformTimingRegularity, "sigv:waveform_timing_regularity");
+        AddNumericSignalFeature(signals, features, SignalKeys.WaveformPathDiversity, "sigv:waveform_path_diversity");
+        AddNumericSignalFeature(signals, features, SignalKeys.AtoDriftScore, "sigv:ato_drift_score");
+
+        AddNormalizedCountFeature(signals, features, SignalKeys.ResponseCount404, "sigv:response_404_count", 20f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.ResponseUnique404Paths, "sigv:response_unique_404_paths", 10f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.ResponseHoneypotHits, "sigv:response_honeypot_hits", 5f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.ResponseAuthFailures, "sigv:response_auth_failures", 20f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.ResponseRateLimitViolations, "sigv:response_rate_limit_violations", 10f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.SimilarityMatchCount, "sigv:similarity_match_count", 5f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.CveMatchCount, "sigv:cve_match_count", 5f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.SessionRequestCount, "sigv:session_request_count", 20f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.SessionHistoryCount, "sigv:session_history_count", 10f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.StreamConcurrentStreams, "sigv:stream_concurrent_streams", 10f);
+        AddNormalizedCountFeature(signals, features, SignalKeys.StreamReconnectRate, "sigv:stream_reconnect_rate", 60f);
+
+        AddStringEnumFeature(signals, features, SignalKeys.IntentThreatBand, "sigv:intent_band");
+        AddStringEnumFeature(signals, features, SignalKeys.CveTopSeverity, "sigv:cve_severity");
+    }
+
+    /// <summary>
     ///     Extracts AI/LLM detector results as numeric features.
     ///     This provides the actual prediction values, not just presence indicators.
     ///     Critical for late heuristic to incorporate AI feedback.
@@ -453,6 +501,100 @@ public static class HeuristicFeatureExtractor
         if (values.Count < 2) return 0;
         var avg = values.Average();
         return values.Sum(v => Math.Pow(v - avg, 2)) / values.Count;
+    }
+
+    private static void AddBooleanSignalFeature(
+        IReadOnlyDictionary<string, object> signals,
+        Dictionary<string, float> features,
+        string signalKey,
+        string featureKey)
+    {
+        if (!signals.TryGetValue(signalKey, out var value))
+            return;
+
+        var normalized = value switch
+        {
+            bool b => b ? 1f : 0f,
+            string s when bool.TryParse(s, out var parsed) => parsed ? 1f : 0f,
+            _ => 0f
+        };
+
+        features[featureKey] = normalized;
+    }
+
+    private static void AddNumericSignalFeature(
+        IReadOnlyDictionary<string, object> signals,
+        Dictionary<string, float> features,
+        string signalKey,
+        string featureKey)
+    {
+        if (!TryGetNumericSignalValue(signals, signalKey, out var value))
+            return;
+
+        features[featureKey] = Math.Clamp((float)value, 0f, 1f);
+    }
+
+    private static void AddNormalizedCountFeature(
+        IReadOnlyDictionary<string, object> signals,
+        Dictionary<string, float> features,
+        string signalKey,
+        string featureKey,
+        float scale)
+    {
+        if (!TryGetNumericSignalValue(signals, signalKey, out var value) || scale <= 0f)
+            return;
+
+        features[featureKey] = Math.Clamp((float)value / scale, 0f, 1f);
+    }
+
+    private static void AddStringEnumFeature(
+        IReadOnlyDictionary<string, object> signals,
+        Dictionary<string, float> features,
+        string signalKey,
+        string featurePrefix)
+    {
+        if (!signals.TryGetValue(signalKey, out var value))
+            return;
+
+        var text = value?.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        features[$"{featurePrefix}:{NormalizeKey(text)}"] = 1f;
+    }
+
+    private static bool TryGetNumericSignalValue(
+        IReadOnlyDictionary<string, object> signals,
+        string signalKey,
+        out double value)
+    {
+        value = 0.0;
+        if (!signals.TryGetValue(signalKey, out var rawValue))
+            return false;
+
+        switch (rawValue)
+        {
+            case double d:
+                value = d;
+                return true;
+            case float f:
+                value = f;
+                return true;
+            case int i:
+                value = i;
+                return true;
+            case long l:
+                value = l;
+                return true;
+            case decimal m:
+                value = (double)m;
+                return true;
+            case string s when double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed):
+                value = parsed;
+                return true;
+            default:
+                return false;
+        }
     }
 }
 

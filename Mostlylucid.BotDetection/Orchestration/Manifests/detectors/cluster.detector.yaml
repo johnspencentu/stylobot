@@ -27,8 +27,8 @@ input:
   optional_signals:
     - geo.country_code
     - geo.country_name
-    - request.ip.asn
-    - request.ip.is_datacenter
+    - ip.asn
+    - ip.is_datacenter
 
 # Output contract - what this detector produces
 output:

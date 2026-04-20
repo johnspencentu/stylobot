@@ -54,23 +54,32 @@
                       style="background: var(--sb-signal-warn); color: #1a0e00;">UNSAVED</span>
             </div>
             <div class="flex items-center gap-1">
-                <button id="config-revert-btn" type="button" disabled
-                        class="text-[11px] px-2 py-1 rounded border hover:bg-base-200/40 disabled:opacity-40"
-                        style="border-color: var(--sb-card-divider); color: var(--sb-brand-muted);"
-                        title="Discard unsaved edits and reload the current effective YAML">
-                    Revert
-                </button>
-                <button id="config-delete-btn" type="button" disabled
-                        class="text-[11px] px-2 py-1 rounded border hover:bg-base-200/40 disabled:opacity-40"
-                        style="border-color: var(--sb-signal-danger); color: var(--sb-signal-danger);"
-                        title="Delete the override file and revert to the embedded defaults">
-                    Reset to defaults
-                </button>
-                <button id="config-save-btn" type="button" disabled
-                        class="text-[11px] px-2 py-1 rounded font-semibold disabled:opacity-40"
-                        style="background: var(--sb-accent); color: #ffffff;">
-                    Save
-                </button>
+                @if (Model.ReadOnly)
+                {
+                    <span class="text-[10px] px-2 py-1 rounded bg-base-300 text-base-content/50">
+                        <i class="bx bx-lock-alt text-xs"></i> Read Only
+                    </span>
+                }
+                else
+                {
+                    <button id="config-revert-btn" type="button" disabled
+                            class="text-[11px] px-2 py-1 rounded border hover:bg-base-200/40 disabled:opacity-40"
+                            style="border-color: var(--sb-card-divider); color: var(--sb-brand-muted);"
+                            title="Discard unsaved edits and reload the current effective YAML">
+                        Revert
+                    </button>
+                    <button id="config-delete-btn" type="button" disabled
+                            class="text-[11px] px-2 py-1 rounded border hover:bg-base-200/40 disabled:opacity-40"
+                            style="border-color: var(--sb-signal-danger); color: var(--sb-signal-danger);"
+                            title="Delete the override file and revert to the embedded defaults">
+                        Reset to defaults
+                    </button>
+                    <button id="config-save-btn" type="button" disabled
+                            class="text-[11px] px-2 py-1 rounded font-semibold disabled:opacity-40"
+                            style="background: var(--sb-accent); color: #ffffff;">
+                        Save
+                    </button>
+                }
             </div>
         </div>
 
@@ -171,7 +180,8 @@
                     minimap: { enabled: false },
                     scrollBeyondLastLine: false,
                     tabSize: 2,
-                    wordWrap: 'on'
+                    wordWrap: 'on',
+                    readOnly: @(Model.ReadOnly ? "true" : "false")
                 });
                 editor.onDidChangeModelContent(updateDirtyState);
             } else {

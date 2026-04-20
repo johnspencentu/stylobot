@@ -163,11 +163,21 @@ public class HeaderContributor : ConfiguredContributorBase
                 "Header",
                 "Valid API key - trusted programmatic client"));
 
+        var missingHeadersDetected =
+            (!hasAccept && !isWebSocketUpgrade && !hasFetchMetadata && !hasApiKey)
+            || (looksLikeBrowser && !hasAcceptLanguage && !isWebSocketUpgrade && !hasFetchMetadata && !hasApiKey)
+            || (headerCount < MinHeaderCount && !isWebSocketUpgrade && !hasApiKey);
+        if (missingHeadersDetected)
+            state.WriteSignal(SignalKeys.HeadersMissing, true);
+
         // No bot indicators found - emit human signal from YAML config
         if (contributions.Count == 0)
             contributions.Add(HumanContribution(
                 "Header",
                 isWebSocketUpgrade ? "WebSocket upgrade - header profile expected" : "Headers appear normal"));
+
+        if (contributions.Any(c => c.ConfidenceDelta > 0.05))
+            state.WriteSignal(SignalKeys.HeadersSuspicious, true);
 
         return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
     }

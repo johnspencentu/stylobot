@@ -125,6 +125,7 @@ public class IntentClassificationCoordinator : BackgroundService
 
         // Try LLM classification if available
         var llmService = _serviceProvider.GetService(typeof(ILlmClassificationService));
+        var llmClassified = false;
         if (llmService is ILlmClassificationService llm)
         {
             var prompt = IntentPromptBuilder.BuildPrompt(request.SessionSummary);
@@ -134,6 +135,7 @@ public class IntentClassificationCoordinator : BackgroundService
                 var parsed = ParseLlmResponse(response);
                 if (parsed.HasValue)
                 {
+                    llmClassified = true;
                     threatScore = parsed.Value.Threat;
                     category = parsed.Value.Category;
                     reasoning = parsed.Value.Reasoning;
@@ -167,35 +169,41 @@ public class IntentClassificationCoordinator : BackgroundService
             reasoning = "No LLM provider, used heuristic";
         }
 
-        // Learning loop: embed into intent HNSW index
-        await _intentSearch.AddAsync(
-            request.IntentVector,
-            request.PrimarySignature,
-            threatScore,
-            category,
-            reasoning);
-
-        // Publish learning event for other handlers
-        _learningBus?.TryPublish(new LearningEvent
+        var learningEvent = new LearningEvent
         {
             Type = LearningEventType.IntentClassified,
             Source = "IntentClassificationCoordinator",
             Confidence = threatScore,
             RequestId = request.RequestId,
+            Features = request.IntentFeatures.ToDictionary(
+                kv => kv.Key,
+                kv => (double)kv.Value,
+                StringComparer.OrdinalIgnoreCase),
             Metadata = new Dictionary<string, object>
             {
                 ["signature"] = request.PrimarySignature,
                 ["threat_score"] = threatScore,
                 ["category"] = category,
                 ["reasoning"] = reasoning ?? "",
-                ["llm_classified"] = llmService != null
+                ["llm_classified"] = llmClassified
             }
-        });
+        };
+
+        var published = _learningBus?.TryPublish(learningEvent) == true;
+        if (!published)
+        {
+            await _intentSearch.AddAsync(
+                request.IntentVector,
+                request.PrimarySignature,
+                threatScore,
+                category,
+                reasoning);
+        }
 
         _logger.LogInformation(
             "Intent classified: sig={Sig} threat={Threat:F2} category={Cat} llm={Llm}",
             request.PrimarySignature[..Math.Min(8, request.PrimarySignature.Length)],
-            threatScore, category, llmService != null);
+            threatScore, category, llmClassified);
     }
 
     private static (double Threat, string Category, string Reasoning)? ParseLlmResponse(string response)

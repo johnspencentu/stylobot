@@ -12,6 +12,16 @@ public interface ILlmProvider
     Task<string> CompleteAsync(LlmRequest request, CancellationToken ct = default);
 
     /// <summary>
+    ///     Send a prompt and return both content and thinking (if enabled).
+    ///     Default implementation wraps CompleteAsync for backward compatibility.
+    /// </summary>
+    async Task<LlmResponse> CompleteWithThinkingAsync(LlmRequest request, CancellationToken ct = default)
+    {
+        var content = await CompleteAsync(request, ct);
+        return new LlmResponse { Content = content };
+    }
+
+    /// <summary>
     ///     Whether the provider is initialized and ready to accept requests.
     /// </summary>
     bool IsReady { get; }

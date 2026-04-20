@@ -123,10 +123,19 @@ public sealed class CveFingerprintContributor : ContributingDetectorBase
         var dims = RadarDimensions.CreateEmpty();
 
         dims[RadarDimensions.UaAnomaly] = ReadBool(s, SignalKeys.UserAgentIsBot) ? 0.8 : 0.0;
-        dims[RadarDimensions.HeaderAnomaly] = s.ContainsKey(SignalKeys.HeadersSuspicious) ? 0.6 : 0.0;
+        dims[RadarDimensions.HeaderAnomaly] =
+            ReadBool(s, SignalKeys.HeadersSuspicious) || ReadBool(s, SignalKeys.HeadersMissing) ? 0.6 : 0.0;
         dims[RadarDimensions.IpReputation] = ReadBool(s, SignalKeys.IpIsDatacenter) ? 0.5 : 0.0;
         dims[RadarDimensions.Behavioral] = ReadBool(s, SignalKeys.BehavioralAnomalyDetected) ? 0.7 : 0.0;
-        dims[RadarDimensions.AdvancedBehavioral] = 0.0;
+        dims[RadarDimensions.AdvancedBehavioral] = Math.Min(1.0, Math.Max(
+            ReadBool(s, SignalKeys.StreamHandshakeStorm) ? 0.9 : 0.0,
+            Math.Max(
+                ReadBool(s, SignalKeys.StreamCrossEndpointMixing) ? 0.8 : 0.0,
+                Math.Max(
+                    ReadDouble(s, SignalKeys.WaveformTimingRegularity),
+                    Math.Max(
+                        ReadDouble(s, SignalKeys.SessionVelocityMagnitude),
+                        ReadBool(s, SignalKeys.WaveformBurstDetected) ? 0.75 : 0.0)))));
         dims[RadarDimensions.CacheBehavior] = ReadBool(s, SignalKeys.CacheBehaviorAnomaly) ? 0.6 : 0.0;
         dims[RadarDimensions.SecurityTool] = ReadBool(s, SignalKeys.SecurityToolDetected) ? 0.9 : 0.0;
         dims[RadarDimensions.ClientFingerprint] = Math.Min(1.0, ReadDouble(s, SignalKeys.FingerprintHeadlessScore));
@@ -134,17 +143,48 @@ public sealed class CveFingerprintContributor : ContributingDetectorBase
         dims[RadarDimensions.Inconsistency] = Math.Min(1.0, ReadDouble(s, SignalKeys.InconsistencyScore));
         dims[RadarDimensions.ReputationMatch] = ReadBool(s, SignalKeys.ReputationFastPathHit) ? 0.7 : 0.0;
         dims[RadarDimensions.AiClassification] = Math.Min(1.0, ReadDouble(s, SignalKeys.AiConfidence));
-        dims[RadarDimensions.ClusterSignal] = 0.0;
-        dims[RadarDimensions.CountryReputation] = 0.0;
+        dims[RadarDimensions.ClusterSignal] = Math.Min(1.0, Math.Max(
+            ReadDouble(s, SignalKeys.ClusterAvgSimilarity),
+            ReadDouble(s, "cluster.community_affinity")));
+        dims[RadarDimensions.CountryReputation] = Math.Min(1.0, ReadDouble(s, SignalKeys.GeoCountryBotRate));
         dims[RadarDimensions.RatePattern] = ReadBool(s, SignalKeys.BehavioralRateExceeded) ? 0.8 : 0.0;
-        dims[RadarDimensions.PayloadSignature] = 0.0;
+        dims[RadarDimensions.PayloadSignature] = Math.Min(1.0, Math.Max(
+            ReadBool(s, SignalKeys.AttackDetected) ? 0.6 : 0.0,
+            Math.Max(
+                ReadBool(s, SignalKeys.AttackSqli) || ReadBool(s, SignalKeys.AttackCmdi) ||
+                ReadBool(s, SignalKeys.AttackSsrf) || ReadBool(s, SignalKeys.AttackSsti) ||
+                ReadBool(s, SignalKeys.AttackXss) ? 0.95 : 0.0,
+                ReadBool(s, SignalKeys.AttackPathProbe) || ReadBool(s, SignalKeys.AttackConfigExposure) ||
+                ReadBool(s, SignalKeys.AttackAdminScan) || ReadBool(s, SignalKeys.AttackWebshellProbe) ||
+                ReadBool(s, SignalKeys.AttackBackupScan) || ReadBool(s, SignalKeys.AttackDebugExposure)
+                    ? 0.7
+                    : 0.0)));
 
         return dims;
     }
 
     private static bool ReadBool(IReadOnlyDictionary<string, object> signals, string key) =>
-        signals.TryGetValue(key, out var val) && val is true;
+        signals.TryGetValue(key, out var val) && val switch
+        {
+            bool b => b,
+            string s when bool.TryParse(s, out var parsed) => parsed,
+            _ => false
+        };
 
-    private static double ReadDouble(IReadOnlyDictionary<string, object> signals, string key) =>
-        signals.TryGetValue(key, out var val) && val is double d ? d : 0.0;
+    private static double ReadDouble(IReadOnlyDictionary<string, object> signals, string key)
+    {
+        if (!signals.TryGetValue(key, out var val))
+            return 0.0;
+
+        return val switch
+        {
+            double d => d,
+            float f => f,
+            int i => i,
+            long l => l,
+            decimal m => (double)m,
+            string s when double.TryParse(s, out var parsed) => parsed,
+            _ => 0.0
+        };
+    }
 }

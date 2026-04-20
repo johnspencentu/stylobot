@@ -40,6 +40,7 @@ public class GeoChangeContributor : ConfiguredContributorBase
     }
 
     public override string Name => "GeoChange";
+    protected override string ManifestName => Name;
     public override int Priority => Manifest?.Priority ?? 16;
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>

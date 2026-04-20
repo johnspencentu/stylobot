@@ -76,11 +76,11 @@ public class LearningListener : IBotSignalListener, ISignalSubscriber
 
     private void CaptureAiLearning(DetectionContext context)
     {
-        var aiPrediction = context.GetSignal<bool>(SignalKeys.AiPrediction);
-        var aiConfidence = context.GetSignal<double>(SignalKeys.AiConfidence);
+        var aiPrediction = TryReadAiPrediction(context.GetSignal<object>(SignalKeys.AiPrediction));
+        var aiConfidence = TryReadDouble(context.GetSignal<object>(SignalKeys.AiConfidence));
         var learnedPattern = context.GetSignal<string>(SignalKeys.AiLearnedPattern);
 
-        if (aiConfidence > 0.8 && !string.IsNullOrEmpty(learnedPattern))
+        if (aiPrediction.HasValue && aiConfidence > 0.8 && !string.IsNullOrEmpty(learnedPattern))
         {
             context.AddLearning(new LearnedSignal
             {
@@ -90,7 +90,7 @@ public class LearningListener : IBotSignalListener, ISignalSubscriber
                 Confidence = aiConfidence,
                 Metadata = new Dictionary<string, object>
                 {
-                    ["prediction"] = aiPrediction,
+                    ["prediction"] = aiPrediction.Value,
                     ["timestamp"] = DateTimeOffset.UtcNow
                 }
             });
@@ -151,5 +151,34 @@ public class LearningListener : IBotSignalListener, ISignalSubscriber
         }
 
         return features;
+    }
+
+    private static bool? TryReadAiPrediction(object? value)
+    {
+        return value switch
+        {
+            bool b => b,
+            string s when s.Equals("bot", StringComparison.OrdinalIgnoreCase) => true,
+            string s when s.Equals("human", StringComparison.OrdinalIgnoreCase) => false,
+            string s when bool.TryParse(s, out var parsed) => parsed,
+            int i => i != 0,
+            long l => l != 0,
+            double d => d > 0.5,
+            float f => f > 0.5f,
+            _ => null
+        };
+    }
+
+    private static double TryReadDouble(object? value)
+    {
+        return value switch
+        {
+            double d => d,
+            float f => f,
+            int i => i,
+            long l => l,
+            string s when double.TryParse(s, out var parsed) => parsed,
+            _ => 0.0
+        };
     }
 }

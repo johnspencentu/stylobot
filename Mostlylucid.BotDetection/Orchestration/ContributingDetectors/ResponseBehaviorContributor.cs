@@ -18,7 +18,8 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     - Auth brute-forcing detection (repeated 401s)
 ///     - Rate limit violations (429 responses)
 ///     - Response time anomalies (too fast = cached/automated)
-///     This runs early (wave 0) to provide feedback for current request based on past behavior.
+///     This runs after transport/header classification so it can suppress response-side
+///     signals for legitimate programmatic traffic before scoring history.
 ///     Configuration loaded from: responsebehavior.detector.yaml
 ///     Override via: appsettings.json → BotDetection:Detectors:ResponseBehaviorContributor:*
 /// </summary>
@@ -40,8 +41,12 @@ public class ResponseBehaviorContributor : ConfiguredContributorBase
     public override string Name => "ResponseBehavior";
     public override int Priority => Manifest?.Priority ?? 12;
 
-    // No triggers - runs in first wave
-    public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
+    // Wait for transport classification so programmatic/API traffic is already labelled
+    // before response-side history is scored.
+    public override IReadOnlyList<TriggerCondition> TriggerConditions =>
+    [
+        Triggers.WhenSignalExists(SignalKeys.TransportProtocol)
+    ];
 
     // Config-driven thresholds - no magic numbers
     private int ScanHeavyCount404 => GetParam("scan_heavy_count_404", 8);

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
+using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.Similarity;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
@@ -24,18 +25,21 @@ public class IntentContributor : ConfiguredContributorBase
 {
     private readonly IIntentSimilaritySearch _intentSearch;
     private readonly IntentVectorizer _vectorizer;
+    private readonly IntentClassificationCoordinator? _intentCoordinator;
     private readonly ILogger<IntentContributor> _logger;
 
     public IntentContributor(
         ILogger<IntentContributor> logger,
         IntentVectorizer vectorizer,
         IIntentSimilaritySearch intentSearch,
-        IDetectorConfigProvider configProvider)
+        IDetectorConfigProvider configProvider,
+        IntentClassificationCoordinator? intentCoordinator = null)
         : base(configProvider)
     {
         _logger = logger;
         _vectorizer = vectorizer;
         _intentSearch = intentSearch;
+        _intentCoordinator = intentCoordinator;
     }
 
     public override string Name => "Intent";
@@ -44,10 +48,15 @@ public class IntentContributor : ConfiguredContributorBase
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
     {
         Triggers.AnyOf(
-            new SignalExistsTrigger(SignalKeys.AttackDetected),
-            new SignalExistsTrigger(SignalKeys.ResponseHasHistory),
-            new SignalExistsTrigger(SignalKeys.StreamAbuseChecked),
-            new SignalExistsTrigger(SignalKeys.TransportProtocol))
+            Triggers.AllOf(
+                Triggers.WhenSignalExists(SignalKeys.SessionRequestCount),
+                Triggers.WhenSignalExists(SignalKeys.StreamAbuseChecked)),
+            Triggers.AllOf(
+                Triggers.WhenSignalExists(SignalKeys.SessionRequestCount),
+                Triggers.WhenSignalExists(SignalKeys.ResponseHasHistory)),
+            Triggers.AllOf(
+                Triggers.WhenSignalExists(SignalKeys.SessionRequestCount),
+                Triggers.WhenSignalExists(SignalKeys.AttackDetected)))
     };
 
     // Config-driven parameters from YAML
@@ -120,8 +129,27 @@ public class IntentContributor : ConfiguredContributorBase
             if (isAmbiguous || matches.Count == 0)
             {
                 state.WriteSignal(SignalKeys.IntentAmbiguous, true);
-                // LLM classification is handled by IntentClassificationCoordinator
-                // which reads this signal from the learning event
+
+                if (_intentCoordinator != null)
+                {
+                    var enqueued = _intentCoordinator.TryEnqueue(new IntentClassificationRequest
+                    {
+                        RequestId = state.RequestId,
+                        PrimarySignature = state.GetSignal<string>(SignalKeys.WaveformSignature) ?? state.RequestId,
+                        IntentVector = vector,
+                        IntentFeatures = new Dictionary<string, float>(features, StringComparer.OrdinalIgnoreCase),
+                        Signals = new Dictionary<string, object>(state.Signals, StringComparer.OrdinalIgnoreCase),
+                        SessionSummary = IntentPromptBuilder.BuildSessionSummary(state.Signals, state.Path),
+                        HeuristicThreatScore = threatScore
+                    });
+
+                    if (!enqueued)
+                    {
+                        _logger.LogDebug(
+                            "Intent classification queue full for {RequestId}; using heuristic-only threat score",
+                            state.RequestId);
+                    }
+                }
             }
 
             // Classify into threat band
@@ -152,7 +180,6 @@ public class IntentContributor : ConfiguredContributorBase
         var features = new Dictionary<string, float>();
 
         // Attack features from HaxxorContributor
-        var attackDetected = state.GetSignal<bool?>(SignalKeys.AttackDetected) ?? false;
         var attackCategories = state.GetSignal<string>(SignalKeys.AttackCategories) ?? "";
         var attackSeverity = state.GetSignal<string>(SignalKeys.AttackSeverity) ?? "";
 
@@ -186,12 +213,15 @@ public class IntentContributor : ConfiguredContributorBase
 
         // Response features from ResponseBehaviorContributor
         var count404 = state.GetSignal<int?>(SignalKeys.ResponseCount404) ?? 0;
-        var unique404 = state.GetSignal<int?>(SignalKeys.ResponseUnique404Paths) ?? 0;
         var honeypotHits = state.GetSignal<int?>(SignalKeys.ResponseHoneypotHits) ?? 0;
         var authFailures = state.GetSignal<int?>(SignalKeys.ResponseAuthFailures) ?? 0;
+        var rateLimitViolations = state.GetSignal<int?>(SignalKeys.ResponseRateLimitViolations) ?? 0;
         var errorHarvesting = state.GetSignal<bool?>(SignalKeys.ResponseErrorHarvesting) ?? false;
         var totalResponses = state.GetSignal<int?>(SignalKeys.ResponseTotalResponses) ?? 0;
 
+        features["response:4xx_ratio"] = totalResponses > 0
+            ? Math.Min((float)(count404 + authFailures + rateLimitViolations) / totalResponses, 1.0f)
+            : 0.0f;
         features["response:404_ratio"] = totalResponses > 0
             ? Math.Min((float)count404 / totalResponses, 1.0f) : 0.0f;
         features["response:honeypot_hits"] = Math.Min(honeypotHits / 3.0f, 1.0f);
@@ -204,7 +234,6 @@ public class IntentContributor : ConfiguredContributorBase
         features["auth:brute_force"] = bruteForce ? 1.0f : 0.0f;
 
         // Transport features
-        var transportClass = state.GetSignal<string>(SignalKeys.TransportClass) ?? "http";
         var isStreaming = state.GetSignal<bool?>(SignalKeys.TransportIsStreaming) ?? false;
         var protocolClass = state.GetSignal<string>(SignalKeys.TransportProtocolClass) ?? "unknown";
 
@@ -216,16 +245,36 @@ public class IntentContributor : ConfiguredContributorBase
         var burstDetected = state.GetSignal<bool?>(SignalKeys.WaveformBurstDetected) ?? false;
         var timingRegularity = state.GetSignal<double?>(SignalKeys.WaveformTimingRegularity) ?? 0.0;
         var pathDiversity = state.GetSignal<double?>(SignalKeys.WaveformPathDiversity) ?? 0.5;
+        var requestRate = state.GetSignal<double?>("waveform.request_rate") ?? 0.0;
+        var sessionDurationMinutes = state.GetSignal<double?>("waveform.session_duration_minutes") ?? 0.0;
+        var traversalPattern = state.GetSignal<string>("waveform.traversal_pattern") ?? "mixed";
 
+        features["temporal:request_rate"] = (float)Math.Min(requestRate / 30.0, 1.0);
         features["temporal:burst_ratio"] = burstDetected ? 1.0f : 0.0f;
         features["temporal:interrequest_cv"] = (float)Math.Min(timingRegularity, 1.0);
+        features["temporal:session_duration"] = (float)Math.Min(sessionDurationMinutes / 30.0, 1.0);
 
         // Behavioral features
+        features["path:unique_ratio"] = (float)Math.Min(pathDiversity, 1.0);
         features["behavior:path_repetition"] = (float)(1.0 - Math.Min(pathDiversity, 1.0));
+        features["behavior:depth_pattern"] = traversalPattern switch
+        {
+            "depth-first-strict" => 1.0f,
+            "depth-first-loose" => 0.7f,
+            "mixed" => 0.25f,
+            _ => 0.0f
+        };
 
         // Stream abuse signals
         var handshakeStorm = state.GetSignal<bool?>(SignalKeys.StreamHandshakeStorm) ?? false;
         var crossMixing = state.GetSignal<bool?>(SignalKeys.StreamCrossEndpointMixing) ?? false;
+        var reconnectRate = state.GetSignal<double?>(SignalKeys.StreamReconnectRate) ?? 0.0;
+        var concurrentStreams = state.GetSignal<int?>(SignalKeys.StreamConcurrentStreams) ?? 0;
+
+        features["stream:handshake_storm"] = handshakeStorm ? 1.0f : 0.0f;
+        features["stream:cross_endpoint_mixing"] = crossMixing ? 1.0f : 0.0f;
+        features["stream:reconnect_rate"] = (float)Math.Min(reconnectRate / 20.0, 1.0);
+        features["stream:concurrent_streams"] = Math.Min(concurrentStreams / 5.0f, 1.0f);
 
         // Path classification based on current request path
         ClassifyPath(state.Path, features);

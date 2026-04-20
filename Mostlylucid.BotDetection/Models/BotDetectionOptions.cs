@@ -223,7 +223,7 @@ public class BotDetectionOptions
     ///     This property will be removed in a future version.
     /// </summary>
     [Obsolete("Use AiDetection.Ollama.Model instead. This property will be removed in v1.0.")]
-    public string? OllamaModel { get; set; } = "qwen3:0.6b";
+    public string? OllamaModel { get; set; } = LlmDefaults.DefaultModel;
 
     /// <summary>
     ///     [OBSOLETE] Use AiDetection.TimeoutMs instead.
@@ -2585,20 +2585,15 @@ TYPE:scraper|searchengine|monitor|malicious|social|good|unknown
 
     /// <summary>
     ///     Ollama API endpoint URL.
-    ///     Default: "http://localhost:11434"
     /// </summary>
-    public string Endpoint { get; set; } = "http://localhost:11434";
+    public string Endpoint { get; set; } = LlmDefaults.DefaultEndpoint;
 
     /// <summary>
     ///     Ollama model to use for bot detection.
-    ///     Default: "qwen3:0.6b" (0.6B params, fast inference, good classification)
-    ///     Alternatives:
-    ///     - "gemma3:4b" - Larger, better reasoning
-    ///     - "qwen2.5:1.5b" - Good reasoning, slightly larger
-    ///     - "phi3:mini" - Microsoft's small model
-    ///     - "tinyllama" - Very small, basic classification
+    ///     Default: gemma4 (efficient, thinking-capable).
+    ///     Alternatives: qwen3:0.6b, gemma3:4b, qwen2.5:1.5b, phi3:mini, tinyllama
     /// </summary>
-    public string Model { get; set; } = "qwen3:0.6b";
+    public string Model { get; set; } = LlmDefaults.DefaultModel;
 
     /// <summary>
     ///     Whether to use JSON mode for structured output.
@@ -2610,13 +2605,19 @@ TYPE:scraper|searchengine|monitor|malicious|social|good|unknown
     /// <summary>
     ///     Custom system prompt for bot detection.
     ///     Use {REQUEST_INFO} as placeholder for the request data.
-    ///     If empty, uses the default compact prompt optimized for small models.
-    ///     Default prompt (~350 tokens) is designed for small models like qwen3:0.6b.
+    ///     If empty, uses the default prompt.
     /// </summary>
     public string? CustomPrompt { get; set; }
 
-    /// <summary>Number of CPU threads for Ollama inference. Default: 4</summary>
-    public int NumThreads { get; set; } = 4;
+    /// <summary>Number of CPU threads for Ollama inference.</summary>
+    public int NumThreads { get; set; } = LlmDefaults.DefaultNumThreads;
+
+    /// <summary>
+    ///     Enable thinking/chain-of-thought mode for models that support it.
+    ///     When true, the model reasons internally before answering.
+    ///     Models: gemma4, qwen3, deepseek-r1. Default: false.
+    /// </summary>
+    public bool EnableThinking { get; set; }
 }
 
 /// <summary>
@@ -3210,8 +3211,8 @@ public class ClusterOptions
     /// <summary>Enable LLM-generated cluster descriptions. Default: false</summary>
     public bool EnableLlmDescriptions { get; set; }
 
-    /// <summary>LLM model for cluster descriptions. Default: qwen3:0.6b</summary>
-    public string DescriptionModel { get; set; } = "qwen3:0.6b";
+    /// <summary>LLM model for cluster descriptions. Uses LlmDefaults.DefaultModel.</summary>
+    public string DescriptionModel { get; set; } = LlmDefaults.DefaultModel;
 
     /// <summary>Ollama endpoint for cluster descriptions. Uses the main AiDetection endpoint if empty.</summary>
     public string? DescriptionEndpoint { get; set; }

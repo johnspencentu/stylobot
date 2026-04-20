@@ -83,6 +83,15 @@ public sealed class HnswIntentSearch : IIntentSimilaritySearch, IDisposable
         // Ensure startup load completes before first search
         await _loadTask.ConfigureAwait(false);
 
+        if (vector.Length != IntentVectorizer.VectorDimension)
+        {
+            _logger.LogWarning(
+                "Ignoring intent similarity search with incompatible vector length {Length}; expected {Expected}",
+                vector.Length,
+                IntentVectorizer.VectorDimension);
+            return Array.Empty<SimilarIntent>();
+        }
+
         var results = new List<SimilarIntent>();
         var maxDistance = 1.0f - minSimilarity;
 
@@ -131,6 +140,9 @@ public sealed class HnswIntentSearch : IIntentSimilaritySearch, IDisposable
         // Brute-force search on pending vectors (small set, SIMD distance)
         for (var i = 0; i < pendingVectors.Count; i++)
         {
+            if (pendingVectors[i].Length != vector.Length)
+                continue;
+
             var distance = CosineDistance.SIMD(vector, pendingVectors[i]);
             if (distance <= maxDistance)
             {
@@ -154,13 +166,25 @@ public sealed class HnswIntentSearch : IIntentSimilaritySearch, IDisposable
     public Task AddAsync(float[] vector, string signatureId,
         double threatScore, string intentCategory, string? reasoning = null)
     {
+        if (vector.Length != IntentVectorizer.VectorDimension)
+        {
+            _logger.LogWarning(
+                "Skipping intent vector for {Signature}: incompatible length {Length}; expected {Expected}",
+                signatureId,
+                vector.Length,
+                IntentVectorizer.VectorDimension);
+            return Task.CompletedTask;
+        }
+
         var meta = new IntentMetadata
         {
             SignatureId = signatureId,
             ThreatScore = threatScore,
             IntentCategory = intentCategory,
             Reasoning = reasoning,
-            Timestamp = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow,
+            SchemaVersion = IntentVectorizer.SchemaVersion,
+            VectorDimension = IntentVectorizer.VectorDimension
         };
 
         lock (_writeLock)
@@ -251,10 +275,43 @@ public sealed class HnswIntentSearch : IIntentSimilaritySearch, IDisposable
                 return;
             }
 
+            var compatibleMetadata = new List<IntentMetadata>(loadedMetadata.Count);
+            var compatibleVectors = new List<float[]>(loadedVectors.Count);
+            var skippedVectors = 0;
+
+            for (var i = 0; i < loadedMetadata.Count; i++)
+            {
+                var meta = loadedMetadata[i];
+                var vector = loadedVectors[i];
+
+                var schemaVersion = meta.SchemaVersion == 0 ? 1 : meta.SchemaVersion;
+                var vectorDimension = meta.VectorDimension == 0 ? vector.Length : meta.VectorDimension;
+
+                if (schemaVersion != IntentVectorizer.SchemaVersion ||
+                    vectorDimension != IntentVectorizer.VectorDimension ||
+                    vector.Length != IntentVectorizer.VectorDimension)
+                {
+                    skippedVectors++;
+                    continue;
+                }
+
+                compatibleMetadata.Add(meta);
+                compatibleVectors.Add(vector);
+            }
+
+            if (skippedVectors > 0)
+            {
+                _logger.LogInformation(
+                    "Discarded {Count} incompatible intent vectors during load (schema={SchemaVersion}, dimension={Dimension})",
+                    skippedVectors,
+                    IntentVectorizer.SchemaVersion,
+                    IntentVectorizer.VectorDimension);
+            }
+
             lock (_writeLock)
             {
-                _graphVectors = loadedVectors;
-                _metadata = loadedMetadata;
+                _graphVectors = compatibleVectors;
+                _metadata = compatibleMetadata;
 
                 if (_graphVectors.Count < MinVectorsForGraph)
                 {
@@ -387,6 +444,8 @@ public class IntentMetadata
     public string IntentCategory { get; set; } = string.Empty;
     public string? Reasoning { get; set; }
     public DateTimeOffset Timestamp { get; set; }
+    public int SchemaVersion { get; set; }
+    public int VectorDimension { get; set; }
 }
 
 [System.Text.Json.Serialization.JsonSerializable(typeof(List<IntentMetadata>))]

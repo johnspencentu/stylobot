@@ -972,6 +972,15 @@ public static class SignalKeys
     /// <summary>Float[]: velocity vector between last two completed sessions</summary>
     public const string SessionVelocityVector = "session.velocity_vector";
 
+    /// <summary>String: name of the matched behavioral archetype from partial chain early detection</summary>
+    public const string SessionPartialChainMatch = "session.partial_chain_match";
+
+    /// <summary>Float: cosine similarity to the matched archetype</summary>
+    public const string SessionPartialChainSimilarity = "session.partial_chain_similarity";
+
+    /// <summary>Float: scaled confidence delta from partial chain archetype match</summary>
+    public const string SessionPartialChainConfidence = "session.partial_chain_confidence";
+
     // ==========================================
     // Intent / Threat scoring signals
     // Set by IntentContributor from session activity analysis
@@ -1080,4 +1089,38 @@ public static class SignalKeys
 
     /// <summary>String: comma-separated list of all matched CVE advisory IDs.</summary>
     public const string CveMatchedIds = "cve.matched_ids";
+
+    // ==========================================
+    // CVE Probe Detection (Simulation Packs)
+    // Set by CveProbeContributor when request matches a simulation pack honeypot or CVE probe path
+    // ==========================================
+
+    /// <summary>Boolean: true if a CVE probe was detected from a simulation pack.</summary>
+    public const string CveProbeDetected = "cve.probe.detected";
+
+    /// <summary>String: CVE ID of the matched probe (e.g., "CVE-2024-6386").</summary>
+    public const string CveProbeId = "cve.probe.id";
+
+    /// <summary>String: severity of the matched CVE probe (critical/high/medium/low).</summary>
+    public const string CveProbeSeverity = "cve.probe.severity";
+
+    /// <summary>String: simulation pack ID that matched (e.g., "wordpress-5.9").</summary>
+    public const string CveProbePackId = "cve.probe.pack_id";
+
+    /// <summary>Boolean: true if request matched any simulation pack path (honeypot or CVE).</summary>
+    public const string SimulationPackMatch = "simulation.pack.match";
+
+    // ==========================================
+    // Privacy / PII Detection signals
+    // Set by PiiQueryStringContributor when PII patterns detected in query strings
+    // ==========================================
+
+    /// <summary>Boolean: true if PII was detected in the query string.</summary>
+    public const string PrivacyQueryPiiDetected = "privacy.query_pii_detected";
+
+    /// <summary>String: comma-separated list of detected PII types (e.g., "email,token").</summary>
+    public const string PrivacyQueryPiiTypes = "privacy.query_pii_types";
+
+    /// <summary>Boolean: true if PII was detected in an unencrypted (HTTP) request.</summary>
+    public const string PrivacyUnencryptedPii = "privacy.unencrypted_pii";
 }

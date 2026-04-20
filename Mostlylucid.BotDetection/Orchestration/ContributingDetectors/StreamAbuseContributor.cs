@@ -85,6 +85,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
                 {
                     var window = GetOrCreateWindow(signature);
                     RecordNonStreamingRequest(state, window);
+                    WriteWindowSignals(state, window);
                     CheckCrossEndpointMixing(state, window, contributions);
                 }
 
@@ -121,11 +122,12 @@ public class StreamAbuseContributor : ConfiguredContributorBase
             // Prune timestamps outside window
             PruneTimestamps(activityWindow.WsUpgrades, now, TimeSpan.FromSeconds(HandshakeStormWindowSeconds));
             PruneTimestamps(activityWindow.SseReconnects, now, TimeSpan.FromSeconds(SseReconnectWindowSeconds));
+            WriteWindowSignals(state, activityWindow);
 
             // Check each abuse pattern
             CheckHandshakeStorm(activityWindow, contributions);
             CheckSseReconnectRate(activityWindow, contributions);
-            CheckConcurrentStreams(state, activityWindow, contributions);
+            CheckConcurrentStreams(activityWindow, contributions);
             CheckCrossEndpointMixing(state, activityWindow, contributions);
 
             if (contributions.Count == 0)
@@ -157,21 +159,20 @@ public class StreamAbuseContributor : ConfiguredContributorBase
     {
         if (window.SseReconnects.Count >= SseReconnectRateThreshold)
         {
+            var reconnectRate = ComputeReconnectRate(window);
             contributions.Add(BotContribution(
                 "StreamAbuse",
-                $"SSE reconnect abuse: {window.SseReconnects.Count} reconnects in {SseReconnectWindowSeconds}s window",
+                $"SSE reconnect abuse: {window.SseReconnects.Count} reconnects in {SseReconnectWindowSeconds}s window ({reconnectRate:F1}/min)",
                 confidenceOverride: SseReconnectConfidence,
                 weightMultiplier: SseReconnectWeight,
                 botType: BotType.MaliciousBot.ToString()));
         }
     }
 
-    private void CheckConcurrentStreams(BlackboardState state, StreamActivityWindow window,
-        List<DetectionContribution> contributions)
+    private void CheckConcurrentStreams(StreamActivityWindow window, List<DetectionContribution> contributions)
     {
         if (window.StreamEndpoints.Count >= ConcurrentStreamsThreshold)
         {
-            state.WriteSignal(SignalKeys.StreamConcurrentStreams, window.StreamEndpoints.Count);
             contributions.Add(BotContribution(
                 "StreamAbuse",
                 $"Streaming to {window.StreamEndpoints.Count} distinct endpoints (probing for open streams)",
@@ -219,6 +220,19 @@ public class StreamAbuseContributor : ConfiguredContributorBase
             window.PageRequests++;
     }
 
+    private void WriteWindowSignals(BlackboardState state, StreamActivityWindow window)
+    {
+        if (window.WsUpgrades.Count >= HandshakeStormThreshold)
+            state.WriteSignal(SignalKeys.StreamHandshakeStorm, true);
+
+        if (window.StreamEndpoints.Count > 1)
+            state.WriteSignal(SignalKeys.StreamConcurrentStreams, window.StreamEndpoints.Count);
+
+        var reconnectRate = ComputeReconnectRate(window);
+        if (reconnectRate > 0)
+            state.WriteSignal(SignalKeys.StreamReconnectRate, reconnectRate);
+    }
+
     private StreamActivityWindow GetOrCreateWindow(string signature)
     {
         var cacheKey = CacheKeyPrefix + signature;
@@ -233,6 +247,14 @@ public class StreamAbuseContributor : ConfiguredContributorBase
     {
         var cutoff = now - window;
         timestamps.RemoveAll(t => t < cutoff);
+    }
+
+    private double ComputeReconnectRate(StreamActivityWindow window)
+    {
+        if (window.SseReconnects.Count == 0 || SseReconnectWindowSeconds <= 0)
+            return 0.0;
+
+        return window.SseReconnects.Count * 60.0 / SseReconnectWindowSeconds;
     }
 
     private static string GetPathHash(string path)

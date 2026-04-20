@@ -70,13 +70,15 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                 avg_processing_time_ms REAL,
                 error_count INTEGER DEFAULT 0,
                 timing_entropy REAL DEFAULT 0,
-                narrative TEXT
+                narrative TEXT,
+                dashboard_signature_id TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_sessions_signature ON sessions(signature, ended_at DESC);
             CREATE INDEX IF NOT EXISTS idx_sessions_ended ON sessions(ended_at DESC);
             CREATE INDEX IF NOT EXISTS idx_sessions_is_bot ON sessions(is_bot, ended_at DESC);
             CREATE INDEX IF NOT EXISTS idx_sessions_country ON sessions(country_code);
+            CREATE INDEX IF NOT EXISTS idx_sessions_dashboard_sig ON sessions(dashboard_signature_id, ended_at DESC);
 
             CREATE TABLE IF NOT EXISTS signatures (
                 signature_id TEXT PRIMARY KEY,
@@ -136,13 +138,13 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                     dominant_state, is_bot, avg_bot_probability, avg_confidence, risk_band,
                     action, bot_name, bot_type, country_code, top_reasons_json,
                     transition_counts_json, paths_json, avg_processing_time_ms,
-                    error_count, timing_entropy, narrative
+                    error_count, timing_entropy, narrative, dashboard_signature_id
                 ) VALUES (
                     @sig, @started, @ended, @reqCount, @vector, @maturity,
                     @domState, @isBot, @avgProb, @avgConf, @risk,
                     @action, @botName, @botType, @country, @reasons,
                     @transitions, @paths, @avgTime,
-                    @errors, @entropy, @narrative
+                    @errors, @entropy, @narrative, @dashSig
                 )
             """;
             cmd.Parameters.AddWithValue("@sig", session.Signature);
@@ -167,6 +169,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             cmd.Parameters.AddWithValue("@errors", session.ErrorCount);
             cmd.Parameters.AddWithValue("@entropy", session.TimingEntropy);
             cmd.Parameters.AddWithValue("@narrative", (object?)session.Narrative ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@dashSig", (object?)session.DashboardSignatureId ?? DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync(ct);
         }
@@ -273,7 +276,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM sessions WHERE signature = @sig ORDER BY ended_at DESC LIMIT @limit";
+        // Query by either waveform signature OR dashboard multi-factor signature ID
+        cmd.CommandText = "SELECT * FROM sessions WHERE signature = @sig OR dashboard_signature_id = @sig ORDER BY ended_at DESC LIMIT @limit";
         cmd.Parameters.AddWithValue("@sig", signature);
         cmd.Parameters.AddWithValue("@limit", limit);
         return await ReadSessionsAsync(cmd, ct);

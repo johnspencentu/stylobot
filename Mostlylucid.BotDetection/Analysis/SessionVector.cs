@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Mostlylucid.BotDetection.Models;
 
 namespace Mostlylucid.BotDetection.Analysis;
 
@@ -550,6 +551,20 @@ public sealed class SessionStore
     }
 
     /// <summary>
+    ///     Gets a live radar projection of the current in-progress session.
+    ///     Returns null if no active session or too few requests.
+    ///     This is FAST — just encodes the cached request list into a vector and projects.
+    /// </summary>
+    public double[]? GetLiveRadarProjection(string signature, FingerprintContext? fingerprint = null)
+    {
+        var currentSession = GetCurrentSession(signature);
+        if (currentSession == null || currentSession.Count < 2) return null;
+
+        var vector = SessionVectorizer.Encode(currentSession, fingerprint);
+        return VectorRadarProjection.Project(vector);
+    }
+
+    /// <summary>
     ///     Gets completed session snapshots for inter-session analysis.
     /// </summary>
     public IReadOnlyList<SessionSnapshot> GetHistory(string signature)
@@ -686,5 +701,114 @@ public sealed class SessionStore
         _logger.LogDebug(
             "Compacted {CompactCount} snapshots into root ({TotalRequests} total requests), keeping {KeepCount} recent",
             compactCount, totalRequestCount, keepCount);
+    }
+}
+
+/// <summary>
+///     A behavioral archetype defined by a partial Markov transition vector.
+///     Used for early detection when only 3-5 requests are available.
+/// </summary>
+public sealed record MarkovArchetype
+{
+    /// <summary>Human-readable archetype name</summary>
+    public required string Name { get; init; }
+
+    /// <summary>L2-normalized partial transition vector (100 dims, 10x10 Markov matrix)</summary>
+    public required float[] PartialVector { get; init; }
+
+    /// <summary>Default confidence delta to emit on match (positive = bot, negative = human)</summary>
+    public required float DefaultConfidence { get; init; }
+
+    /// <summary>Bot type to emit, or null for human archetypes</summary>
+    public required BotType? DefaultBotType { get; init; }
+
+    /// <summary>Whether this archetype represents human behavior</summary>
+    public required bool IsHuman { get; init; }
+}
+
+/// <summary>
+///     Hardcoded behavioral archetypes for partial Markov chain early detection.
+///     Each archetype is a sparse transition matrix flattened to float[100] and L2-normalized.
+/// </summary>
+public static class MarkovArchetypes
+{
+    private static readonly int StateCount = Enum.GetValues<RequestState>().Length;
+
+    public static IReadOnlyList<MarkovArchetype> All { get; } = BuildArchetypes();
+
+    private static List<MarkovArchetype> BuildArchetypes()
+    {
+        return
+        [
+            Build("human-browser", new Dictionary<(int from, int to), float>
+            {
+                { ((int)RequestState.PageView, (int)RequestState.StaticAsset), 0.6f },
+                { ((int)RequestState.StaticAsset, (int)RequestState.StaticAsset), 0.3f },
+                { ((int)RequestState.StaticAsset, (int)RequestState.PageView), 0.4f },
+                { ((int)RequestState.PageView, (int)RequestState.PageView), 0.1f }
+            }, -0.15f, null, isHuman: true),
+
+            Build("scraper", new Dictionary<(int from, int to), float>
+            {
+                { ((int)RequestState.PageView, (int)RequestState.PageView), 0.8f },
+                { ((int)RequestState.PageView, (int)RequestState.ApiCall), 0.1f },
+                { ((int)RequestState.ApiCall, (int)RequestState.PageView), 0.1f }
+            }, 0.25f, BotType.Scraper, isHuman: false),
+
+            Build("api-bot", new Dictionary<(int from, int to), float>
+            {
+                { ((int)RequestState.ApiCall, (int)RequestState.ApiCall), 0.9f },
+                { ((int)RequestState.ApiCall, (int)RequestState.PageView), 0.05f },
+                { ((int)RequestState.PageView, (int)RequestState.ApiCall), 0.05f }
+            }, 0.30f, BotType.Scraper, isHuman: false),
+
+            Build("scanner", new Dictionary<(int from, int to), float>
+            {
+                { ((int)RequestState.PageView, (int)RequestState.NotFound), 0.5f },
+                { ((int)RequestState.NotFound, (int)RequestState.NotFound), 0.3f },
+                { ((int)RequestState.NotFound, (int)RequestState.PageView), 0.2f }
+            }, 0.35f, BotType.MaliciousBot, isHuman: false),
+
+            Build("auth-bot", new Dictionary<(int from, int to), float>
+            {
+                { ((int)RequestState.PageView, (int)RequestState.FormSubmit), 0.3f },
+                { ((int)RequestState.FormSubmit, (int)RequestState.AuthAttempt), 0.4f },
+                { ((int)RequestState.AuthAttempt, (int)RequestState.AuthAttempt), 0.2f },
+                { ((int)RequestState.AuthAttempt, (int)RequestState.FormSubmit), 0.1f }
+            }, 0.30f, BotType.MaliciousBot, isHuman: false)
+        ];
+    }
+
+    private static MarkovArchetype Build(
+        string name,
+        Dictionary<(int from, int to), float> transitions,
+        float confidence,
+        BotType? botType,
+        bool isHuman)
+    {
+        var vector = new float[StateCount * StateCount];
+
+        foreach (var ((from, to), prob) in transitions)
+            vector[from * StateCount + to] = prob;
+
+        // L2-normalize
+        float norm = 0;
+        for (var i = 0; i < vector.Length; i++)
+            norm += vector[i] * vector[i];
+        norm = MathF.Sqrt(norm);
+        if (norm > 0)
+        {
+            for (var i = 0; i < vector.Length; i++)
+                vector[i] /= norm;
+        }
+
+        return new MarkovArchetype
+        {
+            Name = name,
+            PartialVector = vector,
+            DefaultConfidence = confidence,
+            DefaultBotType = botType,
+            IsHuman = isHuman
+        };
     }
 }

@@ -60,13 +60,11 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     public override string Name => "AccountTakeover";
     public override int Priority => Manifest?.Priority ?? 25;
 
-    // Wave 1 - needs signals from earlier detectors
+    // Wait for waveform identity/signature so timing, response, geo, and drift signals
+    // have had a chance to accumulate before ATO scoring runs.
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
-        Triggers.AnyOf(
-            Triggers.WhenSignalExists(SignalKeys.UserAgentFamily),
-            Triggers.WhenSignalExists(SignalKeys.WaveformSignature)
-        )
+        Triggers.WhenSignalExists(SignalKeys.WaveformSignature)
     ];
 
     // Config-driven parameters

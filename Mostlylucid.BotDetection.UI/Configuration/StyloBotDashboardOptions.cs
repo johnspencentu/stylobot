@@ -76,6 +76,27 @@ public sealed class StyloBotDashboardOptions
     public bool AllowUnauthenticatedAccess { get; set; }
 
     /// <summary>
+    ///     Authorization filter for write operations (config save/delete, policy changes).
+    ///     Separate from read access — viewing the dashboard does NOT grant write permission.
+    ///     If null and RequireWriteAuthorizationPolicy is also null, write operations are DENIED by default.
+    /// </summary>
+    public Func<HttpContext, Task<bool>>? WriteAuthorizationFilter { get; set; }
+
+    /// <summary>
+    ///     Authorization policy name required for write operations.
+    ///     If null and WriteAuthorizationFilter is also null, write operations are DENIED by default.
+    ///     This is separate from RequireAuthorizationPolicy (which controls read access).
+    /// </summary>
+    public string? RequireWriteAuthorizationPolicy { get; set; }
+
+    /// <summary>
+    ///     When true, config editing is enabled in the dashboard UI.
+    ///     Even when enabled, write operations require WriteAuthorizationFilter or RequireWriteAuthorizationPolicy.
+    ///     Default: false (config tab is read-only).
+    /// </summary>
+    public bool EnableConfigEditing { get; set; }
+
+    /// <summary>
     ///     When true, extract basic browser, protocol, and country info from HTTP headers
     ///     for ALL detections (including human traffic). This enables browser/protocol/country
     ///     dashboard stats even when the detection pipeline doesn't write signals for humans.

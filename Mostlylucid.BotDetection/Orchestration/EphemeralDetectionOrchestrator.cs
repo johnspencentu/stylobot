@@ -741,14 +741,15 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
         return new BlackboardState
         {
             HttpContext = httpContext,
-            Signals = new Dictionary<string, object>(signals),
+            Signals = signals,
             CurrentRiskScore = aggregated.BotProbability,
             DetectionConfidence = aggregated.Confidence,
             CompletedDetectors = completedResults.Select(r => r.Contributor).ToHashSet(),
             FailedDetectors = aggregated.FailedDetectors,
             Contributions = aggregated.Contributions,
             RequestId = requestId,
-            Elapsed = elapsed
+            Elapsed = elapsed,
+            SignalWriter = signals
         };
     }
 

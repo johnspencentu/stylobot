@@ -108,6 +108,11 @@
         <EmbeddedResource Include="Orchestration\Manifests\schemas\*.json" />
     </ItemGroup>
 
+    <!-- Embed simulation pack YAML definitions -->
+    <ItemGroup>
+        <EmbeddedResource Include="SimulationPacks\Packs\*.yaml" />
+    </ItemGroup>
+
     <!-- Include icon and README in NuGet package -->
     <ItemGroup>
         <None Include=".\icon.png" Pack="true" PackagePath="">

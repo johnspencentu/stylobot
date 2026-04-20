@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
@@ -394,6 +395,25 @@ public class BlackboardOrchestrator
                             readyDetectorsList.Add(d);
                     }
 
+                    if (readyDetectorsList.Count > 1)
+                    {
+                        var deferredHeuristicLate = false;
+                        for (var i = readyDetectorsList.Count - 1; i >= 0; i--)
+                        {
+                            if (!string.Equals(readyDetectorsList[i].Name, "HeuristicLate",
+                                    StringComparison.OrdinalIgnoreCase))
+                                continue;
+
+                            readyDetectorsList.RemoveAt(i);
+                            deferredHeuristicLate = true;
+                        }
+
+                        if (deferredHeuristicLate)
+                            _logger.LogDebug(
+                                "Wave {Wave}: Deferring HeuristicLate until other ready detectors complete",
+                                waveNumber);
+                    }
+
                     if (readyDetectorsList.Count == 0)
                     {
                         _logger.LogDebug(
@@ -640,10 +660,12 @@ public class BlackboardOrchestrator
                     PublishLearningEvent(result, httpContext, requestId, stopwatch.Elapsed);
 
                 // Extract geo data from signals for country tracking and cluster analysis
-                var geoCountryCode = signals.TryGetValue("geo.country_code", out var ccVal) ? ccVal as string : null;
+                var geoCountryCode = signals.TryGetValue(SignalKeys.GeoCountryCode, out var ccVal)
+                    ? ccVal as string
+                    : null;
                 var geoCountryName = signals.TryGetValue("geo.country_name", out var cnVal) ? cnVal as string : null;
-                var geoAsn = signals.TryGetValue("request.ip.asn", out var asnVal) ? asnVal as string : null;
-                var geoIsDatacenter = signals.TryGetValue("request.ip.is_datacenter", out var dcVal) && dcVal is true;
+                var geoAsn = signals.TryGetValue(SignalKeys.IpAsn, out var asnVal) ? asnVal as string : null;
+                var geoIsDatacenter = signals.TryGetValue(SignalKeys.IpIsDatacenter, out var dcVal) && dcVal is true;
 
                 // Feed country reputation tracker
                 if (_countryTracker != null && !string.IsNullOrEmpty(geoCountryCode))
@@ -1235,6 +1257,7 @@ public class BlackboardOrchestrator
     private static string BuildSnapshotRequestInfo(HttpContext httpContext, AggregatedEvidence evidence)
     {
         var sb = new StringBuilder();
+        var signals = evidence.Signals;
 
         // Facts only - no opinions, no probability steering
         var ua = httpContext.Request.Headers.UserAgent.ToString();
@@ -1267,6 +1290,107 @@ public class BlackboardOrchestrator
                 sb.AppendLine($"- {c.DetectorName}: {c.Reason} ({direction})");
             }
         }
+
+        var wroteStructuredSignals = false;
+
+        void AppendStructuredLine(string label, string value)
+        {
+            if (!wroteStructuredSignals)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Structured signals:");
+                wroteStructuredSignals = true;
+            }
+
+            sb.AppendLine($"- {label}: {value}");
+        }
+
+        void AppendSignal(string label, string signalKey)
+        {
+            if (!signals.TryGetValue(signalKey, out var value))
+                return;
+
+            switch (value)
+            {
+                case bool b when b:
+                    AppendStructuredLine(label, "yes");
+                    break;
+                case bool:
+                    break;
+                case double d:
+                    AppendStructuredLine(label, d.ToString("0.###", CultureInfo.InvariantCulture));
+                    break;
+                case float f:
+                    AppendStructuredLine(label, f.ToString("0.###", CultureInfo.InvariantCulture));
+                    break;
+                case int i:
+                    AppendStructuredLine(label, i.ToString(CultureInfo.InvariantCulture));
+                    break;
+                case long l:
+                    AppendStructuredLine(label, l.ToString(CultureInfo.InvariantCulture));
+                    break;
+                case decimal m:
+                    AppendStructuredLine(label, m.ToString("0.###", CultureInfo.InvariantCulture));
+                    break;
+                default:
+                {
+                    var text = value?.ToString();
+                    if (!string.IsNullOrWhiteSpace(text))
+                        AppendStructuredLine(label, text);
+                    break;
+                }
+            }
+        }
+
+        AppendSignal("Transport protocol", SignalKeys.TransportProtocol);
+        AppendSignal("Transport class", SignalKeys.TransportClass);
+        AppendSignal("Protocol class", SignalKeys.TransportProtocolClass);
+        AppendSignal("Streaming transport", SignalKeys.TransportIsStreaming);
+        AppendSignal("Programmatic request", SignalKeys.ProgrammaticRequest);
+
+        AppendSignal("404 count", SignalKeys.ResponseCount404);
+        AppendSignal("Unique 404 paths", SignalKeys.ResponseUnique404Paths);
+        AppendSignal("Honeypot hits", SignalKeys.ResponseHoneypotHits);
+        AppendSignal("Auth failures", SignalKeys.ResponseAuthFailures);
+        AppendSignal("Rate-limit violations", SignalKeys.ResponseRateLimitViolations);
+        AppendSignal("Response historical score", SignalKeys.ResponseHistoricalScore);
+
+        AppendSignal("Waveform timing regularity", SignalKeys.WaveformTimingRegularity);
+        AppendSignal("Waveform burst detected", SignalKeys.WaveformBurstDetected);
+        AppendSignal("Waveform path diversity", SignalKeys.WaveformPathDiversity);
+        AppendSignal("Stream handshake storm", SignalKeys.StreamHandshakeStorm);
+        AppendSignal("Stream cross-endpoint mixing", SignalKeys.StreamCrossEndpointMixing);
+        AppendSignal("Stream reconnect rate", SignalKeys.StreamReconnectRate);
+        AppendSignal("Concurrent streams", SignalKeys.StreamConcurrentStreams);
+
+        AppendSignal("Session request count", SignalKeys.SessionRequestCount);
+        AppendSignal("Session history count", SignalKeys.SessionHistoryCount);
+        AppendSignal("Session self-similarity", SignalKeys.SessionSelfSimilarity);
+        AppendSignal("Session velocity magnitude", SignalKeys.SessionVelocityMagnitude);
+
+        AppendSignal("Similarity match count", SignalKeys.SimilarityMatchCount);
+        AppendSignal("Top similarity score", SignalKeys.SimilarityTopScore);
+        AppendSignal("Similarity matched known bot", SignalKeys.SimilarityKnownBot);
+
+        AppendSignal("Geo country", SignalKeys.GeoCountryCode);
+        AppendSignal("Geo drift detected", SignalKeys.GeoChangeDriftDetected);
+        AppendSignal("Country bot rate", SignalKeys.GeoCountryBotRate);
+        AppendSignal("Country bot rank", SignalKeys.GeoCountryBotRank);
+
+        AppendSignal("ATO detected", SignalKeys.AtoDetected);
+        AppendSignal("ATO drift score", SignalKeys.AtoDriftScore);
+
+        AppendSignal("Cluster similarity", SignalKeys.ClusterAvgSimilarity);
+        AppendSignal("Cluster type", SignalKeys.ClusterType);
+
+        AppendSignal("CVE advisory", SignalKeys.CveTopAdvisoryId);
+        AppendSignal("CVE severity", SignalKeys.CveTopSeverity);
+        AppendSignal("CVE similarity", SignalKeys.CveTopSimilarity);
+        AppendSignal("CVE match count", SignalKeys.CveMatchCount);
+
+        AppendSignal("Intent threat score", SignalKeys.IntentThreatScore);
+        AppendSignal("Intent threat band", SignalKeys.IntentThreatBand);
+        AppendSignal("Intent category", SignalKeys.IntentCategory);
 
         sb.AppendLine();
         sb.AppendLine($"Heuristic model score: {evidence.BotProbability:F2} (0=human, 1=bot)");

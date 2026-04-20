@@ -11,7 +11,7 @@ public interface IIntentSimilaritySearch
     /// <summary>
     ///     Find the most similar intent patterns to the given intent vector.
     /// </summary>
-    /// <param name="vector">Intent feature vector (32 dimensions)</param>
+    /// <param name="vector">Intent feature vector (36 dimensions in schema v2)</param>
     /// <param name="topK">Maximum number of results to return</param>
     /// <param name="minSimilarity">Minimum cosine similarity threshold (0.0 to 1.0)</param>
     /// <returns>List of similar intents ordered by distance (closest first)</returns>
@@ -21,7 +21,7 @@ public interface IIntentSimilaritySearch
     /// <summary>
     ///     Add a new intent vector to the index.
     /// </summary>
-    /// <param name="vector">Intent feature vector (32 dimensions)</param>
+    /// <param name="vector">Intent feature vector (36 dimensions in schema v2)</param>
     /// <param name="signatureId">Signature that produced this intent pattern</param>
     /// <param name="threatScore">Threat score assigned (0.0 to 1.0)</param>
     /// <param name="intentCategory">Intent category (browsing, scanning, attacking, etc.)</param>

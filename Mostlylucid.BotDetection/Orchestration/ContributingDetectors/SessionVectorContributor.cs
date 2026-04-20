@@ -56,6 +56,11 @@ public class SessionVectorContributor : ConfiguredContributorBase
     private double ConsistentSessionHumanConfidence => GetParam("consistent_session_human_confidence", -0.2);
     private double StableVelocityHumanConfidence => GetParam("stable_velocity_human_confidence", -0.15);
 
+    // Partial chain early detection thresholds
+    private int PartialChainMinRequests => GetParam("partial_chain_min_requests", 3);
+    private float PartialChainSimilarityThreshold => (float)GetParam("partial_chain_similarity_threshold", 0.6);
+    private float PartialChainMaxConfidence => (float)GetParam("partial_chain_max_confidence", 0.35);
+
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
         BlackboardState state,
         CancellationToken cancellationToken = default)
@@ -112,6 +117,14 @@ public class SessionVectorContributor : ConfiguredContributorBase
                 _logger.LogDebug(
                     "Session boundary detected for {Signature}: {Count} requests, maturity={Maturity:F2}",
                     signature, completedSession.RequestCount, completedSession.Maturity);
+            }
+
+            // === Partial chain early detection (before full maturity) ===
+            if (currentSession != null &&
+                currentSession.Count >= PartialChainMinRequests &&
+                currentSession.Count < MinSessionRequests)
+            {
+                AnalyzePartialChain(state, currentSession, fpContext, contributions);
             }
 
             // === Analyze current session (in-progress) ===
@@ -226,6 +239,106 @@ public class SessionVectorContributor : ConfiguredContributorBase
                 Math.Abs(StableVelocityHumanConfidence),
                 $"Stable behavior across {history.Count} sessions (velocity={magnitude:F2})"));
         }
+    }
+
+    /// <summary>
+    ///     Analyzes a partial Markov chain (3-5 requests) against known behavioral archetypes
+    ///     for early bot/human signal scoring before the full session vector matures.
+    /// </summary>
+    private void AnalyzePartialChain(
+        BlackboardState state,
+        IReadOnlyList<SessionRequest> currentSession,
+        FingerprintContext fpContext,
+        List<DetectionContribution> contributions)
+    {
+        // Encode only the transition matrix (first 100 dims) from the partial session
+        var fullVector = SessionVectorizer.Encode(currentSession, fpContext);
+        var stateCount = Enum.GetValues<RequestState>().Length;
+        var transitionDims = stateCount * stateCount;
+        var partialVector = new float[transitionDims];
+        Array.Copy(fullVector, partialVector, Math.Min(fullVector.Length, transitionDims));
+
+        // L2-normalize the partial vector
+        float norm = 0;
+        for (var i = 0; i < partialVector.Length; i++)
+            norm += partialVector[i] * partialVector[i];
+        norm = MathF.Sqrt(norm);
+        if (norm > 0)
+        {
+            for (var i = 0; i < partialVector.Length; i++)
+                partialVector[i] /= norm;
+        }
+        else
+        {
+            // Zero vector — no transitions to analyze
+            return;
+        }
+
+        // Compare against each archetype
+        var bestSimilarity = 0f;
+        MarkovArchetype? bestMatch = null;
+
+        foreach (var archetype in MarkovArchetypes.All)
+        {
+            var similarity = CosineSimilarity100(partialVector, archetype.PartialVector);
+            if (similarity > bestSimilarity)
+            {
+                bestSimilarity = similarity;
+                bestMatch = archetype;
+            }
+        }
+
+        var threshold = PartialChainSimilarityThreshold;
+        if (bestMatch == null || bestSimilarity < threshold)
+            return;
+
+        // Scale confidence by similarity, clamped to max
+        var scaledConfidence = Math.Min(
+            PartialChainMaxConfidence,
+            Math.Abs(bestMatch.DefaultConfidence) * bestSimilarity);
+
+        // Write signals
+        state.WriteSignals([
+            new(SignalKeys.SessionPartialChainMatch, bestMatch.Name),
+            new(SignalKeys.SessionPartialChainSimilarity, bestSimilarity),
+            new(SignalKeys.SessionPartialChainConfidence, scaledConfidence)
+        ]);
+
+        if (bestMatch.IsHuman)
+        {
+            contributions.Add(HumanContribution(
+                scaledConfidence,
+                $"Partial chain ({currentSession.Count} requests) matches '{bestMatch.Name}' archetype (similarity={bestSimilarity:F2})"));
+        }
+        else
+        {
+            contributions.Add(BotContribution(
+                scaledConfidence,
+                $"Partial chain ({currentSession.Count} requests) matches '{bestMatch.Name}' archetype (similarity={bestSimilarity:F2})",
+                bestMatch.DefaultBotType ?? BotType.Scraper));
+        }
+
+        _logger.LogDebug(
+            "Partial chain match: {Archetype} (similarity={Similarity:F2}, confidence={Confidence:F2}, requests={Count})",
+            bestMatch.Name, bestSimilarity, scaledConfidence, currentSession.Count);
+    }
+
+    /// <summary>
+    ///     Cosine similarity for two float[100] vectors (already L2-normalized).
+    /// </summary>
+    private static float CosineSimilarity100(float[] a, float[] b)
+    {
+        var len = Math.Min(a.Length, b.Length);
+        float dot = 0, normA = 0, normB = 0;
+        for (var i = 0; i < len; i++)
+        {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+
+        var denom = MathF.Sqrt(normA) * MathF.Sqrt(normB);
+        return denom > 0 ? dot / denom : 0f;
     }
 
     /// <summary>

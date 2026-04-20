@@ -7,8 +7,9 @@ using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 
 /// <summary>
-///     Late-stage heuristic contributor - runs AFTER AI/LLM to provide final classification.
-///     Consumes all evidence including AI results for comprehensive learned classification.
+///     Late-stage heuristic contributor - runs as the final meta-layer after the other
+///     contributing detectors have populated the blackboard.
+///     Consumes all accumulated evidence, including any AI results when present.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -16,7 +17,7 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///         <list type="number">
 ///             <item><b>Early Heuristic</b> (HeuristicContributor): Uses basic request features</item>
 ///             <item><b>AI/LLM</b>: Uses early heuristic + other signals for classification</item>
-///             <item><b>Late Heuristic</b> (this): Consumes ALL evidence including AI results</item>
+///             <item><b>Late Heuristic</b> (this): Consumes all accumulated evidence as the final pass</item>
 ///         </list>
 ///     </para>
 ///     <para>
@@ -24,10 +25,8 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///         including whether the AI/LLM agreed with earlier signals or detected something new.
 ///     </para>
 ///     <para>
-///         <b>Signal Flow:</b>
-///         <code>
-///         AiClassificationCompleted/LlmClassificationCompleted → HeuristicLate → HeuristicLateCompleted
-///         </code>
+///         The orchestrator defers this detector until it is the only ready detector left
+///         in the current request, so it executes after the other contributing detectors.
 ///     </para>
 /// </remarks>
 public class HeuristicLateContributor : ContributingDetectorBase
@@ -46,17 +45,15 @@ public class HeuristicLateContributor : ContributingDetectorBase
     public override string Name => "HeuristicLate";
     public override int Priority => 100; // Run after AI detectors (priority ~80-90)
 
-    // Trigger conditions: Run as final meta-layer
-    // - When AI has run (AiPrediction signal exists), OR
-    // - When enough static detectors have run (fallback when no AI)
-    // NOTE: These are OR'd via outer AnyOf. The orchestrator evaluates TriggerConditions
-    // with ALL semantics, so we must wrap in a single AnyOf for OR behavior.
+    // Trigger once the early heuristic has produced a feature-based prediction, or when
+    // inline AI has produced direct signals. The orchestrator then defers execution until
+    // HeuristicLate is the only ready detector remaining, guaranteeing final-pass ordering.
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
         Triggers.AnyOf(
             Triggers.WhenSignalExists(SignalKeys.AiPrediction),
             Triggers.WhenSignalExists(SignalKeys.AiConfidence),
-            Triggers.WhenDetectorCount(5))
+            Triggers.WhenSignalExists(SignalKeys.HeuristicPrediction))
     ];
 
     public override async Task<IReadOnlyList<DetectionContribution>> ContributeAsync(

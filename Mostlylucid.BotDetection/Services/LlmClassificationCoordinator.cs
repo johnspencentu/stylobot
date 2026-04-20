@@ -175,9 +175,22 @@ public class LlmClassificationCoordinator : BackgroundService
 
         var reason = result.Reasons.First();
         var description = reason.Detail;
+        var llmIsBot = result.Confidence > 0.5;
+        var aiMetadata = new Dictionary<string, object>
+        {
+            ["request.signature"] = request.PrimarySignature,
+            ["userAgent"] = request.UserAgent,
+            ["path"] = request.Path ?? string.Empty,
+            ["method"] = request.Method ?? string.Empty,
+            ["heuristicProb"] = request.HeuristicProbability,
+            ["ai_prediction"] = llmIsBot ? "bot" : "human",
+            ["ai_confidence"] = result.Confidence,
+            ["ai_learned_pattern"] = description ?? string.Empty,
+            ["enqueue_reason"] = request.EnqueueReason ?? string.Empty
+        };
 
         // Update ephemeral reputation cache with LLM result
-        var llmLabel = result.Confidence > 0.5 ? 1.0 : 0.0;
+        var llmLabel = llmIsBot ? 1.0 : 0.0;
         const double llmEvidenceWeight = 2.0;
 
         var previousScore = 0.0;
@@ -234,11 +247,32 @@ public class LlmClassificationCoordinator : BackgroundService
         }
 
         // Publish drift event if this was a drift/confirmation sample
+        if (_learningBus != null && !string.IsNullOrWhiteSpace(description))
+        {
+            _learningBus.TryPublish(new LearningEvent
+            {
+                Type = LearningEventType.PatternDiscovered,
+                Source = nameof(LlmClassificationCoordinator),
+                Pattern = description,
+                Confidence = result.Confidence,
+                Label = llmIsBot,
+                RequestId = request.RequestId,
+                Metadata = new Dictionary<string, object>(aiMetadata)
+            });
+        }
+
         if ((request.IsDriftSample || request.IsConfirmationSample) && _learningBus != null)
         {
-            var llmIsBot = result.Confidence > 0.5;
             var heuristicIsBot = request.HeuristicProbability > 0.5;
             var disagrees = llmIsBot != heuristicIsBot;
+
+            var learningMetadata = new Dictionary<string, object>(aiMetadata)
+            {
+                ["llmProb"] = result.Confidence,
+                ["disagrees"] = disagrees,
+                ["isDriftSample"] = request.IsDriftSample,
+                ["isConfirmationSample"] = request.IsConfirmationSample
+            };
 
             _learningBus.TryPublish(new LearningEvent
             {
@@ -249,14 +283,9 @@ public class LlmClassificationCoordinator : BackgroundService
                 Confidence = result.Confidence,
                 Label = llmIsBot,
                 Pattern = request.PrimarySignature,
-                Metadata = new Dictionary<string, object>
-                {
-                    ["heuristicProb"] = request.HeuristicProbability,
-                    ["llmProb"] = result.Confidence,
-                    ["disagrees"] = disagrees,
-                    ["isDriftSample"] = request.IsDriftSample,
-                    ["isConfirmationSample"] = request.IsConfirmationSample
-                }
+                RequestId = request.RequestId,
+                Features = ExtractNumericSignalFeatures(request.Signals),
+                Metadata = learningMetadata
             });
 
             if (disagrees)
@@ -318,5 +347,34 @@ public class LlmClassificationCoordinator : BackgroundService
         {
             _logger.LogDebug(ex, "Fallback failed for {RequestId}", request.RequestId);
         }
+    }
+
+    private static Dictionary<string, double> ExtractNumericSignalFeatures(IReadOnlyDictionary<string, object> signals)
+    {
+        var features = new Dictionary<string, double>(signals.Count, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (key, value) in signals)
+        {
+            switch (value)
+            {
+                case double d:
+                    features[key] = d;
+                    break;
+                case float f:
+                    features[key] = f;
+                    break;
+                case int i:
+                    features[key] = i;
+                    break;
+                case long l:
+                    features[key] = l;
+                    break;
+                case bool b:
+                    features[key] = b ? 1.0 : 0.0;
+                    break;
+            }
+        }
+
+        return features;
     }
 }

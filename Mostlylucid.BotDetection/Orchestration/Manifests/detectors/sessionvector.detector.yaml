@@ -63,6 +63,18 @@ emits:
       type: int
       description: Current session size
 
+    - key: session.partial_chain_match
+      type: string
+      description: Name of the matched behavioral archetype (early detection)
+
+    - key: session.partial_chain_similarity
+      type: float
+      description: Cosine similarity to matched archetype
+
+    - key: session.partial_chain_confidence
+      type: float
+      description: Scaled confidence delta from partial chain match
+
     - key: session.boundary_detected
       type: bool
       description: Whether a session boundary was just detected
@@ -121,6 +133,12 @@ defaults:
     max_snapshots_per_signature: 10
     # Maximum requests tracked per in-progress session
     max_requests_per_session: 200
+    # Partial chain early detection: minimum requests before archetype matching
+    partial_chain_min_requests: 3
+    # Partial chain: cosine similarity threshold for archetype match
+    partial_chain_similarity_threshold: 0.6
+    # Partial chain: maximum confidence delta to emit
+    partial_chain_max_confidence: 0.35
 
 tags:
   - behavioral

@@ -11,6 +11,7 @@ using Mostlylucid.BotDetection.Console.Models;
 using Mostlylucid.BotDetection.Console.Services;
 using Mostlylucid.BotDetection.Console.Transforms;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Llm.Cloud.Extensions;
 using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
 using Mostlylucid.BotDetection.Llm.Ollama.Extensions;
@@ -449,8 +450,8 @@ try
         if (llmProvider.Equals("ollama", StringComparison.OrdinalIgnoreCase))
         {
             builder.Services.AddStylobotOllama(
-                llmUrl ?? "http://localhost:11434",
-                llmModel ?? "qwen3:0.6b");
+                llmUrl ?? LlmDefaults.DefaultEndpoint,
+                llmModel ?? LlmDefaults.DefaultModel);
         }
         else
         {
@@ -977,7 +978,7 @@ static void ShowManPage()
         groq         llama-3.3-70b        Free tier
         mistral      mistral-small        ~$0.10/1M tokens
         deepseek     deepseek-chat        ~$0.07/1M tokens
-        ollama       qwen3:0.6b           Free (local)
+        ollama       gemma4               Free (local)
         llamasharp   qwen2.5:0.5b         Free (in-process CPU)
 
     [bold]ENVIRONMENT[/]

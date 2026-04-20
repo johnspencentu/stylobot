@@ -25,6 +25,7 @@ using Mostlylucid.BotDetection.Persistence;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.Similarity;
+using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.Extensions;
 
@@ -179,17 +180,17 @@ public static class ServiceCollectionExtensions
     ///     - Enables all heuristic detection methods
     ///     - Enables LLM-based semantic analysis
     ///     - Requires Ollama to be running at the specified endpoint
-    ///     - Recommended models: qwen3:0.6b, qwen2.5:1.5b, phi3:mini
+    ///     - Recommended models: gemma4, qwen3:0.6b, phi3:mini
     ///     LLM detection is fail-safe: if Ollama is unavailable,
     ///     detection continues with heuristics only.
     /// </remarks>
     /// <param name="services">The service collection</param>
-    /// <param name="ollamaEndpoint">Ollama endpoint URL (default: http://localhost:11434)</param>
-    /// <param name="model">Ollama model name (default: qwen3:0.6b)</param>
+    /// <param name="ollamaEndpoint">Ollama endpoint URL</param>
+    /// <param name="model">Ollama model name</param>
     /// <param name="configure">Optional configuration action</param>
     /// <returns>The service collection for chaining</returns>
     /// <example>
-    ///     // With default Ollama settings
+    ///     // With default Ollama settings (gemma4)
     ///     builder.Services.AddAdvancedBotDetection();
     ///     // With custom endpoint and model
     ///     builder.Services.AddAdvancedBotDetection(
@@ -198,8 +199,8 @@ public static class ServiceCollectionExtensions
     /// </example>
     public static IServiceCollection AddAdvancedBotDetection(
         this IServiceCollection services,
-        string ollamaEndpoint = "http://localhost:11434",
-        string model = "qwen3:0.6b",
+        string ollamaEndpoint = LlmDefaults.DefaultEndpoint,
+        string model = LlmDefaults.DefaultModel,
         Action<BotDetectionOptions>? configure = null)
     {
         return services.AddBotDetection(options =>
@@ -483,6 +484,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, TimescaleReputationContributor>();
         //
         // Wave 0 detectors (no dependencies - run first)
+        // PII query string detection - privacy signals, not bot detection (priority 8)
+        services.AddSingleton<IContributingDetector, PiiQueryStringContributor>();
         services.AddSingleton<IContributingDetector, UserAgentContributor>();
         services.AddSingleton<IContributingDetector, HeaderContributor>();
         services.AddSingleton<IContributingDetector, IpContributor>();
@@ -492,6 +495,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, HaxxorContributor>();
         // Security tool detection - runs early with UA analysis
         services.AddSingleton<IContributingDetector, SecurityToolContributor>();
+        // Simulation pack CVE probe detection - matches request paths against loaded packs
+        services.TryAddSingleton<ISimulationPackRegistry, SimulationPackLoader>();
+        services.AddSingleton<IContributingDetector, CveProbeContributor>();
         // AI scraper detection - known AI bots, Cloudflare signals, Web Bot Auth
         services.AddSingleton<IContributingDetector, AiScraperContributor>();
         // Cache behavior analysis - runs early alongside behavioral
@@ -533,6 +539,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, MultiLayerCorrelationContributor>();
         // Behavioral waveform analysis - analyzes patterns across multiple requests
         services.AddSingleton<IContributingDetector, BehavioralWaveformContributor>();
+        // Signature mapping - bridges multi-factor IDs (dashboard) to waveform signatures (session store)
+        services.TryAddSingleton<Dashboard.SignatureMapper>();
         // Session vector analysis - Markov chain compression for inter-session anomaly detection
         services.TryAddSingleton<Analysis.SessionStore>();
         services.TryAddSingleton<SessionEscalationService>();
@@ -701,6 +709,10 @@ public static class ServiceCollectionExtensions
 
         // Challenge verification contributor (reads PoW solve metadata as detection signal)
         services.AddSingleton<IContributingDetector, ChallengeVerificationContributor>();
+
+        // Register simulation pack responder (serves fake responses for honeypot paths)
+        services.AddSingleton<SimulationPackResponder>();
+        services.AddSingleton<IActionPolicy>(sp => sp.GetRequiredService<SimulationPackResponder>());
 
         // Register action policy factories (create policies from configuration)
         services.AddSingleton<IActionPolicyFactory, BlockActionPolicyFactory>();

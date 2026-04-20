@@ -148,14 +148,16 @@ else
             <img src="@FlagUrl(Model.CountryCode!)" alt="@Model.CountryCode" class="w-6 h-4 object-cover rounded-sm" />
         }
         <h1 class="text-lg font-bold text-base-content">@(Model.BotName ?? "Unknown Bot")</h1>
-        @if (Model.IsBot)
-        {
-            <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-error/20 text-error">Bot</span>
+        @{
+            var (badgeText, badgeBg) = Model.BotProbability switch
+            {
+                >= 0.8 => ("Bot", "bg-error/20 text-error"),
+                >= 0.5 => ("Suspicious", "bg-warning/20 text-warning"),
+                >= 0.3 => ("Uncertain", "bg-info/20 text-info"),
+                _ => ("Human", "bg-success/20 text-success")
+            };
         }
-        else
-        {
-            <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-success/20 text-success">Human</span>
-        }
+        <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold @badgeBg">@badgeText</span>
     </div>
 
     <!-- Intent & Threat (KEY info) -->
@@ -181,7 +183,21 @@ else
         {
             <div class="flex items-center gap-1.5 text-xs">
                 <span class="text-base-content/50">Policy:</span>
-                <span class="font-bold @ActionColor(Model.Action)">@Model.Action</span>
+                @{
+                    var friendlyAction = Model.Action switch
+                    {
+                        "throttle-stealth" => "Silent Throttle",
+                        "throttle" => "Throttle",
+                        "block" => "Block",
+                        "block-hard" => "Hard Block",
+                        "challenge" => "Challenge",
+                        "logonly" => "Monitor Only",
+                        "redirect-honeypot" => "Honeypot Redirect",
+                        "simulation-pack" => "Simulation Pack",
+                        _ => Model.Action
+                    };
+                }
+                <span class="font-bold @ActionColor(Model.Action)">@friendlyAction</span>
             </div>
         }
     </div>
@@ -214,26 +230,7 @@ else
         </div>
     </div>
 
-    <!-- Behavioral Shape Radar (vector fingerprint collapsed into interpretable axes) -->
-    <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
-        <div class="flex items-center justify-between mb-2">
-            <h3 class="text-xs font-semibold text-base-content/70 uppercase">
-                <i class="bx bx-shape-polygon text-sm" style="color: var(--sb-accent);"></i>
-                Behavioral Shape
-            </h3>
-            <div class="flex items-center gap-2">
-                <button id="radar-prev" class="btn btn-ghost btn-xs" disabled>&lsaquo;</button>
-                <span id="radar-session-label" class="text-[10px] text-base-content/40">Loading...</span>
-                <button id="radar-next" class="btn btn-ghost btn-xs" disabled>&rsaquo;</button>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div id="behavioral-radar" style="height: 280px;"></div>
-            <div id="radar-details" class="text-xs space-y-1 pt-4"></div>
-        </div>
-    </div>
-
-    <!-- Sessions (Markov chain behavioral sessions) - loaded via HTMX -->
+    <!-- Sessions (Markov chain behavioral sessions) - PRIMARY VIEW, loaded via HTMX -->
     <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
         <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">
             <i class="bx bx-pulse text-sm" style="color: var(--sb-accent);"></i>
@@ -247,74 +244,141 @@ else
         </div>
     </div>
 
-    <!-- CRITICAL: Endpoints Visited -->
+    <!-- Behavioral Shape Radar (vector fingerprint collapsed into interpretable axes) -->
+    <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold text-base-content/70 uppercase">
+                <i class="bx bx-shape-polygon text-sm" style="color: var(--sb-accent);"></i>
+                Behavioral Shape
+            </h3>
+            <div class="flex items-center gap-2">
+                <button id="radar-prev" class="btn btn-ghost btn-xs" disabled>&lsaquo;</button>
+                <button id="radar-play" class="btn btn-ghost btn-xs" title="Animate through sessions">
+                    <i class="bx bx-play"></i>
+                </button>
+                <span id="radar-session-label" class="text-[10px] text-base-content/40">Loading...</span>
+                <button id="radar-next" class="btn btn-ghost btn-xs" disabled>&rsaquo;</button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div id="behavioral-radar" style="height: 280px;"></div>
+            <div id="radar-details" class="text-xs space-y-1 pt-4"></div>
+        </div>
+    </div>
+
+    <!-- Fingerprint Profile (placeholder - individual fingerprint dims require API plumbing) -->
+    <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+        <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">
+            <i class="bx bx-fingerprint text-sm" style="color: var(--sb-accent);"></i>
+            Fingerprint Profile
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            @{
+                var fpDims = new[] {
+                    ("TLS Version", "bx-lock-alt"),
+                    ("HTTP Protocol", "bx-globe"),
+                    ("Protocol Client", "bx-transfer"),
+                    ("TCP OS Consistency", "bx-chip"),
+                    ("QUIC 0-RTT", "bx-bolt-circle"),
+                    ("Fingerprint Integrity", "bx-shield"),
+                    ("Headless Indicator", "bx-bot"),
+                    ("Datacenter IP", "bx-server")
+                };
+            }
+            @foreach (var (label, icon) in fpDims)
+            {
+                <div class="flex items-center gap-2 rounded-lg border px-2 py-1.5" style="border-color: var(--sb-card-divider);">
+                    <i class="bx @icon text-sm" style="color: var(--sb-accent);"></i>
+                    <div>
+                        <div class="text-[10px] text-base-content/50">@label</div>
+                        <div class="text-xs font-mono text-base-content/40">--</div>
+                    </div>
+                </div>
+            }
+        </div>
+        <p class="text-[10px] text-base-content/30 mt-2 italic">TLS/TCP/HTTP layer consistency from session vector dimensions 118-125. Individual dimension data requires API enhancement.</p>
+    </div>
+
+    <!-- Endpoints Visited (collapsed) -->
     @if (Model.Paths.Count > 0)
     {
-        <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
-            <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">Endpoints Visited <span class="text-base-content/40 font-normal">(@Model.Paths.Count)</span></h3>
-            <div class="overflow-x-auto">
-                <table class="table table-xs w-full">
-                    <thead>
-                        <tr class="text-[10px] uppercase tracking-wider text-base-content/40">
-                            <th class="py-1">#</th>
-                            <th class="py-1">Path</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (var i = 0; i < Model.Paths.Count; i++)
-                        {
-                            <tr class="hover:bg-base-200/50">
-                                <td class="py-1 text-[10px] text-base-content/30 font-mono">@(i + 1)</td>
-                                <td class="py-1 text-xs font-mono text-base-content/70">@Model.Paths[i]</td>
+        <details class="rounded-xl border mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+            <summary class="p-4 cursor-pointer text-xs font-semibold text-base-content/70 uppercase">
+                <i class="bx bx-link text-sm" style="color: var(--sb-accent);"></i>
+                Endpoints Visited <span class="text-base-content/40 font-normal">(@Model.Paths.Count)</span>
+                <span class="text-[10px] font-normal text-base-content/40 ml-2">Click to expand</span>
+            </summary>
+            <div class="p-4 pt-0">
+                <div class="overflow-x-auto">
+                    <table class="table table-xs w-full">
+                        <thead>
+                            <tr class="text-[10px] uppercase tracking-wider text-base-content/40">
+                                <th class="py-1">#</th>
+                                <th class="py-1">Path</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < Model.Paths.Count; i++)
+                            {
+                                <tr class="hover:bg-base-200/50">
+                                    <td class="py-1 text-[10px] text-base-content/30 font-mono">@(i + 1)</td>
+                                    <td class="py-1 text-xs font-mono text-base-content/70">@Model.Paths[i]</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </details>
     }
 
-    <!-- CRITICAL: Recent Detections -->
+    <!-- Raw Requests (collapsed) -->
     @if (Model.RecentDetections.Count > 0)
     {
-        <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
-            <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">Recent Detections <span class="text-base-content/40 font-normal">(@Model.RecentDetections.Count)</span></h3>
-            <div class="overflow-x-auto">
-                <table class="table table-xs w-full">
-                    <thead>
-                        <tr class="text-[10px] uppercase tracking-wider text-base-content/40">
-                            <th class="py-1">Time</th>
-                            <th class="py-1">Method</th>
-                            <th class="py-1">Path</th>
-                            <th class="py-1 text-center">Status</th>
-                            <th class="py-1 text-right">Prob</th>
-                            <th class="py-1 text-right">Conf</th>
-                            <th class="py-1">Risk</th>
-                            <th class="py-1">Action</th>
-                            <th class="py-1 text-right">Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var d in Model.RecentDetections)
-                        {
-                            var is404 = d.StatusCode == 404;
-                            var statusClass = d.StatusCode >= 400 ? "text-error font-bold" : d.StatusCode >= 300 ? "text-warning" : "text-success";
-                            <tr class="hover:bg-base-200/50 @(is404 ? "bg-error/5" : "")">
-                                <td class="py-1 text-[10px] text-base-content/50 whitespace-nowrap">@d.Timestamp.ToString("HH:mm:ss")</td>
-                                <td class="py-1 text-[10px] font-mono text-base-content/50">@d.Method</td>
-                                <td class="py-1 text-xs font-mono text-base-content/70 max-w-[250px] truncate">@d.Path</td>
-                                <td class="py-1 text-center text-xs @statusClass">@(d.StatusCode > 0 ? d.StatusCode.ToString() : "-")</td>
-                                <td class="py-1 text-right text-xs @(d.BotProbability >= 0.7 ? "text-error" : d.BotProbability >= 0.4 ? "text-warning" : "text-success")">@($"{d.BotProbability:P0}")</td>
-                                <td class="py-1 text-right text-xs text-base-content/60">@($"{d.Confidence:P0}")</td>
-                                <td class="py-1 text-[10px] @RiskColor(d.RiskBand)">@d.RiskBand</td>
-                                <td class="py-1 text-[10px] @ActionColor(d.Action)">@(d.Action ?? "Allow")</td>
-                                <td class="py-1 text-right text-[10px] text-base-content/40 font-mono">@($"{d.ProcessingTimeMs:F1}")ms</td>
+        <details class="rounded-xl border mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+            <summary class="p-4 cursor-pointer text-xs font-semibold text-base-content/70 uppercase">
+                <i class="bx bx-list-ul text-sm" style="color: var(--sb-accent);"></i>
+                Raw Requests <span class="text-base-content/40 font-normal">(@Model.RecentDetections.Count)</span>
+                <span class="text-[10px] font-normal text-base-content/40 ml-2">Click to expand</span>
+            </summary>
+            <div class="p-4 pt-0">
+                <div class="overflow-x-auto">
+                    <table class="table table-xs w-full">
+                        <thead>
+                            <tr class="text-[10px] uppercase tracking-wider text-base-content/40">
+                                <th class="py-1">Time</th>
+                                <th class="py-1">Method</th>
+                                <th class="py-1">Path</th>
+                                <th class="py-1 text-center">Status</th>
+                                <th class="py-1 text-right">Prob</th>
+                                <th class="py-1 text-right">Conf</th>
+                                <th class="py-1">Risk</th>
+                                <th class="py-1">Action</th>
+                                <th class="py-1 text-right">Time</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.RecentDetections)
+                            {
+                                var is404 = d.StatusCode == 404;
+                                var statusClass = d.StatusCode >= 400 ? "text-error font-bold" : d.StatusCode >= 300 ? "text-warning" : "text-success";
+                                <tr class="hover:bg-base-200/50 @(is404 ? "bg-error/5" : "")">
+                                    <td class="py-1 text-[10px] text-base-content/50 whitespace-nowrap">@d.Timestamp.ToString("HH:mm:ss")</td>
+                                    <td class="py-1 text-[10px] font-mono text-base-content/50">@d.Method</td>
+                                    <td class="py-1 text-xs font-mono text-base-content/70 max-w-[250px] truncate">@d.Path</td>
+                                    <td class="py-1 text-center text-xs @statusClass">@(d.StatusCode > 0 ? d.StatusCode.ToString() : "-")</td>
+                                    <td class="py-1 text-right text-xs @(d.BotProbability >= 0.7 ? "text-error" : d.BotProbability >= 0.4 ? "text-warning" : "text-success")">@($"{d.BotProbability:P0}")</td>
+                                    <td class="py-1 text-right text-xs text-base-content/60">@($"{d.Confidence:P0}")</td>
+                                    <td class="py-1 text-[10px] @RiskColor(d.RiskBand)">@d.RiskBand</td>
+                                    <td class="py-1 text-[10px] @ActionColor(d.Action)">@(d.Action ?? "Allow")</td>
+                                    <td class="py-1 text-right text-[10px] text-base-content/40 font-mono">@($"{d.ProcessingTimeMs:F1}")ms</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </details>
     }
 
     <!-- Charts: Bot Probability & Confidence History + Processing Time -->
@@ -454,9 +518,21 @@ else
                 }
                 @if (!string.IsNullOrEmpty(Model.Action))
                 {
+                    var friendlyAction2 = Model.Action switch
+                    {
+                        "throttle-stealth" => "Silent Throttle",
+                        "throttle" => "Throttle",
+                        "block" => "Block",
+                        "block-hard" => "Hard Block",
+                        "challenge" => "Challenge",
+                        "logonly" => "Monitor Only",
+                        "redirect-honeypot" => "Honeypot Redirect",
+                        "simulation-pack" => "Simulation Pack",
+                        _ => Model.Action
+                    };
                     <div>
                         <span class="text-sm text-base-content/50">Policy:</span>
-                        <span class="text-sm font-bold @ActionColor(Model.Action)">@Model.Action</span>
+                        <span class="text-sm font-bold @ActionColor(Model.Action)">@friendlyAction2</span>
                     </div>
                 }
             </div>
@@ -630,6 +706,39 @@ else
 
         if (prevBtn) prevBtn.onclick = function() { showSession(currentIdx - 1); };
         if (nextBtn) nextBtn.onclick = function() { showSession(currentIdx + 1); };
+
+        // Session playback animation
+        var playInterval = null;
+        var playBtn = document.getElementById('radar-play');
+        function setPlayIcon(playing) {
+            if (!playBtn) return;
+            var icon = playBtn.querySelector('i');
+            if (icon) {
+                icon.className = playing ? 'bx bx-pause' : 'bx bx-play';
+            }
+        }
+        if (playBtn) {
+            playBtn.addEventListener('click', function() {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                    setPlayIcon(false);
+                    return;
+                }
+                setPlayIcon(true);
+                currentIdx = 0;
+                showSession(0);
+                playInterval = setInterval(function() {
+                    if (currentIdx >= sessions.length - 1) {
+                        clearInterval(playInterval);
+                        playInterval = null;
+                        setPlayIcon(false);
+                        return;
+                    }
+                    showSession(currentIdx + 1);
+                }, 1500);
+            });
+        }
 
         // Fetch session data with radar projections
         fetch(bp + '/api/sessions/signature/' + encodeURIComponent(sig))

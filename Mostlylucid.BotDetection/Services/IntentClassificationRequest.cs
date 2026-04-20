@@ -11,6 +11,7 @@ public sealed record IntentClassificationRequest
     public required string RequestId { get; init; }
     public required string PrimarySignature { get; init; }
     public required float[] IntentVector { get; init; }
+    public required IReadOnlyDictionary<string, float> IntentFeatures { get; init; }
     public required IReadOnlyDictionary<string, object> Signals { get; init; }
     public required string SessionSummary { get; init; }
     public required double HeuristicThreatScore { get; init; }
@@ -59,6 +60,9 @@ public static class IntentPromptBuilder
         if (signals.TryGetValue(Models.SignalKeys.ResponseAuthFailures, out var af) &&
             af is int afInt && afInt > 0)
             sb.Append("Auth failures: ").AppendLine(afInt.ToString());
+        if (signals.TryGetValue(Models.SignalKeys.ResponseRateLimitViolations, out var rl) &&
+            rl is int rlInt && rlInt > 0)
+            sb.Append("Rate-limit violations: ").AppendLine(rlInt.ToString());
 
         // Transport
         if (signals.TryGetValue(Models.SignalKeys.TransportClass, out var tc))
@@ -69,12 +73,25 @@ public static class IntentPromptBuilder
         // Temporal
         if (signals.TryGetValue(Models.SignalKeys.WaveformBurstDetected, out var burst) && burst is true)
             sb.AppendLine("Burst detected: yes");
+        if (signals.TryGetValue(Models.SignalKeys.SessionVelocityMagnitude, out var velocity))
+            sb.Append("Session velocity: ").AppendLine(velocity?.ToString());
+        if (signals.TryGetValue(Models.SignalKeys.SessionSelfSimilarity, out var selfSimilarity))
+            sb.Append("Session self-similarity: ").AppendLine(selfSimilarity?.ToString());
 
         // Stream abuse
         if (signals.TryGetValue(Models.SignalKeys.StreamHandshakeStorm, out var storm) && storm is true)
             sb.AppendLine("Handshake storm: yes");
         if (signals.TryGetValue(Models.SignalKeys.StreamCrossEndpointMixing, out var mix) && mix is true)
             sb.AppendLine("Cross-endpoint mixing: yes");
+        if (signals.TryGetValue(Models.SignalKeys.StreamReconnectRate, out var reconnectRate))
+            sb.Append("Reconnect rate: ").AppendLine(reconnectRate?.ToString());
+        if (signals.TryGetValue(Models.SignalKeys.StreamConcurrentStreams, out var concurrentStreams))
+            sb.Append("Concurrent streams: ").AppendLine(concurrentStreams?.ToString());
+
+        if (signals.TryGetValue(Models.SignalKeys.SimilarityTopScore, out var similarity))
+            sb.Append("Top similarity score: ").AppendLine(similarity?.ToString());
+        if (signals.TryGetValue(Models.SignalKeys.GeoChangeDriftDetected, out var geoDrift) && geoDrift is true)
+            sb.AppendLine("Geo drift detected: yes");
 
         // ATO signals
         if (signals.TryGetValue(Models.SignalKeys.AtoBruteForce, out var bf) && bf is true)

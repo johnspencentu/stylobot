@@ -43,6 +43,7 @@ public class ClusterContributor : ConfiguredContributorBase
     }
 
     public override string Name => "ClusterContributor";
+    protected override string ManifestName => Name;
     public override int Priority => Manifest?.Priority ?? 850;
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
@@ -182,9 +183,9 @@ public class ClusterContributor : ConfiguredContributorBase
             //    This INCREASES RESOLUTION on borderline calls without making arbitrary associations
             if (!inCluster)
             {
-                var countryCode = state.GetSignal<string>("geo.country_code");
-                var asn = state.GetSignal<string>("request.ip.asn");
-                var isDatacenter = state.GetSignal<bool>("request.ip.is_datacenter");
+                var countryCode = state.GetSignal<string>(SignalKeys.GeoCountryCode);
+                var asn = state.GetSignal<string>(SignalKeys.IpAsn);
+                var isDatacenter = state.GetSignal<bool>(SignalKeys.IpIsDatacenter);
 
                 if (!string.IsNullOrEmpty(asn) || !string.IsNullOrEmpty(countryCode))
                 {
@@ -211,7 +212,7 @@ public class ClusterContributor : ConfiguredContributorBase
 
             // 3. Check country reputation
             {
-                var countryCode = state.GetSignal<string>("geo.country_code");
+                var countryCode = state.GetSignal<string>(SignalKeys.GeoCountryCode);
                 if (!string.IsNullOrEmpty(countryCode))
                 {
                     var botRate = _countryTracker.GetCountryBotRate(countryCode);

@@ -418,6 +418,44 @@ public class StyloBotDashboardMiddleware
         return false;
     }
 
+    /// <summary>
+    ///     Checks if the current request is authorized for WRITE operations (config save/delete).
+    ///     Write access is denied by default — requires explicit WriteAuthorizationFilter
+    ///     or RequireWriteAuthorizationPolicy configuration. Viewing the dashboard does NOT grant write access.
+    /// </summary>
+    private async Task<bool> IsWriteAuthorizedAsync(HttpContext context)
+    {
+        // Custom write filter takes precedence
+        if (_options.WriteAuthorizationFilter != null)
+            return await _options.WriteAuthorizationFilter(context);
+
+        // Policy-based write auth
+        if (!string.IsNullOrEmpty(_options.RequireWriteAuthorizationPolicy))
+        {
+            var authService = context.RequestServices
+                    .GetService(typeof(IAuthorizationService))
+                as IAuthorizationService;
+
+            if (authService != null)
+            {
+                var result = await authService.AuthorizeAsync(
+                    context.User, null, _options.RequireWriteAuthorizationPolicy);
+                return result.Succeeded;
+            }
+        }
+
+        // Config editing must be explicitly enabled AND write auth configured
+        if (!_options.EnableConfigEditing)
+        {
+            _logger.LogWarning("Config write attempt denied: EnableConfigEditing is false");
+            return false;
+        }
+
+        // Default DENY — write access is never implicitly granted
+        _logger.LogWarning("Config write attempt denied: no WriteAuthorizationFilter or RequireWriteAuthorizationPolicy configured");
+        return false;
+    }
+
     private async Task ServeDashboardPageAsync(HttpContext context)
     {
         context.Response.ContentType = "text/html";
@@ -2013,11 +2051,16 @@ public class StyloBotDashboardMiddleware
         var license = LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
         var commercial = license.Status is LicenseStatusKind.Active or LicenseStatusKind.Trial;
 
+        // Config editing requires explicit opt-in via EnableConfigEditing + write auth
+        var canEdit = _options.EnableConfigEditing &&
+            (_options.WriteAuthorizationFilter != null || !string.IsNullOrEmpty(_options.RequireWriteAuthorizationPolicy));
+
         return new ConfigurationEditorModel
         {
             BasePath = _options.BasePath.TrimEnd('/'),
             Detectors = editor.ListManifests(),
-            IsCommercialLicensed = commercial
+            IsCommercialLicensed = commercial,
+            ReadOnly = !canEdit
         };
     }
 
@@ -2089,6 +2132,15 @@ public class StyloBotDashboardMiddleware
 
     private async Task ServeConfigManifestPutAsync(HttpContext context, ConfigEditorService editor, string slug)
     {
+        // Write operations require explicit write authorization — separate from dashboard read access
+        if (!await IsWriteAuthorizedAsync(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("{\"ok\":false,\"error\":\"Write access denied. Configure WriteAuthorizationFilter or RequireWriteAuthorizationPolicy.\"}");
+            return;
+        }
+
         // Body is either text/plain YAML or JSON {"yaml":"…"} — accept both because the
         // browser sends JSON via fetch() while curl users tend to send raw YAML.
         string yaml;
@@ -2149,6 +2201,15 @@ public class StyloBotDashboardMiddleware
 
     private async Task ServeConfigManifestDeleteAsync(HttpContext context, ConfigEditorService editor, string slug)
     {
+        // Write operations require explicit write authorization
+        if (!await IsWriteAuthorizedAsync(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("{\"ok\":false,\"error\":\"Write access denied.\"}");
+            return;
+        }
+
         var outcome = editor.DeleteOverride(slug);
         context.Response.StatusCode = outcome switch
         {
