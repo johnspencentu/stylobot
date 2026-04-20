@@ -548,6 +548,8 @@ public static class ServiceCollectionExtensions
         // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
         services.TryAddSingleton<Data.ISessionStore, Data.SqliteSessionStore>();
         services.AddHostedService<Data.SessionPersistenceService>();
+        // Entity resolution - background service for merge/split/rewind analysis
+        services.AddHostedService<Services.EntityResolutionService>();
         // Markov chain path learning and drift detection
         services.TryAddSingleton<Markov.MarkovTracker>();
         services.TryAddSingleton<Clustering.AdaptiveSimilarityWeighter>();

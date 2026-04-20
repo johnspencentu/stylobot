@@ -17,6 +17,9 @@ namespace Mostlylucid.BotDetection.Data;
 public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
 {
     private readonly string _connectionString;
+
+    /// <summary>Connection string for direct access by background services.</summary>
+    internal string ConnectionString => _connectionString;
     private readonly ILogger<SqliteSessionStore> _logger;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private bool _initialized;
@@ -512,15 +515,41 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
 
     // === Entity Resolution ===
 
+    /// <summary>Cosine similarity threshold for merging a new signature into an existing entity.</summary>
+    private const float MergeSimilarityThreshold = 0.85f;
+
+    /// <summary>Maximum age of entities to consider for merge candidates.</summary>
+    private static readonly TimeSpan MergeCandidateWindow = TimeSpan.FromHours(6);
+
     public async Task<string> ResolveEntityAsync(string primarySignature, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct);
 
-        // Check for existing active edge
+        // Check for existing active edge — exact match
         var existing = await GetEntityForSignatureAsync(primarySignature, ct);
         if (existing != null) return existing.EntityId;
 
-        // Create new entity + Initial edge
+        // Get the latest session vector for this new signature
+        var sessions = await GetSessionsAsync(primarySignature, 1, ct);
+        var newVector = sessions.Count > 0 && sessions[0].Vector is { Length: > 0 }
+            ? DeserializeVector(sessions[0].Vector)
+            : null;
+
+        // Try to merge with a near-neighbor entity (rotation detection)
+        if (newVector != null)
+        {
+            var mergeCandidate = await FindMergeCandidateAsync(newVector, primarySignature, ct);
+            if (mergeCandidate != null)
+            {
+                await MergeSignatureAsync(mergeCandidate.Value.EntityId, primarySignature,
+                    mergeCandidate.Value.Similarity,
+                    $"cosine={mergeCandidate.Value.Similarity:F3}, behavioral_match=true",
+                    ct);
+                return mergeCandidate.Value.EntityId;
+            }
+        }
+
+        // No merge candidate — create new entity
         var entityId = Guid.NewGuid().ToString("N")[..16];
         var now = DateTime.UtcNow.ToString("O");
 
@@ -555,6 +584,71 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
 
         _logger.LogDebug("Created entity {EntityId} for signature {Signature}", entityId, primarySignature[..Math.Min(8, primarySignature.Length)]);
         return entityId;
+    }
+
+    /// <summary>
+    ///     Find the best merge candidate among recent entities.
+    ///     Compares the new signature's session vector against root vectors of existing entities.
+    ///     Returns the entity ID and similarity if above threshold, null otherwise.
+    /// </summary>
+    private async Task<(string EntityId, float Similarity)?> FindMergeCandidateAsync(
+        float[] newVector, string excludeSignature, CancellationToken ct)
+    {
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        // Get recent entities with their most recent session vector (via their signatures)
+        // Only consider entities updated within the merge window
+        var cutoff = DateTime.UtcNow.Subtract(MergeCandidateWindow).ToString("O");
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT DISTINCT e.entity_id, s.vector
+            FROM entities e
+            INNER JOIN entity_edges ee ON e.entity_id = ee.entity_id AND ee.reverted_at IS NULL
+            INNER JOIN sessions s ON s.signature = ee.signature
+            WHERE e.updated_at >= @cutoff
+              AND ee.signature != @exclude
+              AND s.vector IS NOT NULL
+            ORDER BY s.ended_at DESC
+            LIMIT 50
+        """;
+        cmd.Parameters.AddWithValue("@cutoff", cutoff);
+        cmd.Parameters.AddWithValue("@exclude", excludeSignature);
+
+        string? bestEntityId = null;
+        var bestSimilarity = 0f;
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var seenEntities = new HashSet<string>();
+        while (await reader.ReadAsync(ct))
+        {
+            var entityId = reader.GetString(0);
+            if (!seenEntities.Add(entityId)) continue; // One comparison per entity
+
+            var vectorBytes = reader.IsDBNull(1) ? null : (byte[])reader[1];
+            if (vectorBytes == null) continue;
+
+            var candidateVector = DeserializeVector(vectorBytes);
+            if (candidateVector == null) continue;
+
+            var similarity = Analysis.SessionVectorizer.CosineSimilarity(newVector, candidateVector);
+            if (similarity > bestSimilarity)
+            {
+                bestSimilarity = similarity;
+                bestEntityId = entityId;
+            }
+        }
+
+        if (bestEntityId != null && bestSimilarity >= MergeSimilarityThreshold)
+        {
+            _logger.LogInformation(
+                "Merge candidate found: entity {Entity} similarity={Sim:F3} (threshold={Threshold})",
+                bestEntityId, bestSimilarity, MergeSimilarityThreshold);
+            return (bestEntityId, bestSimilarity);
+        }
+
+        return null;
     }
 
     public async Task<ResolvedEntity?> GetEntityForSignatureAsync(string primarySignature, CancellationToken ct = default)
