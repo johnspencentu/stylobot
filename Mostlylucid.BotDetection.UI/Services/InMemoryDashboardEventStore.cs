@@ -451,33 +451,25 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
         if (endTime.HasValue) source = source.Where(d => d.Timestamp <= endTime.Value);
 
         var threats = source
-            .Where(d => d.ThreatScore is > 0.3
-                        || (d.Path != null && (d.Path.StartsWith("/wp-", StringComparison.OrdinalIgnoreCase)
-                            || d.Path.StartsWith("/.env", StringComparison.OrdinalIgnoreCase)
-                            || d.Path.StartsWith("/.git", StringComparison.OrdinalIgnoreCase)))
-                        || d.Action == "simulation-pack")
+            .Where(d => d.Action == "simulation-pack"
+                        || d.ThreatBand is "Critical" or "High")
             .OrderByDescending(d => d.Timestamp)
             .Take(count)
             .Select(d =>
             {
                 var path = d.Path ?? "/";
                 var threatScore = d.ThreatScore ?? 0;
-                string? cveSeverity = null;
-                string? packId = null;
 
-                if (path.StartsWith("/wp-", StringComparison.OrdinalIgnoreCase))
+                // Derive severity from the detection system's threat band — no hardcoded path matching
+                var cveSeverity = d.ThreatBand switch
                 {
-                    packId = "wordpress-5.9";
-                    cveSeverity = threatScore >= 0.8 ? "critical" : threatScore >= 0.55 ? "high" : "medium";
-                }
-                else if (path.StartsWith("/.env", StringComparison.OrdinalIgnoreCase) ||
-                         path.StartsWith("/.git", StringComparison.OrdinalIgnoreCase))
-                {
-                    cveSeverity = "high";
-                }
-                else if (threatScore >= 0.8) cveSeverity = "critical";
-                else if (threatScore >= 0.55) cveSeverity = "high";
-                else if (threatScore >= 0.35) cveSeverity = "medium";
+                    "Critical" => "critical",
+                    "High" => "high",
+                    "Elevated" or "Medium" => "medium",
+                    _ => threatScore >= 0.8 ? "critical" : threatScore >= 0.55 ? "high" : null
+                };
+                // Pack ID comes from the detection action, not path matching
+                var packId = d.Action == "simulation-pack" ? "simulation-pack" : (string?)null;
 
                 return new ThreatEntry
                 {

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Services;
@@ -48,9 +50,33 @@ public static class StyloBotDashboardServiceExtensions
     }
 
     /// <summary>
+    ///     Full StyloBot setup: detection + dashboard services.
+    ///     This is the recommended entry point for most applications.
+    ///     Pair with <see cref="UseStyloBot"/> in the middleware pipeline.
+    /// </summary>
+    /// <example>
+    ///     <code>
+    ///     builder.Services.AddStyloBot(dashboard => {
+    ///         dashboard.AllowUnauthenticatedAccess = true; // dev only
+    ///     });
+    ///     app.UseRouting();
+    ///     app.UseStyloBot();
+    ///     app.MapControllers();
+    ///     </code>
+    /// </example>
+    public static IServiceCollection AddStyloBot(
+        this IServiceCollection services,
+        Action<StyloBotDashboardOptions>? configureDashboard = null,
+        Action<BotDetectionOptions>? configureDetection = null)
+    {
+        services.AddBotDetection(configureDetection);
+        services.AddStyloBotDashboard(configureDashboard);
+        return services;
+    }
+
+    /// <summary>
     ///     Adds Stylobot Dashboard services to the service collection.
-    ///     This is the "batteries included" option: full dashboard route, SignalR hub,
-    ///     all widget partials, real-time updates, API endpoints.
+    ///     For most applications, use <see cref="AddStyloBot"/> instead which includes detection.
     ///     <para>
     ///     Internally calls <see cref="AddStyloBotUI"/> so all tag helpers are available too.
     ///     </para>
@@ -136,29 +162,68 @@ public static class StyloBotDashboardServiceExtensions
     }
 
     /// <summary>
-    ///     Maps Stylobot Dashboard endpoints (UI and SignalR hub).
+    ///     Full StyloBot setup: detection + dashboard in the correct middleware order.
+    ///     This is the recommended way to add StyloBot to your application.
+    ///     <para>
+    ///     Registers: detection middleware, broadcast middleware, dashboard UI, SignalR hub.
+    ///     The broadcast middleware wraps detection so ALL detections (including blocked requests)
+    ///     are recorded in the dashboard — no middleware ordering issues.
+    ///     </para>
     /// </summary>
-    /// <param name="app">The application builder</param>
-    /// <returns>The application builder for chaining</returns>
+    /// <example>
+    ///     <code>
+    ///     builder.Services.AddStyloBot();             // or AddBotDetection() + AddStyloBotDashboard()
+    ///     app.UseRouting();
+    ///     app.UseStyloBot();                           // detection + dashboard, correct order guaranteed
+    ///     app.MapControllers();
+    ///     </code>
+    /// </example>
+    public static IApplicationBuilder UseStyloBot(this IApplicationBuilder app)
+    {
+        var options = app.ApplicationServices.GetService<StyloBotDashboardOptions>();
+
+        if (options?.Enabled == true)
+        {
+            // Broadcast middleware goes FIRST — it wraps detection.
+            // When _next returns (whether detection blocked or allowed the request),
+            // the broadcast middleware ALWAYS runs and records the result.
+            // This solves the "blocked requests invisible in dashboard" problem.
+            app.UseMiddleware<DetectionBroadcastMiddleware>();
+        }
+
+        // Detection middleware
+        app.UseBotDetection();
+
+        if (options?.Enabled == true)
+        {
+            // Dashboard UI middleware
+            app.UseMiddleware<StyloBotDashboardMiddleware>();
+
+            // SignalR hub for live updates
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapHub<StyloBotDashboardHub>(options.HubPath)
+                    .WithMetadata(new BotDetection.Attributes.BotPolicyAttribute("default") { BlockThreshold = 0.95 });
+            });
+        }
+
+        return app;
+    }
+
+    /// <summary>
+    ///     Maps Stylobot Dashboard endpoints (UI and SignalR hub).
+    ///     Prefer <see cref="UseStyloBot"/> which handles middleware ordering automatically.
+    ///     Use this only if you need to register detection and dashboard middleware separately.
+    /// </summary>
     public static IApplicationBuilder UseStyloBotDashboard(this IApplicationBuilder app)
     {
         var options = app.ApplicationServices.GetRequiredService<StyloBotDashboardOptions>();
 
         if (!options.Enabled) return app;
 
-        // Detection runs on ALL paths including dashboard API - no exclusions.
-        // FastPathReputation fix (UA patterns don't trigger early exit) prevents feedback loops.
-
-        // Broadcast REAL detections to SignalR - must be BEFORE UseEndpoints
-        // This runs for ALL requests to capture detection results
         app.UseMiddleware<DetectionBroadcastMiddleware>();
-
-        // Use dashboard middleware for routing dashboard UI requests
         app.UseMiddleware<StyloBotDashboardMiddleware>();
 
-        // Map SignalR hub - this must be inside UseEndpoints
-        // Detection still runs (signals collected, reputation built) but only confirmed bots
-        // (0.95+) are blocked. Dashboard operators connecting via WebSocket pass through.
         app.UseEndpoints(endpoints =>
         {
             endpoints.MapHub<StyloBotDashboardHub>(options.HubPath)

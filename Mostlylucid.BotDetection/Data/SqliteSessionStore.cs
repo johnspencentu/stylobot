@@ -70,15 +70,13 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                 avg_processing_time_ms REAL,
                 error_count INTEGER DEFAULT 0,
                 timing_entropy REAL DEFAULT 0,
-                narrative TEXT,
-                dashboard_signature_id TEXT
+                narrative TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_sessions_signature ON sessions(signature, ended_at DESC);
             CREATE INDEX IF NOT EXISTS idx_sessions_ended ON sessions(ended_at DESC);
             CREATE INDEX IF NOT EXISTS idx_sessions_is_bot ON sessions(is_bot, ended_at DESC);
             CREATE INDEX IF NOT EXISTS idx_sessions_country ON sessions(country_code);
-            CREATE INDEX IF NOT EXISTS idx_sessions_dashboard_sig ON sessions(dashboard_signature_id, ended_at DESC);
 
             CREATE TABLE IF NOT EXISTS signatures (
                 signature_id TEXT PRIMARY KEY,

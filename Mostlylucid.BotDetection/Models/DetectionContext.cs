@@ -469,7 +469,11 @@ public static class SignalKeys
     // Set by BehavioralWaveformContributor
     // ==========================================
 
+    /// <summary>String: Unified client signature (HMAC-SHA256). Written by SignatureContributor at Priority 1.</summary>
+    public const string PrimarySignature = "signature.primary";
+
     /// <summary>String: Client waveform signature (IP:UA hash)</summary>
+    [Obsolete("Use PrimarySignature instead. WaveformSignature will be removed in 7.0.")]
     public const string WaveformSignature = "waveform.signature";
 
     /// <summary>Double: Timing regularity score (coefficient of variation)</summary>

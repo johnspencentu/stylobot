@@ -21,8 +21,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGeoRoutingSimple();
 
 // Add bot detection - configuration from appsettings.json
-// Full detection mode is enabled via the "full-log" ActionPolicy in config
-builder.Services.AddBotDetection();
+// ExcludeLocalIpFromBroadcast=false so localhost traffic appears in the dashboard
+builder.Services.AddBotDetection(options =>
+{
+    options.ExcludeLocalIpFromBroadcast = false;
+});
 
 // Add telemetry instrumentation (required by BotDetectionMiddleware)
 builder.Services.AddBotDetectionTelemetry();
@@ -98,19 +101,17 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// Add bot detection middleware (MUST be after UseRouting so endpoint metadata is visible)
-app.UseBotDetection();
+// Full StyloBot: detection + dashboard, correct middleware ordering guaranteed.
+// Broadcast middleware wraps detection so blocked requests are always recorded.
+app.UseStyloBot();
 
-// Add signature capture middleware (MUST be after UseBotDetection to capture evidence)
+// Add signature capture middleware (MUST be after UseStyloBot to capture evidence)
 app.UseSignatureCapture();
 
-// Add YARP learning mode middleware (MUST be after UseBotDetection)
+// Add YARP learning mode middleware (MUST be after UseStyloBot)
 app.UseYarpLearningMode();
 
 app.UseAuthorization();
-
-// Add StyloBot Dashboard (MUST be after UseRouting/UseAuthorization)
-app.UseStyloBotDashboard();
 
 app.MapControllers();
 app.MapControllerRoute("default", "{controller}/{action=Index}/{id?}"); // MVC conventional routing

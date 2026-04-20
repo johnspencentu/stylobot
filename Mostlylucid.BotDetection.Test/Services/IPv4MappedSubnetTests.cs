@@ -4,63 +4,94 @@ namespace Mostlylucid.BotDetection.Test.Services;
 
 /// <summary>
 ///     Tests for IPv4-mapped IPv6 subnet normalization.
-///     Regression test for the bug where ::ffff:x.x.x.x addresses were grouped
-///     into the ::ffff::/48 subnet, causing ALL IPv4-mapped addresses to share
-///     reputation and leading to false positive VerifiedBadBot verdicts.
+///     Local/private IPs return empty (they must never get subnet reputation).
+///     Public IPs return their /24 or /48 subnet.
 /// </summary>
 public class IPv4MappedSubnetTests
 {
     [Theory]
-    [InlineData("192.168.1.100", "192.168.1.0/24")]
-    [InlineData("10.0.0.1", "10.0.0.0/24")]
     [InlineData("8.8.8.8", "8.8.8.0/24")]
-    public void NormalizeIpToRange_PureIPv4_Returns24Subnet(string ip, string expected)
+    [InlineData("1.2.3.4", "1.2.3.0/24")]
+    [InlineData("203.0.113.50", "203.0.113.0/24")]
+    public void NormalizeIpToRange_PublicIPv4_Returns24Subnet(string ip, string expected)
     {
         var result = SignatureFeedbackHandler.NormalizeIpToRange(ip);
         Assert.Equal(expected, result);
     }
 
     [Theory]
-    [InlineData("::ffff:192.168.1.100", "192.168.1.0/24")]
-    [InlineData("::ffff:10.0.0.1", "10.0.0.0/24")]
-    [InlineData("::ffff:127.0.0.1", "127.0.0.0/24")]
+    [InlineData("192.168.1.100")]
+    [InlineData("10.0.0.1")]
+    [InlineData("127.0.0.1")]
+    [InlineData("172.16.0.1")]
+    public void NormalizeIpToRange_PrivateIPv4_ReturnsEmpty(string ip)
+    {
+        var result = SignatureFeedbackHandler.NormalizeIpToRange(ip);
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Theory]
     [InlineData("::ffff:8.8.8.8", "8.8.8.0/24")]
-    public void NormalizeIpToRange_IPv4Mapped_ExtractsIPv4AndReturns24Subnet(string ip, string expected)
+    public void NormalizeIpToRange_IPv4Mapped_PublicIP_ExtractsAndReturns24(string ip, string expected)
     {
         var result = SignatureFeedbackHandler.NormalizeIpToRange(ip);
         Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("::ffff:192.168.1.100")]
+    [InlineData("::ffff:10.0.0.1")]
+    [InlineData("::ffff:127.0.0.1")]
+    public void NormalizeIpToRange_IPv4Mapped_PrivateIP_ReturnsEmpty(string ip)
+    {
+        var result = SignatureFeedbackHandler.NormalizeIpToRange(ip);
+        Assert.Equal(string.Empty, result);
     }
 
     [Fact]
     public void NormalizeIpToRange_IPv4Mapped_DoesNotReturn48Subnet()
     {
-        // This was the bug: ::ffff:192.168.0.86 was being normalized to ::ffff::/48
-        // which matched ALL IPv4-mapped addresses
-        var result = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:192.168.0.86");
-
+        // Public IPv4-mapped should return /24, not /48
+        var result = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:8.8.8.8");
         Assert.DoesNotContain("/48", result);
-        Assert.DoesNotContain("::ffff::", result);
-        Assert.Equal("192.168.0.0/24", result);
+        Assert.Equal("8.8.8.0/24", result);
     }
 
     [Fact]
     public void NormalizeIpToRange_DifferentIPv4Mapped_DifferentSubnets()
     {
-        // These should be in DIFFERENT subnets, not the same ::ffff::/48
+        // Private IPs return empty (no reputation)
         var local = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:127.0.0.1");
-        var lan = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:192.168.0.86");
-        var public1 = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:8.8.8.8");
+        Assert.Equal(string.Empty, local);
 
-        Assert.NotEqual(local, lan);
-        Assert.NotEqual(lan, public1);
-        Assert.NotEqual(local, public1);
+        // Public IPs should be in different subnets
+        var public1 = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:8.8.8.8");
+        var public2 = SignatureFeedbackHandler.NormalizeIpToRange("::ffff:1.1.1.1");
+        Assert.NotEqual(public1, public2);
+    }
+
+    [Fact]
+    public void NormalizeIpToRange_Localhost_ReturnsEmpty()
+    {
+        Assert.Equal(string.Empty, SignatureFeedbackHandler.NormalizeIpToRange("::1"));
+        Assert.Equal(string.Empty, SignatureFeedbackHandler.NormalizeIpToRange("127.0.0.1"));
     }
 
     [Theory]
     [InlineData("2001:db8:1234::1", "2001:db8:1234::/48")]
-    public void NormalizeIpToRange_PureIPv6_Returns48Subnet(string ip, string expected)
+    public void NormalizeIpToRange_PureIPv6_Public_Returns48Subnet(string ip, string expected)
     {
         var result = SignatureFeedbackHandler.NormalizeIpToRange(ip);
         Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("fe80::1")]
+    [InlineData("fc00::1")]
+    [InlineData("fd00::1")]
+    public void NormalizeIpToRange_IPv6_LinkLocalAndULA_ReturnsEmpty(string ip)
+    {
+        var result = SignatureFeedbackHandler.NormalizeIpToRange(ip);
+        Assert.Equal(string.Empty, result);
     }
 }

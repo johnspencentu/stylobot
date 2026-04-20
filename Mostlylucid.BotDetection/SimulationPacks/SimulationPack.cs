@@ -12,9 +12,9 @@ public sealed record SimulationPack
     public required string Framework { get; init; }
     public required string Version { get; init; }
     public string? Description { get; init; }
-    public IReadOnlyList<PackHoneypotPath> HoneypotPaths { get; init; } = [];
-    public IReadOnlyList<PackResponseTemplate> ResponseTemplates { get; init; } = [];
-    public IReadOnlyList<PackCveModule> CveModules { get; init; } = [];
+    public List<PackHoneypotPath> HoneypotPaths { get; init; } = [];
+    public List<PackResponseTemplate> ResponseTemplates { get; init; } = [];
+    public List<PackCveModule> CveModules { get; init; } = [];
     public PackTimingProfile TimingProfile { get; init; } = new();
 }
 
@@ -86,7 +86,7 @@ public sealed record PackResponseHints
     public string? BodySchema { get; init; }
 
     /// <summary>Expected HTTP methods that trigger this endpoint (GET, POST, etc.).</summary>
-    public IReadOnlyList<string>? ExpectedMethods { get; init; }
+    public List<string>? ExpectedMethods { get; init; }
 
     /// <summary>
     ///     What a multi-step exploit flow looks like for this endpoint.
@@ -116,8 +116,8 @@ public sealed record PackCveModule
 {
     public required string CveId { get; init; }
     public string? Severity { get; init; }
-    public IReadOnlyList<string> AffectedVersions { get; init; } = [];
-    public required IReadOnlyList<string> ProbePaths { get; init; }
+    public List<string> AffectedVersions { get; init; } = [];
+    public required List<string> ProbePaths { get; init; }
     public PackResponseTemplate? ProbeResponse { get; init; }
     public string? Description { get; init; }
 }

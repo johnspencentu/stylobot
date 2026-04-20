@@ -787,6 +787,8 @@ public class EphemeralDetectionOrchestrator : IAsyncDisposable
             metadata["ip"] = ip;
         if (result.Signals.TryGetValue("path", out var path))
             metadata["path"] = path;
+        if (result.Signals.TryGetValue(Models.SignalKeys.PrimarySignature, out var primarySig))
+            metadata["primarySignature"] = primarySig;
 
         _learningBus.TryPublish(new LearningEvent
         {

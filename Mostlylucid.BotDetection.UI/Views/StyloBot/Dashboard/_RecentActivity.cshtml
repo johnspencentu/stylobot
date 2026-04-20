@@ -91,11 +91,19 @@
                                 _ => "text-success"
                             };
                             var actionClass = v.Action switch {
-                                "Block" => "text-error",
-                                "Throttle" => "text-warning",
-                                "Challenge" => "text-info",
-                                "TarPit" => "text-error",
+                                "Block" or "block" or "block-hard" => "text-error",
+                                "Throttle" or "throttle" or "throttle-stealth" => "text-warning",
+                                "Challenge" or "challenge" => "text-info",
+                                "TarPit" or "simulation-pack" => "text-error",
                                 _ => "text-base-content/50"
+                            };
+                            var friendlyAction = v.Action switch {
+                                "throttle-stealth" => "Silent Throttle",
+                                "block-hard" => "Hard Block",
+                                "logonly" => "Monitor Only",
+                                "redirect-honeypot" => "Honeypot",
+                                "simulation-pack" => "Honeypot",
+                                _ => v.Action
                             };
                             <tr class="hover:bg-base-300/50 cursor-pointer transition-colors">
                                 <td class="py-1 text-base-content/50 whitespace-nowrap text-[10px]">
@@ -119,7 +127,7 @@
                                     }
                                 </td>
                                 <td class="py-1 text-right font-bold text-xs @riskClass">@(probPct)%</td>
-                                <td class="py-1 text-[10px] @actionClass font-medium">@(v.Action ?? "Allow")</td>
+                                <td class="py-1 text-[10px] @actionClass font-medium">@(friendlyAction ?? "Allow")</td>
                             </tr>
                         }
                     </tbody>

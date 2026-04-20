@@ -199,7 +199,16 @@ public class SignatureFeedbackHandler : ILearningEventHandler
     {
         var signatures = new List<(string, string)>();
 
-        // UA pattern signature
+        // PRIMARY: Use the multi-factor PrimarySignature as the reputation anchor.
+        // This is HMAC(IP+UA) — it distinguishes visitors behind the same IP.
+        // Different browsers/tools from the same IP get different reputations.
+        if (evt.Metadata?.TryGetValue("primarySignature", out var primaryObj) == true &&
+            primaryObj is string primary && !string.IsNullOrEmpty(primary))
+        {
+            signatures.Add((SignatureTypes.CombinedSignature, primary));
+        }
+
+        // UA pattern signature — still useful for UA-family reputation (all Chrome users)
         if (evt.Metadata?.TryGetValue("userAgent", out var uaObj) == true &&
             uaObj is string userAgent && !string.IsNullOrEmpty(userAgent))
         {
@@ -207,13 +216,9 @@ public class SignatureFeedbackHandler : ILearningEventHandler
             signatures.Add((SignatureTypes.UaPattern, uaPattern));
         }
 
-        // IP range signature
-        if (evt.Metadata?.TryGetValue("ip", out var ipObj) == true &&
-            ipObj is string ip && !string.IsNullOrEmpty(ip))
-        {
-            var ipRange = NormalizeIpToRange(ip);
-            signatures.Add((SignatureTypes.IpRange, ipRange));
-        }
+        // NO IP range reputation. IP-alone reputation poisons all visitors from the same
+        // network (e.g., localhost curl traffic poisons localhost Chrome).
+        // The PrimarySignature already incorporates IP — that's sufficient.
 
         // Path pattern signature
         if (evt.Metadata?.TryGetValue("path", out var pathObj) == true &&
@@ -228,13 +233,6 @@ public class SignatureFeedbackHandler : ILearningEventHandler
         {
             var behaviorHash = ComputeBehaviorHash(evt.Features);
             signatures.Add((SignatureTypes.BehaviorHash, behaviorHash));
-        }
-
-        // Combined signature (if we have enough data)
-        if (signatures.Count >= 2)
-        {
-            var combined = ComputeCombinedSignature(signatures);
-            signatures.Add((SignatureTypes.CombinedSignature, combined));
         }
 
         // Pattern from event
@@ -285,6 +283,11 @@ public class SignatureFeedbackHandler : ILearningEventHandler
     /// </summary>
     internal static string NormalizeIpToRange(string ip)
     {
+        // Local/loopback IPs must never get subnet-level reputation.
+        // They're not network identities — every developer runs from ::1/127.0.0.1.
+        // Building reputation on localhost would poison detection for all local traffic.
+        if (IsLocalOrLoopback(ip)) return string.Empty;
+
         // For IPv4: use /24 (class C)
         // For IPv6: use /48
         // For IPv4-mapped IPv6 (::ffff:x.x.x.x): extract the IPv4 and use /24
@@ -293,6 +296,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
         if (ip.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase) && ip.Contains('.'))
         {
             var ipv4Part = ip.Substring("::ffff:".Length);
+            if (IsLocalOrLoopback(ipv4Part)) return string.Empty;
             var parts = ipv4Part.Split('.');
             if (parts.Length >= 3) return $"{parts[0]}.{parts[1]}.{parts[2]}.0/24";
         }
@@ -311,6 +315,24 @@ public class SignatureFeedbackHandler : ILearningEventHandler
         }
 
         return ip; // Fallback to exact IP
+    }
+
+    private static bool IsLocalOrLoopback(string ip)
+    {
+        return ip is "::1" or "127.0.0.1" or "0.0.0.0"
+               || ip.StartsWith("127.", StringComparison.Ordinal)
+               || ip.StartsWith("10.", StringComparison.Ordinal)
+               || ip.StartsWith("192.168.", StringComparison.Ordinal)
+               || ip.StartsWith("172.16.", StringComparison.Ordinal)
+               || ip.StartsWith("172.17.", StringComparison.Ordinal)
+               || ip.StartsWith("172.18.", StringComparison.Ordinal)
+               || ip.StartsWith("172.19.", StringComparison.Ordinal)
+               || ip.StartsWith("172.2", StringComparison.Ordinal) // 172.20-29
+               || ip.StartsWith("172.30.", StringComparison.Ordinal)
+               || ip.StartsWith("172.31.", StringComparison.Ordinal)
+               || ip.StartsWith("fe80:", StringComparison.OrdinalIgnoreCase) // link-local
+               || ip.StartsWith("fc", StringComparison.OrdinalIgnoreCase)    // ULA
+               || ip.StartsWith("fd", StringComparison.OrdinalIgnoreCase);   // ULA
     }
 
     /// <summary>

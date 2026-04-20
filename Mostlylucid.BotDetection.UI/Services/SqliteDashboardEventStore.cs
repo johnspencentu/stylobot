@@ -125,21 +125,21 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 VALUES (@ts, @sig, @method, @path, @isBot, @prob, @conf, @risk, @name, @type, @action, @country, @ms, @threat, @band, @status)
                 """;
             cmd.Parameters.AddWithValue("@ts", detection.Timestamp.ToString("O"));
-            cmd.Parameters.AddWithValue("@sig", detection.PrimarySignature ?? "");
+            cmd.Parameters.AddWithValue("@sig", detection.PrimarySignature ?? "unknown");
             cmd.Parameters.AddWithValue("@method", detection.Method ?? "GET");
             cmd.Parameters.AddWithValue("@path", detection.Path ?? "/");
             cmd.Parameters.AddWithValue("@isBot", detection.IsBot ? 1 : 0);
-            cmd.Parameters.AddWithValue("@prob", detection.BotProbability);
-            cmd.Parameters.AddWithValue("@conf", detection.Confidence);
+            cmd.Parameters.AddWithValue("@prob", (double)detection.BotProbability);
+            cmd.Parameters.AddWithValue("@conf", (double)detection.Confidence);
             cmd.Parameters.AddWithValue("@risk", detection.RiskBand ?? "Unknown");
             cmd.Parameters.AddWithValue("@name", (object?)detection.BotName ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@type", (object?)detection.BotType ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@action", (object?)detection.Action ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@country", (object?)detection.CountryCode ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@ms", detection.ProcessingTimeMs);
-            cmd.Parameters.AddWithValue("@threat", detection.ThreatScore);
+            cmd.Parameters.AddWithValue("@ms", (double)detection.ProcessingTimeMs);
+            cmd.Parameters.AddWithValue("@threat", (double)(detection.ThreatScore ?? 0.0));
             cmd.Parameters.AddWithValue("@band", (object?)detection.ThreatBand ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@status", detection.StatusCode);
+            cmd.Parameters.AddWithValue("@status", (int)detection.StatusCode);
             await cmd.ExecuteNonQueryAsync();
         }
         finally
@@ -179,17 +179,17 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                     narrative = COALESCE(@narrative, narrative)
                 RETURNING hit_count
                 """;
-            cmd.Parameters.AddWithValue("@sig", signature.PrimarySignature ?? "");
+            cmd.Parameters.AddWithValue("@sig", signature.PrimarySignature ?? "unknown");
             cmd.Parameters.AddWithValue("@name", (object?)signature.BotName ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@type", (object?)signature.BotType ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@isBot", signature.IsKnownBot ? 1 : 0);
-            cmd.Parameters.AddWithValue("@prob", signature.BotProbability ?? 0);
-            cmd.Parameters.AddWithValue("@conf", signature.Confidence ?? 0);
+            cmd.Parameters.AddWithValue("@prob", (double)(signature.BotProbability ?? 0));
+            cmd.Parameters.AddWithValue("@conf", (double)(signature.Confidence ?? 0));
             cmd.Parameters.AddWithValue("@risk", signature.RiskBand ?? "Unknown");
             cmd.Parameters.AddWithValue("@action", (object?)signature.Action ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@country", DBNull.Value); // Signatures don't carry country directly
-            cmd.Parameters.AddWithValue("@ms", signature.ProcessingTimeMs ?? 0);
-            cmd.Parameters.AddWithValue("@threat", signature.ThreatScore);
+            cmd.Parameters.AddWithValue("@country", DBNull.Value);
+            cmd.Parameters.AddWithValue("@ms", (double)(signature.ProcessingTimeMs ?? 0));
+            cmd.Parameters.AddWithValue("@threat", (double)(signature.ThreatScore ?? 0));
             cmd.Parameters.AddWithValue("@band", (object?)signature.ThreatBand ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@narrative", (object?)signature.Narrative ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("O"));
@@ -548,14 +548,7 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                    threat_score, threat_band, country_code, action, status_code
             FROM detections
             WHERE (action = 'simulation-pack'
-                   OR path LIKE '/wp-%'
-                   OR path LIKE '/xmlrpc.php%'
-                   OR path LIKE '/.env%'
-                   OR path LIKE '/.git%'
-                   OR path LIKE '/.svn%'
-                   OR path LIKE '/phpmyadmin%'
-                   OR path LIKE '/wp-config%'
-                   OR (threat_score >= 0.55 AND threat_band IN ('Critical', 'High')))
+                   OR threat_band IN ('Critical', 'High'))
             """;
 
         if (startTime.HasValue)

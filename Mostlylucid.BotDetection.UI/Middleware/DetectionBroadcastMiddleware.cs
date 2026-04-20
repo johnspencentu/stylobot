@@ -82,18 +82,15 @@ public partial class DetectionBroadcastMiddleware
                 context.Items.TryGetValue(BotDetectionMiddleware.BotDetectionResultKey, out var upstreamObj) &&
                 upstreamObj is BotDetectionResult upstreamResult)
             {
-                var options = optionsAccessor.Value;
-                if (options.ExcludeLocalIpFromBroadcast && IsLocalIp(context.Connection.RemoteIpAddress))
-                {
-                    _logger.LogDebug("Skipping upstream broadcast for local IP {Ip}", context.Connection.RemoteIpAddress);
-                    return;
-                }
-
                 var detection = BuildDetectionFromUpstream(context, upstreamResult);
+                // Always store and update caches regardless of source IP
                 var updatedSignature = await StoreDetectionAndSignatureAsync(context, detection, eventStore);
-
                 signatureAggregateCache.UpdateFromDetection(detection);
                 visitorListCache.Upsert(detection);
+
+                var options = optionsAccessor.Value;
+                if (options.ExcludeLocalIpFromBroadcast && IsLocalIp(context.Connection.RemoteIpAddress))
+                    return; // Skip SignalR broadcast only — DB and caches are already updated
 
                 // Beacon-only: signal which widgets need refreshing, never send full payloads
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
@@ -136,17 +133,12 @@ public partial class DetectionBroadcastMiddleware
                 var updatedSignature = await StoreDetectionAndSignatureAsync(context, detection, eventStore);
 
                 signatureAggregateCache.UpdateFromDetection(detection);
+                visitorListCache.Upsert(detection);
 
-                // Filter out local/private IP detections from broadcast if configured
+                // Filter out local/private IP detections from SignalR broadcast if configured
                 var options = optionsAccessor.Value;
                 if (options.ExcludeLocalIpFromBroadcast && IsLocalIp(context.Connection.RemoteIpAddress))
-                {
-                    _logger.LogDebug("Skipping broadcast for local IP {Ip}", context.Connection.RemoteIpAddress);
-                    return; // Stored to DB above, just don't broadcast to live feed
-                }
-
-                // Update server-side visitor cache and broadcast beacon signals
-                visitorListCache.Upsert(detection);
+                    return; // Skip broadcast only — DB and caches are already updated
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
                 await hubContext.Clients.All.BroadcastInvalidation("summary");
 

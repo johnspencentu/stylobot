@@ -370,7 +370,10 @@ else
                                     <td class="py-1 text-right text-xs @(d.BotProbability >= 0.7 ? "text-error" : d.BotProbability >= 0.4 ? "text-warning" : "text-success")">@($"{d.BotProbability:P0}")</td>
                                     <td class="py-1 text-right text-xs text-base-content/60">@($"{d.Confidence:P0}")</td>
                                     <td class="py-1 text-[10px] @RiskColor(d.RiskBand)">@d.RiskBand</td>
-                                    <td class="py-1 text-[10px] @ActionColor(d.Action)">@(d.Action ?? "Allow")</td>
+                                    @{
+                                        var dAction = d.Action switch { "throttle-stealth" => "Silent Throttle", "block-hard" => "Hard Block", "logonly" => "Monitor Only", "redirect-honeypot" => "Honeypot", "simulation-pack" => "Honeypot", _ => d.Action };
+                                    }
+                                    <td class="py-1 text-[10px] @ActionColor(d.Action)">@(dAction ?? "Allow")</td>
                                     <td class="py-1 text-right text-[10px] text-base-content/40 font-mono">@($"{d.ProcessingTimeMs:F1}")ms</td>
                                 </tr>
                             }

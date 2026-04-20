@@ -1094,11 +1094,8 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
                    bot_probability, COALESCE((important_signals->>'threat.score')::double precision, 0) AS threat_score,
                    important_signals->>'threat.band' AS threat_band, country_code, action, status_code
             FROM dashboard_detections
-            WHERE (COALESCE((important_signals->>'threat.score')::double precision, 0) > 0.3
-                   OR path LIKE '/wp-%%'
-                   OR path LIKE '/.env%%'
-                   OR path LIKE '/.git%%'
-                   OR action = 'simulation-pack')
+            WHERE (action = 'simulation-pack'
+                   OR important_signals->>'threat.band' IN ('Critical', 'High'))
             {timeFilter}
             ORDER BY timestamp DESC
             LIMIT @Count";
