@@ -7,32 +7,73 @@
 <div id="summary-stats"
      data-sb-widget="summary"
      data-sb-depends="summary"
-     class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 rounded-lg text-sm"
+     class="px-3 py-2 rounded-lg text-sm"
      style="background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);">
 
-    <span class="inline-flex items-center gap-1.5">
-        <span class="font-bold text-base-content">@s.TotalRequests.ToString("N0")</span>
-        <span class="text-base-content/50 text-xs">total</span>
-    </span>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span class="inline-flex items-center gap-1.5">
+            <span class="font-bold text-base-content">@s.TotalRequests.ToString("N0")</span>
+            <span class="text-base-content/50 text-xs">total</span>
+        </span>
 
-    <span style="color: var(--sb-card-divider);">|</span>
+        <span style="color: var(--sb-card-divider);">|</span>
 
-    <span class="inline-flex items-center gap-1.5">
-        <span class="font-bold text-error">@s.BotRequests.ToString("N0")</span>
-        <span class="text-xs text-error/70">bots (@(botPct)%)</span>
-    </span>
+        <span class="inline-flex items-center gap-1.5">
+            <span class="font-bold text-error">@s.BotRequests.ToString("N0")</span>
+            <span class="text-xs text-error/70">bots (@(botPct)%)</span>
+        </span>
 
-    <span style="color: var(--sb-card-divider);">|</span>
+        <span style="color: var(--sb-card-divider);">|</span>
 
-    <span class="inline-flex items-center gap-1.5">
-        <span class="font-bold text-success">@s.HumanRequests.ToString("N0")</span>
-        <span class="text-xs text-base-content/50">human</span>
-    </span>
+        <span class="inline-flex items-center gap-1.5">
+            <span class="font-bold text-success">@s.HumanRequests.ToString("N0")</span>
+            <span class="text-xs text-base-content/50">human</span>
+        </span>
 
-    <span style="color: var(--sb-card-divider);">|</span>
+        <span style="color: var(--sb-card-divider);">|</span>
 
-    <span class="inline-flex items-center gap-1.5">
-        <span class="font-bold text-base-content">@s.UniqueSignatures.ToString("N0")</span>
-        <span class="text-xs text-base-content/50">signatures</span>
-    </span>
+        <span class="inline-flex items-center gap-1.5">
+            <span class="font-bold text-base-content">@s.UniqueSignatures.ToString("N0")</span>
+            <span class="text-xs text-base-content/50">signatures</span>
+        </span>
+    </div>
+
+    <!-- Session analytics row -->
+    <div id="summary-analytics" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-sm">
+        <div class="p-2 bg-base-200/50 rounded">
+            <div class="text-base-content/50 text-xs">Active now</div>
+            <div class="text-lg font-bold">@Model.ActiveSessions</div>
+        </div>
+        <div class="p-2 bg-base-200/50 rounded">
+            <div class="text-base-content/50 text-xs">Unique visitors</div>
+            <div class="text-lg font-bold">@Model.UniqueVisitors</div>
+        </div>
+        <div class="p-2 bg-base-200/50 rounded">
+            <div class="text-base-content/50 text-xs">Real bounce rate</div>
+            <div class="text-lg font-bold">@Model.HumanBounceRate%</div>
+            @if (Model.BounceRate != Model.HumanBounceRate && Model.BounceRate > 0)
+            {
+                <div class="text-[10px] text-base-content/40">@Model.BounceRate% including bots</div>
+            }
+        </div>
+        <div class="p-2 bg-base-200/50 rounded">
+            <div class="text-base-content/50 text-xs">Avg session</div>
+            <div class="text-lg font-bold">@FormatDuration(Model.HumanAvgSessionDurationSecs)</div>
+            @if (Model.BotAvgSessionDurationSecs > 0)
+            {
+                <div class="text-[10px] text-base-content/40">Bots: @FormatDuration(Model.BotAvgSessionDurationSecs)</div>
+            }
+        </div>
+    </div>
 </div>
+
+@functions {
+    static string FormatDuration(double secs)
+    {
+        if (secs <= 0) return "0s";
+        if (secs < 60) return $"{secs:F0}s";
+        var mins = (int)(secs / 60);
+        var remainSecs = (int)(secs % 60);
+        return $"{mins}m {remainSecs}s";
+    }
+}

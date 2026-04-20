@@ -27,6 +27,16 @@ public sealed class SummaryStatsModel
 {
     public required DashboardSummary Summary { get; init; }
     public required string BasePath { get; init; }
+
+    // Session-first analytics
+    public int ActiveSessions { get; set; }
+    public int UniqueVisitors { get; set; }
+    public double BounceRate { get; set; }
+    public double HumanBounceRate { get; set; }
+    public double BotBounceRate { get; set; }
+    public double AvgSessionDurationSecs { get; set; }
+    public double HumanAvgSessionDurationSecs { get; set; }
+    public double BotAvgSessionDurationSecs { get; set; }
 }
 
 /// <summary>
