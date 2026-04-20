@@ -2,8 +2,8 @@
 @model SummaryStatsModel
 @{
     var s = Model.Summary;
-    var totalSessions = Model.HumanSessions + Model.BotSessions;
-    var botPct = totalSessions > 0 ? ((double)Model.BotSessions / totalSessions * 100).ToString("F1") : "0.0";
+    var totalFingerprints = Model.HumanSessions + Model.BotSessions;
+    var botPct = totalFingerprints > 0 ? ((double)Model.BotSessions / totalFingerprints * 100).ToString("F1") : "0.0";
 }
 <div id="summary-stats"
      data-sb-widget="summary"
@@ -13,15 +13,15 @@
 
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
         <span class="inline-flex items-center gap-1.5">
-            <span class="font-bold text-base-content">@totalSessions.ToString("N0")</span>
-            <span class="text-base-content/50 text-xs">sessions</span>
+            <span class="font-bold text-base-content">@totalFingerprints.ToString("N0")</span>
+            <span class="text-base-content/50 text-xs">fingerprints</span>
         </span>
 
         <span style="color: var(--sb-card-divider);">|</span>
 
         <span class="inline-flex items-center gap-1.5">
             <span class="font-bold text-error">@Model.BotSessions.ToString("N0")</span>
-            <span class="text-xs text-error/70">bots (@(botPct)%)</span>
+            <span class="text-xs text-error/70">bot (@(botPct)%)</span>
         </span>
 
         <span style="color: var(--sb-card-divider);">|</span>
@@ -34,8 +34,8 @@
         <span style="color: var(--sb-card-divider);">|</span>
 
         <span class="inline-flex items-center gap-1.5">
-            <span class="font-bold text-base-content">@s.UniqueSignatures.ToString("N0")</span>
-            <span class="text-xs text-base-content/50">fingerprints</span>
+            <span class="font-bold text-base-content">@s.TotalRequests.ToString("N0")</span>
+            <span class="text-xs text-base-content/50">requests</span>
         </span>
     </div>
 
