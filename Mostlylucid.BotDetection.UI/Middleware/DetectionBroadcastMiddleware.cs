@@ -31,7 +31,7 @@ public partial class DetectionBroadcastMiddleware
         "ua.", "header.", "client.", "geo.", "ip.", "behavioral.",
         "detection.", "request.", "h2.", "tls.", "tcp.", "h3.",
         "cluster.", "reputation.", "honeypot.", "similarity.",
-        "attack.", "ato.", "intent.", "heuristic."
+        "attack.", "ato.", "intent.", "heuristic.", "referrer."
     ];
 
     /// <summary>Signal keys that must never reach the dashboard.</summary>
@@ -648,6 +648,22 @@ public partial class DetectionBroadcastMiddleware
         var acceptEncoding = context.Request.Headers.AcceptEncoding.ToString();
         if (!string.IsNullOrEmpty(acceptEncoding))
             signals.TryAdd("request.accept_encoding", acceptEncoding);
+
+        // Extract referrer domain (non-PII: host only, no path/query)
+        var referrer = context.Request.Headers.Referer.ToString();
+        if (!string.IsNullOrEmpty(referrer))
+        {
+            try
+            {
+                var uri = new Uri(referrer);
+                signals.TryAdd("referrer.domain", uri.Host);
+            }
+            catch
+            {
+                // Malformed referrer -- store raw
+                signals.TryAdd("referrer.domain", referrer);
+            }
+        }
     }
 
     private static void EnrichFromRequest(HttpContext context, Dictionary<string, object> signals, ref string? countryCode)
