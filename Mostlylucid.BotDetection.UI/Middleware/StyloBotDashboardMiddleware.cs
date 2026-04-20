@@ -320,6 +320,10 @@ public class StyloBotDashboardMiddleware
                 await ServeTopBotsPartialAsync(context);
                 break;
 
+            case "partials/bot-breakdown":
+                await ServeBotBreakdownPartialAsync(context);
+                break;
+
             case "partials/recent":
                 await ServeRecentActivityPartialAsync(context);
                 break;
@@ -3328,4 +3332,73 @@ public class StyloBotDashboardMiddleware
                 .ToList()
         };
     }
+
+    private async Task ServeBotBreakdownPartialAsync(HttpContext context)
+    {
+        var detections = await _eventStore.GetDetectionsAsync(new DashboardFilter { Limit = 5000 });
+        var botDetections = detections.Where(d => d.IsBot).ToList();
+
+        var categories = botDetections
+            .GroupBy(d =>
+            {
+                if (d.ImportantSignals?.TryGetValue("intent.category", out var cat) == true
+                    && cat is string catStr && !string.IsNullOrEmpty(catStr))
+                    return catStr;
+                return "unclassified";
+            })
+            .Select(g => new BotCategoryStats
+            {
+                Category = g.Key,
+                DisplayName = FormatCategoryName(g.Key),
+                SessionCount = g.Count(),
+                Percentage = botDetections.Count > 0
+                    ? Math.Round((double)g.Count() / botDetections.Count * 100, 1) : 0,
+                TopEndpoints = g.Where(d => !string.IsNullOrEmpty(d.Path))
+                    .GroupBy(d => d.Path!)
+                    .OrderByDescending(pg => pg.Count())
+                    .Take(3)
+                    .Select(pg => pg.Key)
+                    .ToList(),
+                Color = GetCategoryColor(g.Key)
+            })
+            .OrderByDescending(c => c.SessionCount)
+            .ToList();
+
+        var model = new BotBreakdownModel
+        {
+            BasePath = _options.BasePath.TrimEnd('/'),
+            Categories = categories,
+            TotalBotSessions = botDetections.Count
+        };
+
+        context.Response.ContentType = "text/html";
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/StyloBot/Dashboard/_BotBreakdown.cshtml", model, context);
+        await context.Response.WriteAsync(html);
+    }
+
+    private static string FormatCategoryName(string category) => category.ToLowerInvariant() switch
+    {
+        "scraping" => "Scrapers",
+        "scanning" => "Vulnerability Scanners",
+        "credential_abuse" => "Credential Attacks",
+        "api_abuse" => "API Abuse",
+        "reconnaissance" => "Reconnaissance",
+        "monitoring" => "Monitoring Bots",
+        "browsing" => "Automated Browsing",
+        "unclassified" => "Unclassified Bots",
+        _ => category
+    };
+
+    private static string GetCategoryColor(string category) => category.ToLowerInvariant() switch
+    {
+        "scraping" => "#f59e0b",
+        "scanning" => "#ef4444",
+        "credential_abuse" => "#dc2626",
+        "api_abuse" => "#f97316",
+        "reconnaissance" => "#8b5cf6",
+        "monitoring" => "#06b6d4",
+        "browsing" => "#10b981",
+        _ => "#6b7280"
+    };
 }
