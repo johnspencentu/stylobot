@@ -218,8 +218,9 @@ public static class StyloBotDashboardServiceExtensions
         // SignalR for broadcasting to connected dashboard clients
         services.AddSignalR();
 
-        // Event store (in-memory by default, replaced by PostgreSQL when configured)
-        services.TryAddSingleton<IDashboardEventStore, InMemoryDashboardEventStore>();
+        // Event store: SQLite by default (persists across restarts).
+        // PostgreSQL package overrides via RemoveAll + AddSingleton when configured.
+        services.TryAddSingleton<IDashboardEventStore, SqliteDashboardEventStore>();
 
         // Operator-supplied signature labels for detector weighting / ground truth
         // (in-memory by default; production wires a SQLite or PostgreSQL implementation).

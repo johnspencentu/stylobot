@@ -8,6 +8,7 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     In-memory storage for dashboard events.
 ///     Thread-safe, circular buffer with configurable max size.
 /// </summary>
+[Obsolete("Use SqliteDashboardEventStore (FOSS) or PostgreSQLDashboardEventStore (commercial). Will be removed in 6.0.")]
 public class InMemoryDashboardEventStore : IDashboardEventStore
 {
     private readonly ConcurrentQueue<DashboardDetectionEvent> _detections = new();
@@ -441,6 +442,63 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
         };
 
         return Task.FromResult<DashboardEndpointDetail?>(detail);
+    }
+
+    public Task<List<ThreatEntry>> GetThreatsAsync(int count = 20, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        IEnumerable<DashboardDetectionEvent> source = _detections;
+        if (startTime.HasValue) source = source.Where(d => d.Timestamp >= startTime.Value);
+        if (endTime.HasValue) source = source.Where(d => d.Timestamp <= endTime.Value);
+
+        var threats = source
+            .Where(d => d.ThreatScore is > 0.3
+                        || (d.Path != null && (d.Path.StartsWith("/wp-", StringComparison.OrdinalIgnoreCase)
+                            || d.Path.StartsWith("/.env", StringComparison.OrdinalIgnoreCase)
+                            || d.Path.StartsWith("/.git", StringComparison.OrdinalIgnoreCase)))
+                        || d.Action == "simulation-pack")
+            .OrderByDescending(d => d.Timestamp)
+            .Take(count)
+            .Select(d =>
+            {
+                var path = d.Path ?? "/";
+                var threatScore = d.ThreatScore ?? 0;
+                string? cveSeverity = null;
+                string? packId = null;
+
+                if (path.StartsWith("/wp-", StringComparison.OrdinalIgnoreCase))
+                {
+                    packId = "wordpress-5.9";
+                    cveSeverity = threatScore >= 0.8 ? "critical" : threatScore >= 0.55 ? "high" : "medium";
+                }
+                else if (path.StartsWith("/.env", StringComparison.OrdinalIgnoreCase) ||
+                         path.StartsWith("/.git", StringComparison.OrdinalIgnoreCase))
+                {
+                    cveSeverity = "high";
+                }
+                else if (threatScore >= 0.8) cveSeverity = "critical";
+                else if (threatScore >= 0.55) cveSeverity = "high";
+                else if (threatScore >= 0.35) cveSeverity = "medium";
+
+                return new ThreatEntry
+                {
+                    Timestamp = d.Timestamp,
+                    Signature = d.PrimarySignature ?? "",
+                    Path = path,
+                    BotName = d.BotName,
+                    BotType = d.BotType,
+                    BotProbability = d.BotProbability,
+                    ThreatScore = threatScore,
+                    ThreatBand = d.ThreatBand,
+                    CountryCode = d.CountryCode,
+                    CveId = null,
+                    CveSeverity = cveSeverity,
+                    PackId = packId,
+                    InHoneypot = d.Action?.Contains("simulation-pack", StringComparison.OrdinalIgnoreCase) == true
+                };
+            })
+            .ToList();
+
+        return Task.FromResult(threats);
     }
 
     public Task<List<DashboardTimeSeriesPoint>> GetTimeSeriesAsync(

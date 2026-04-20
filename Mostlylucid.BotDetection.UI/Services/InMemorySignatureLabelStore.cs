@@ -11,6 +11,7 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     re-labeling replaces the prior value. Cross-labeler disagreement is preserved - a
 ///     signature with {alice: Bot, bob: Human} returns alice's as "latest" if newer.
 /// </summary>
+[Obsolete("Use SqliteSignatureLabelStore (FOSS) or a PostgreSQL implementation (commercial). Will be removed in 6.0.")]
 public sealed class InMemorySignatureLabelStore : ISignatureLabelStore
 {
     // (signature, labeler) → label
