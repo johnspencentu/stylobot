@@ -234,6 +234,26 @@ public interface ISessionStore
     Task<List<(PersistedSession Session, float Similarity)>> FindSimilarSessionsAsync(
         float[] queryVector, int topK = 10, float minSimilarity = 0.7f, CancellationToken ct = default);
 
+    // === Entity Resolution ===
+
+    /// <summary>Resolve or create entity for a PrimarySignature. Returns the entity ID.</summary>
+    Task<string> ResolveEntityAsync(string primarySignature, CancellationToken ct = default);
+
+    /// <summary>Get the entity for a PrimarySignature (null if not yet resolved).</summary>
+    Task<ResolvedEntity?> GetEntityForSignatureAsync(string primarySignature, CancellationToken ct = default);
+
+    /// <summary>Get an entity by ID.</summary>
+    Task<ResolvedEntity?> GetEntityAsync(string entityId, CancellationToken ct = default);
+
+    /// <summary>Get all active edges for an entity.</summary>
+    Task<List<EntityEdge>> GetEntityEdgesAsync(string entityId, CancellationToken ct = default);
+
+    /// <summary>Create a merge edge linking a signature to an existing entity.</summary>
+    Task MergeSignatureAsync(string entityId, string signature, double confidence, string reason, CancellationToken ct = default);
+
+    /// <summary>Update entity metadata (confidence level, rotation cadence, stable anchors, etc.).</summary>
+    Task UpdateEntityAsync(ResolvedEntity entity, CancellationToken ct = default);
+
     // === Maintenance ===
 
     /// <summary>Delete sessions older than retention period.</summary>

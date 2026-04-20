@@ -112,6 +112,45 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             );
 
             CREATE INDEX IF NOT EXISTS idx_buckets_time ON buckets(bucket_time DESC);
+
+            -- Entity Resolution: resolved actor identities
+            -- An entity is our best guess at "this is one actor."
+            -- Multiple PrimarySignatures can map to one entity (merge).
+            -- One signature can fork into multiple entities (split).
+            CREATE TABLE IF NOT EXISTS entities (
+                entity_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                confidence_level INTEGER NOT NULL DEFAULT 0,
+                factor_count INTEGER NOT NULL DEFAULT 1,
+                is_bot INTEGER NOT NULL DEFAULT 0,
+                bot_probability REAL NOT NULL DEFAULT 0,
+                reputation_score REAL NOT NULL DEFAULT 0,
+                stable_anchors_json TEXT,
+                rotation_cadence_seconds REAL,
+                velocity_variance REAL,
+                metadata_json TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_entities_updated ON entities(updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_entities_bot ON entities(is_bot, reputation_score DESC);
+
+            -- Edges link PrimarySignatures to entities with audit trail
+            CREATE TABLE IF NOT EXISTS entity_edges (
+                edge_id TEXT PRIMARY KEY,
+                entity_id TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                edge_type TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                created_at TEXT NOT NULL,
+                reason TEXT,
+                reverted_at TEXT,
+                FOREIGN KEY (entity_id) REFERENCES entities(entity_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_edges_signature ON entity_edges(signature, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_edges_entity ON entity_edges(entity_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_edges_active ON entity_edges(signature) WHERE reverted_at IS NULL;
         """;
         await cmd.ExecuteNonQueryAsync(ct);
 
@@ -470,6 +509,206 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             .Take(topK)
             .ToList();
     }
+
+    // === Entity Resolution ===
+
+    public async Task<string> ResolveEntityAsync(string primarySignature, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+
+        // Check for existing active edge
+        var existing = await GetEntityForSignatureAsync(primarySignature, ct);
+        if (existing != null) return existing.EntityId;
+
+        // Create new entity + Initial edge
+        var entityId = Guid.NewGuid().ToString("N")[..16];
+        var now = DateTime.UtcNow.ToString("O");
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+
+            await using var tx = await conn.BeginTransactionAsync(ct);
+
+            await using var entityCmd = conn.CreateCommand();
+            entityCmd.CommandText = "INSERT INTO entities (entity_id, created_at, updated_at) VALUES (@id, @now, @now)";
+            entityCmd.Parameters.AddWithValue("@id", entityId);
+            entityCmd.Parameters.AddWithValue("@now", now);
+            await entityCmd.ExecuteNonQueryAsync(ct);
+
+            await using var edgeCmd = conn.CreateCommand();
+            edgeCmd.CommandText = """
+                INSERT INTO entity_edges (edge_id, entity_id, signature, edge_type, confidence, created_at, reason)
+                VALUES (@eid, @entity, @sig, 'Initial', 1.0, @now, 'First observation')
+            """;
+            edgeCmd.Parameters.AddWithValue("@eid", Guid.NewGuid().ToString("N")[..16]);
+            edgeCmd.Parameters.AddWithValue("@entity", entityId);
+            edgeCmd.Parameters.AddWithValue("@sig", primarySignature);
+            edgeCmd.Parameters.AddWithValue("@now", now);
+            await edgeCmd.ExecuteNonQueryAsync(ct);
+
+            await tx.CommitAsync(ct);
+        }
+        finally { _writeLock.Release(); }
+
+        _logger.LogDebug("Created entity {EntityId} for signature {Signature}", entityId, primarySignature[..Math.Min(8, primarySignature.Length)]);
+        return entityId;
+    }
+
+    public async Task<ResolvedEntity?> GetEntityForSignatureAsync(string primarySignature, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT e.* FROM entities e
+            INNER JOIN entity_edges ee ON e.entity_id = ee.entity_id
+            WHERE ee.signature = @sig AND ee.reverted_at IS NULL
+            ORDER BY ee.created_at DESC LIMIT 1
+        """;
+        cmd.Parameters.AddWithValue("@sig", primarySignature);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? ReadEntity(reader) : null;
+    }
+
+    public async Task<ResolvedEntity?> GetEntityAsync(string entityId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM entities WHERE entity_id = @id";
+        cmd.Parameters.AddWithValue("@id", entityId);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? ReadEntity(reader) : null;
+    }
+
+    public async Task<List<EntityEdge>> GetEntityEdgesAsync(string entityId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM entity_edges WHERE entity_id = @id ORDER BY created_at DESC";
+        cmd.Parameters.AddWithValue("@id", entityId);
+
+        var edges = new List<EntityEdge>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            edges.Add(ReadEdge(reader));
+        return edges;
+    }
+
+    public async Task MergeSignatureAsync(string entityId, string signature, double confidence, string reason, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO entity_edges (edge_id, entity_id, signature, edge_type, confidence, created_at, reason)
+                VALUES (@eid, @entity, @sig, 'Merge', @conf, @now, @reason)
+            """;
+            cmd.Parameters.AddWithValue("@eid", Guid.NewGuid().ToString("N")[..16]);
+            cmd.Parameters.AddWithValue("@entity", entityId);
+            cmd.Parameters.AddWithValue("@sig", signature);
+            cmd.Parameters.AddWithValue("@conf", confidence);
+            cmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("O"));
+            cmd.Parameters.AddWithValue("@reason", reason);
+            await cmd.ExecuteNonQueryAsync(ct);
+
+            // Update entity timestamp
+            await using var updateCmd = conn.CreateCommand();
+            updateCmd.CommandText = "UPDATE entities SET updated_at = @now WHERE entity_id = @id";
+            updateCmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("O"));
+            updateCmd.Parameters.AddWithValue("@id", entityId);
+            await updateCmd.ExecuteNonQueryAsync(ct);
+
+            _logger.LogInformation("Merged signature {Sig} into entity {Entity} (confidence={Conf:F2}): {Reason}",
+                signature[..Math.Min(8, signature.Length)], entityId, confidence, reason);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task UpdateEntityAsync(ResolvedEntity entity, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                UPDATE entities SET
+                    updated_at = @now,
+                    confidence_level = @level,
+                    factor_count = @factors,
+                    is_bot = @isBot,
+                    bot_probability = @prob,
+                    reputation_score = @rep,
+                    stable_anchors_json = @anchors,
+                    rotation_cadence_seconds = @cadence,
+                    velocity_variance = @variance,
+                    metadata_json = @meta
+                WHERE entity_id = @id
+            """;
+            cmd.Parameters.AddWithValue("@id", entity.EntityId);
+            cmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("O"));
+            cmd.Parameters.AddWithValue("@level", entity.ConfidenceLevel);
+            cmd.Parameters.AddWithValue("@factors", entity.FactorCount);
+            cmd.Parameters.AddWithValue("@isBot", entity.IsBot ? 1 : 0);
+            cmd.Parameters.AddWithValue("@prob", entity.BotProbability);
+            cmd.Parameters.AddWithValue("@rep", entity.ReputationScore);
+            cmd.Parameters.AddWithValue("@anchors", (object?)entity.StableAnchorsJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@cadence", entity.RotationCadenceSeconds.HasValue ? entity.RotationCadenceSeconds.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@variance", entity.VelocityVariance.HasValue ? entity.VelocityVariance.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@meta", (object?)entity.MetadataJson ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    private static ResolvedEntity ReadEntity(SqliteDataReader reader) => new()
+    {
+        EntityId = reader.GetString(reader.GetOrdinal("entity_id")),
+        CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
+        UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("updated_at"))),
+        ConfidenceLevel = reader.GetInt32(reader.GetOrdinal("confidence_level")),
+        FactorCount = reader.GetInt32(reader.GetOrdinal("factor_count")),
+        IsBot = reader.GetInt32(reader.GetOrdinal("is_bot")) == 1,
+        BotProbability = reader.GetDouble(reader.GetOrdinal("bot_probability")),
+        ReputationScore = reader.GetDouble(reader.GetOrdinal("reputation_score")),
+        StableAnchorsJson = reader.IsDBNull(reader.GetOrdinal("stable_anchors_json")) ? null : reader.GetString(reader.GetOrdinal("stable_anchors_json")),
+        RotationCadenceSeconds = reader.IsDBNull(reader.GetOrdinal("rotation_cadence_seconds")) ? null : reader.GetDouble(reader.GetOrdinal("rotation_cadence_seconds")),
+        VelocityVariance = reader.IsDBNull(reader.GetOrdinal("velocity_variance")) ? null : reader.GetDouble(reader.GetOrdinal("velocity_variance")),
+        MetadataJson = reader.IsDBNull(reader.GetOrdinal("metadata_json")) ? null : reader.GetString(reader.GetOrdinal("metadata_json"))
+    };
+
+    private static EntityEdge ReadEdge(SqliteDataReader reader) => new()
+    {
+        EdgeId = reader.GetString(reader.GetOrdinal("edge_id")),
+        EntityId = reader.GetString(reader.GetOrdinal("entity_id")),
+        Signature = reader.GetString(reader.GetOrdinal("signature")),
+        EdgeType = Enum.Parse<EntityEdgeType>(reader.GetString(reader.GetOrdinal("edge_type"))),
+        Confidence = reader.GetDouble(reader.GetOrdinal("confidence")),
+        CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
+        Reason = reader.IsDBNull(reader.GetOrdinal("reason")) ? null : reader.GetString(reader.GetOrdinal("reason")),
+        RevertedAt = reader.IsDBNull(reader.GetOrdinal("reverted_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("reverted_at")))
+    };
 
     public async Task PruneAsync(TimeSpan retention, CancellationToken ct = default)
     {

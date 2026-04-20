@@ -122,6 +122,19 @@ public sealed class SessionPersistenceService : BackgroundService
 
         await _store.UpsertSignatureAsync(sig, ct);
 
+        // Resolve entity — creates one if new, returns existing if known.
+        // This is async/background so it doesn't block the request pipeline.
+        try
+        {
+            var entityId = await _store.ResolveEntityAsync(snapshot.Signature, ct);
+            _logger.LogDebug("Session {Signature} → entity {EntityId}",
+                snapshot.Signature[..Math.Min(8, snapshot.Signature.Length)], entityId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Entity resolution failed for {Signature}", snapshot.Signature);
+        }
+
         _logger.LogDebug(
             "Persisted session for {Signature}: {Requests} requests, {Transitions} transitions",
             snapshot.Signature, snapshot.RequestCount, transitionCounts.Count);
