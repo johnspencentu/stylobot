@@ -67,6 +67,13 @@ public sealed record SessionSnapshot
 
     /// <summary>Dominant request state by frequency</summary>
     public required RequestState DominantState { get; init; }
+
+    /// <summary>
+    ///     HMAC hashes of discriminatory headers at session start.
+    ///     Persisted for retroactive stability analysis across sessions.
+    ///     Null for sessions created before this field was added.
+    /// </summary>
+    public string? HeaderHashesJson { get; init; }
 }
 
 /// <summary>
@@ -551,6 +558,16 @@ public sealed class SessionStore
     }
 
     /// <summary>
+    ///     Store header hashes for the current session. Called once per session (first request).
+    ///     These get carried through to the SessionSnapshot at finalization.
+    /// </summary>
+    public void SetHeaderHashes(string signature, string headerHashesJson)
+    {
+        _cache.Set($"session:headers:{signature}", headerHashesJson,
+            new MemoryCacheEntryOptions { SlidingExpiration = _sessionGapThreshold + TimeSpan.FromMinutes(5) });
+    }
+
+    /// <summary>
     ///     Gets a live radar projection of the current in-progress session.
     ///     Returns null if no active session or too few requests.
     ///     This is FAST — just encodes the cached request list into a vector and projects.
@@ -595,7 +612,8 @@ public sealed class SessionStore
             RequestCount = requests.Count,
             Vector = vector,
             Maturity = maturity,
-            DominantState = dominantState
+            DominantState = dominantState,
+            HeaderHashesJson = _cache.Get<string>($"session:headers:{signature}")
         };
 
         // Append to history (ring buffer)

@@ -73,7 +73,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                 avg_processing_time_ms REAL,
                 error_count INTEGER DEFAULT 0,
                 timing_entropy REAL DEFAULT 0,
-                narrative TEXT
+                narrative TEXT,
+                header_hashes_json TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_sessions_signature ON sessions(signature, ended_at DESC);
@@ -178,13 +179,15 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                     dominant_state, is_bot, avg_bot_probability, avg_confidence, risk_band,
                     action, bot_name, bot_type, country_code, top_reasons_json,
                     transition_counts_json, paths_json, avg_processing_time_ms,
-                    error_count, timing_entropy, narrative, dashboard_signature_id
+                    error_count, timing_entropy, narrative, dashboard_signature_id,
+                    header_hashes_json
                 ) VALUES (
                     @sig, @started, @ended, @reqCount, @vector, @maturity,
                     @domState, @isBot, @avgProb, @avgConf, @risk,
                     @action, @botName, @botType, @country, @reasons,
                     @transitions, @paths, @avgTime,
-                    @errors, @entropy, @narrative, @dashSig
+                    @errors, @entropy, @narrative, @dashSig,
+                    @headerHashes
                 )
             """;
             cmd.Parameters.AddWithValue("@sig", session.Signature);
@@ -210,6 +213,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             cmd.Parameters.AddWithValue("@entropy", session.TimingEntropy);
             cmd.Parameters.AddWithValue("@narrative", (object?)session.Narrative ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@dashSig", (object?)session.DashboardSignatureId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@headerHashes", (object?)session.HeaderHashesJson ?? DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync(ct);
         }

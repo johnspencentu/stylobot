@@ -99,7 +99,8 @@ public sealed class SessionPersistenceService : BackgroundService
             TransitionCountsJson = JsonSerializer.Serialize(transitionCounts),
             PathsJson = JsonSerializer.Serialize(paths),
             ErrorCount = errorCount,
-            TimingEntropy = ComputeTimingEntropy(requests)
+            TimingEntropy = ComputeTimingEntropy(requests),
+            HeaderHashesJson = snapshot.HeaderHashesJson
         };
 
         await _store.AddSessionAsync(persisted, ct);

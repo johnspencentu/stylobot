@@ -89,6 +89,13 @@ public sealed record PersistedSession
     ///     Null for sessions persisted before this field was added.
     /// </summary>
     public string? DashboardSignatureId { get; init; }
+
+    /// <summary>
+    ///     HMAC hashes of discriminatory HTTP headers at session time.
+    ///     JSON: {"accept-language": "hash1", "sec-ch-ua": "hash2", "_header_order": "hash3"}.
+    ///     Used for retroactive stability analysis per entity.
+    /// </summary>
+    public string? HeaderHashesJson { get; init; }
 }
 
 /// <summary>

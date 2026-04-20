@@ -81,6 +81,7 @@ public sealed class EntityResolutionService : BackgroundService
         while (await reader.ReadAsync(ct))
             entityIds.Add(reader.GetString(0));
 
+        // Per-entity analysis: velocity, oscillation, rotation, confidence
         foreach (var entityId in entityIds)
         {
             try
@@ -92,6 +93,11 @@ public sealed class EntityResolutionService : BackgroundService
                 _logger.LogDebug(ex, "Failed to analyze entity {EntityId}", entityId);
             }
         }
+
+        // Cross-entity convergence detection: find entities with parallel behavioral vectors
+        // This is the micro-level equivalent of Leiden clustering
+        if (entityIds.Count >= 2)
+            await DetectConvergenceAsync(entityIds, ct);
     }
 
     private async Task AnalyzeEntityAsync(string entityId, CancellationToken ct)
@@ -245,5 +251,67 @@ public sealed class EntityResolutionService : BackgroundService
         if (factorCount >= 3) return 2; // Transport Identity
         if (factorCount >= 2) return 1; // Browser Guess
         return 0; // Infrastructure
+    }
+
+    /// <summary>
+    ///     Detect convergence: two entities with no fingerprint overlap but high
+    ///     behavioral cosine similarity. Could be same actor on different devices,
+    ///     or coordinated bots with identical behavior.
+    ///     Creates Converge edges (flagged, not auto-merged — operator decides).
+    /// </summary>
+    private const float ConvergenceThreshold = 0.92f;
+
+    private async Task DetectConvergenceAsync(List<string> entityIds, CancellationToken ct)
+    {
+        // Collect latest session vector per entity
+        var entityVectors = new Dictionary<string, float[]>();
+        foreach (var entityId in entityIds)
+        {
+            var edges = await _store.GetEntityEdgesAsync(entityId, ct);
+            var sig = edges.FirstOrDefault(e => e.IsActive)?.Signature;
+            if (sig == null) continue;
+
+            var sessions = await _store.GetSessionsAsync(sig, 1, ct);
+            if (sessions.Count == 0 || sessions[0].Vector is not { Length: > 0 }) continue;
+
+            var vector = SqliteSessionStore.DeserializeVector(sessions[0].Vector);
+            if (vector != null) entityVectors[entityId] = vector;
+        }
+
+        // Pairwise comparison — O(n²) but limited to 100 entities max
+        var comparedPairs = new HashSet<string>();
+        foreach (var (idA, vecA) in entityVectors)
+        {
+            foreach (var (idB, vecB) in entityVectors)
+            {
+                if (idA == idB) continue;
+                var pairKey = string.Compare(idA, idB, StringComparison.Ordinal) < 0
+                    ? $"{idA}:{idB}" : $"{idB}:{idA}";
+                if (!comparedPairs.Add(pairKey)) continue;
+
+                var similarity = SessionVectorizer.CosineSimilarity(vecA, vecB);
+                if (similarity >= ConvergenceThreshold)
+                {
+                    _logger.LogInformation(
+                        "Convergence detected: entities {A} and {B} have behavioral similarity={Sim:F3}. " +
+                        "Possible same actor across devices or coordinated bots.",
+                        idA, idB, similarity);
+
+                    // Don't auto-merge — create Converge edge for operator review
+                    // Check if this convergence was already flagged
+                    var existingEdges = await _store.GetEntityEdgesAsync(idA, ct);
+                    var alreadyFlagged = existingEdges.Any(e =>
+                        e.EdgeType == EntityEdgeType.Converge && e.Reason?.Contains(idB) == true);
+
+                    if (!alreadyFlagged)
+                    {
+                        await _store.MergeSignatureAsync(idA, $"converge:{idB}",
+                            similarity,
+                            $"Behavioral convergence: cosine={similarity:F3}, entity_b={idB}",
+                            ct);
+                    }
+                }
+            }
+        }
     }
 }

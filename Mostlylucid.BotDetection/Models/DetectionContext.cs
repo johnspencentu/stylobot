@@ -472,6 +472,9 @@ public static class SignalKeys
     /// <summary>String: Unified client signature (HMAC-SHA256). Written by SignatureContributor at Priority 1.</summary>
     public const string PrimarySignature = "signature.primary";
 
+    /// <summary>String (JSON): HMAC hashes of discriminatory headers. Written by SignatureContributor.</summary>
+    public const string HeaderHashes = "signature.header_hashes";
+
     /// <summary>String: Client waveform signature (IP:UA hash)</summary>
     [Obsolete("Use PrimarySignature instead. WaveformSignature will be removed in 7.0.")]
     public const string WaveformSignature = "waveform.signature";

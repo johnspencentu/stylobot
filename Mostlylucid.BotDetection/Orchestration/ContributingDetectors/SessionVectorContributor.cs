@@ -100,8 +100,16 @@ public class SessionVectorContributor : ConfiguredContributorBase
             // Record request - may return a completed session snapshot (retrogressive boundary)
             var completedSession = _sessionStore.RecordRequest(signature, sessionRequest, fpContext);
 
-            // Write session signals
+            // Store header hashes on first request of a session (for progressive identity)
             var currentSession = _sessionStore.GetCurrentSession(signature);
+            if (currentSession is { Count: 1 })
+            {
+                var headerHashesJson = state.GetSignal<string>(SignalKeys.HeaderHashes);
+                if (!string.IsNullOrEmpty(headerHashesJson))
+                    _sessionStore.SetHeaderHashes(signature, headerHashesJson);
+            }
+
+            // Write session signals
             var sessionHistory = _sessionStore.GetHistory(signature);
 
             state.WriteSignals([

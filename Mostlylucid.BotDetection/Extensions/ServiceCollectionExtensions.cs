@@ -539,8 +539,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, MultiLayerCorrelationContributor>();
         // Behavioral waveform analysis - analyzes patterns across multiple requests
         services.AddSingleton<IContributingDetector, BehavioralWaveformContributor>();
-        // Signature mapping - bridges multi-factor IDs (dashboard) to waveform signatures (session store)
-        services.TryAddSingleton<Dashboard.SignatureMapper>();
+        // Header hash collector for progressive identity resolution
+        services.TryAddSingleton<Identity.HeaderHashCollector>();
         // Session vector analysis - Markov chain compression for inter-session anomaly detection
         services.TryAddSingleton<Analysis.SessionStore>();
         services.TryAddSingleton<SessionEscalationService>();
