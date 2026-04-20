@@ -53,6 +53,7 @@
                                 hx-get="@SortUrl("botrate")" hx-target="#countries-list" hx-swap="outerHTML transition:true">
                                 Bot %@(Html.Raw(SortIcon("botrate")))
                             </th>
+                            <th class="py-1 text-xs" style="min-width:80px">SPLIT</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -78,6 +79,13 @@
                                 <td class="py-1 text-right text-xs font-mono text-error/70">@country.BotCount</td>
                                 <td class="py-1 text-right text-xs font-mono text-success/70">@country.HumanCount</td>
                                 <td class="py-1 text-right font-bold text-xs @rateClass">@(botPct)%</td>
+                                <td class="py-1">
+                                    @{ var humanPct = country.TotalCount > 0 ? Math.Round((1.0 - country.BotRate) * 100, 0) : 100; }
+                                    <div class="flex h-2 rounded-full overflow-hidden bg-base-300" style="min-width:60px">
+                                        <div class="bg-success" style="width:@(humanPct)%"></div>
+                                        <div class="bg-error" style="width:@(100 - humanPct)%"></div>
+                                    </div>
+                                </td>
                             </tr>
                         }
                     </tbody>
