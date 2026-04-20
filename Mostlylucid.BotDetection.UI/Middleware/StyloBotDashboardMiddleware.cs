@@ -1888,6 +1888,8 @@ public class StyloBotDashboardMiddleware
 
         model.UniqueVisitors = totalCount;
         model.ActiveSessions = allVisitors.Count(v => v.LastSeen > DateTime.UtcNow.AddMinutes(-5));
+        model.BotSessions = botVisitors.Count;
+        model.HumanSessions = humanVisitors.Count;
 
         var totalWithHits = allVisitors.Count(v => v.Hits > 0);
         model.BounceRate = totalWithHits > 0

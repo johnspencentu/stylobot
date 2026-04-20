@@ -28,9 +28,11 @@ public sealed class SummaryStatsModel
     public required DashboardSummary Summary { get; init; }
     public required string BasePath { get; init; }
 
-    // Session-first analytics
+    // Session-first analytics (sessions = unique fingerprints, not hits)
     public int ActiveSessions { get; set; }
     public int UniqueVisitors { get; set; }
+    public int BotSessions { get; set; }
+    public int HumanSessions { get; set; }
     public double BounceRate { get; set; }
     public double HumanBounceRate { get; set; }
     public double BotBounceRate { get; set; }
