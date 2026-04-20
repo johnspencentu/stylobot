@@ -115,6 +115,14 @@
                 </span>
                 <!-- SignalR connection status -->
                 <span id="sb-connection-status" class="w-2 h-2 rounded-full sb-disconnected" title="SignalR: disconnected"></span>
+                @if (Model.License.Status == LicenseStatusKind.Unconfigured)
+                {
+                    <span class="text-[10px] text-base-content/40 ml-2">OSS tier</span>
+                    <a href="https://stylobot.net/pricing" target="_blank" rel="noopener"
+                       class="text-[10px] text-base-content/30 hover:text-base-content/60 ml-1">
+                        Compare paid tiers →
+                    </a>
+                }
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); try { localStorage.setItem('sb-theme', document.documentElement.getAttribute('data-theme')); } catch(e) {}"
@@ -131,15 +139,26 @@
         <!-- Summary stats - always visible -->
         @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_SummaryStats.cshtml", Model.Summary)
 
-        <!-- License + Your Detection: compact row below stats -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
-            <div>
-                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_LicenseCard.cshtml", Model.License)
+        <!-- License + Your Detection -->
+        @if (Model.License.Status != LicenseStatusKind.Unconfigured)
+        {
+            <!-- Licensed: two-column layout with license details -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
+                <div>
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_LicenseCard.cshtml", Model.License)
+                </div>
+                <div>
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_YourDetection.cshtml", Model.YourDetection)
+                </div>
             </div>
-            <div>
+        }
+        else
+        {
+            <!-- OSS: full-width Your Detection (license reminder is in header) -->
+            <div class="my-4">
                 @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_YourDetection.cshtml", Model.YourDetection)
             </div>
-        </div>
+        }
 
         <!-- Tab navigation -->
         <div class="flex items-center gap-1 my-4 bg-base-300/50 rounded-lg p-0.5 w-fit">
@@ -149,6 +168,7 @@
             <a href="@TabUrl("endpoints")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("endpoints")">Endpoints</a>
             <a href="@TabUrl("sessions")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("sessions")">Sessions</a>
             <a href="@TabUrl("clusters")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("clusters")">Clusters</a>
+            <a href="@TabUrl("threats")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("threats")">Threats</a>
             <a href="@TabUrl("useragents")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("useragents")">User Agents</a>
             <a href="@TabUrl("configuration")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("configuration")">Configuration</a>
         </div>
@@ -220,6 +240,10 @@
         else if (tab == "clusters")
         {
             @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_ClustersList.cshtml", Model.Clusters)
+        }
+        else if (tab == "threats")
+        {
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_ThreatsList.cshtml", Model.Threats)
         }
         else if (tab == "useragents")
         {
