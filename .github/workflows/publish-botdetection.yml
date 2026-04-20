@@ -83,16 +83,26 @@ jobs:
         name: nuget-package-botdetection
         path: ./artifacts/*.nupkg
 
-  # Also publish BotDetection.UI (same trusted workflow, separate package)
+  # Also publish BotDetection.UI (same trusted workflow, same MinVer tag)
   publish-ui:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      with:
+        fetch-depth: 0
 
     - name: Setup .NET
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
       with:
         dotnet-version: '10.0.x'
+
+    - name: Create MinVer tag from allbot tag
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        if [[ "$TAG" == allbot-v* ]]; then
+          VERSION=${TAG#allbot-v}
+          git tag "botdetection-v${VERSION}"
+        fi
 
     - name: Restore, Build, Pack UI
       run: |

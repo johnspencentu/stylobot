@@ -12,7 +12,7 @@
 
         <!-- Package metadata -->
         <PackageId>Mostlylucid.BotDetection.UI</PackageId>
-        <Version>3.7.0</Version>
+        <MinVerTagPrefix>botdetection-v</MinVerTagPrefix>
         <Authors>Mostlylucid</Authors>
         <Description>Real-time bot detection dashboard with SignalR and DaisyUI. Includes sb-badge, sb-confidence, sb-gate, sb-honeypot, sb-human, sb-risk, sb-signal, and sb-summary Tag Helpers plus View Components for embedding detection results in ASP.NET Core views.</Description>
         <PackageTags>bot-detection;ui;dashboard;signalr;daisyui;taghelper;viewcomponent;aspnetcore;security</PackageTags>
@@ -25,6 +25,17 @@
     <ItemGroup>
         <ProjectReference Include="..\Mostlylucid.BotDetection\Mostlylucid.BotDetection.csproj"/>
     </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MinVer" Version="7.0.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
+    </PropertyGroup>
 
     <!-- Static web assets (CSS, JS) for package consumption -->
     <ItemGroup>
