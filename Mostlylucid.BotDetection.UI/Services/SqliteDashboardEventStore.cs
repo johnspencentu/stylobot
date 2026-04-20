@@ -307,8 +307,9 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
         {
-            var total = reader.GetInt32(0);
-            var bots = reader.GetInt32(1);
+            var total = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
+            var bots = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+            var sigs = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
             return new DashboardSummary
             {
                 Timestamp = DateTime.UtcNow,
@@ -316,7 +317,7 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 BotRequests = bots,
                 HumanRequests = total - bots,
                 UncertainRequests = 0,
-                UniqueSignatures = reader.GetInt32(2),
+                UniqueSignatures = sigs,
                 RiskBandCounts = new Dictionary<string, int>(),
                 TopBotTypes = new Dictionary<string, int>(),
                 TopActions = new Dictionary<string, int>()
