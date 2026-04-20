@@ -40,10 +40,14 @@ public class SessionVectorContributor : ConfiguredContributorBase
     public override string Name => "SessionVector";
     public override int Priority => Manifest?.Priority ?? 30;
 
-    // Requires waveform signature (needs behavioral analysis to have started)
+    // Requires a signature (unified PrimarySignature or legacy WaveformSignature)
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
     {
-        new SignalExistsTrigger(SignalKeys.WaveformSignature)
+        new AnyOfTrigger(new TriggerCondition[]
+        {
+            new SignalExistsTrigger(SignalKeys.PrimarySignature),
+            new SignalExistsTrigger(SignalKeys.WaveformSignature)
+        })
     };
 
     // Config-driven thresholds
@@ -69,7 +73,8 @@ public class SessionVectorContributor : ConfiguredContributorBase
 
         try
         {
-            var signature = state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature)
+                ?? state.GetSignal<string>(SignalKeys.WaveformSignature); // fallback
             if (string.IsNullOrEmpty(signature))
             {
                 contributions.Add(NeutralContribution("No waveform signature available"));
@@ -166,7 +171,8 @@ public class SessionVectorContributor : ConfiguredContributorBase
         List<DetectionContribution> contributions)
     {
         var history = _sessionStore.GetHistory(
-            state.GetSignal<string>(SignalKeys.WaveformSignature) ?? "");
+            state.GetSignal<string>(SignalKeys.PrimarySignature)
+            ?? state.GetSignal<string>(SignalKeys.WaveformSignature) ?? "");
 
         if (history.Count == 0) return;
 
