@@ -1361,9 +1361,21 @@ public class StyloBotDashboardMiddleware
         var decodedSignature = Uri.UnescapeDataString(signature);
         var limit = int.TryParse(context.Request.Query["limit"], out var l) ? Math.Min(l, 50) : 20;
 
-        var sessions = await sessionStore.GetSessionsAsync(decodedSignature, limit);
+        // The dashboard uses multi-factor signature IDs, but the session store uses
+        // waveform signatures (IP:HASH(UA)). Use the SignatureMapper to bridge them.
+        var signatureMapper = context.RequestServices.GetService<BotDetection.Dashboard.SignatureMapper>();
+        var lookupKey = signatureMapper?.GetWaveformSignature(decodedSignature) ?? decodedSignature;
 
-        var result = sessions.Select(s => new
+        var sessions = await sessionStore.GetSessionsAsync(lookupKey, limit);
+
+        // Compute inter-session velocity (behavioral drift between consecutive sessions)
+        var sessionVectors = sessions
+            .Select(s => s.Vector is { Length: > 0 }
+                ? BotDetection.Data.SqliteSessionStore.DeserializeVector(s.Vector)
+                : null)
+            .ToList();
+
+        var result = sessions.Select((s, idx) => new
         {
             s.Id,
             s.StartedAt,
@@ -1378,6 +1390,12 @@ public class StyloBotDashboardMiddleware
             timingEntropy = Math.Round(s.TimingEntropy, 3),
             s.Maturity,
             live = false,
+            // Inter-session velocity: L2 magnitude of the delta vector from previous session.
+            // High velocity = sudden behavioral shift (bot rotation, account takeover, LLM-driven drift)
+            velocity = (idx < sessions.Count - 1 && sessionVectors[idx] != null && sessionVectors[idx + 1] != null)
+                ? (double?)Math.Round(BotDetection.Analysis.SessionVectorizer.VelocityMagnitude(
+                    BotDetection.Analysis.SessionVectorizer.ComputeVelocity(sessionVectors[idx]!, sessionVectors[idx + 1]!)), 3)
+                : null,
             // Markov chain for drill-in visualization
             transitionCounts = s.TransitionCountsJson != null
                 ? JsonSerializer.Deserialize<Dictionary<string, int>>(s.TransitionCountsJson)
@@ -1387,8 +1405,7 @@ public class StyloBotDashboardMiddleware
                 : null,
             // Radar projection for behavioral shape visualization
             radarAxes = s.Vector is { Length: > 0 }
-                ? BotDetection.Analysis.VectorRadarProjection.Project(
-                    BotDetection.Data.SqliteSessionStore.DeserializeVector(s.Vector)!)
+                ? BotDetection.Analysis.VectorRadarProjection.Project(sessionVectors[idx]!)
                 : null
         }).ToList<object>();
 
@@ -1397,7 +1414,7 @@ public class StyloBotDashboardMiddleware
         var liveSessionStore = context.RequestServices.GetService<BotDetection.Analysis.SessionStore>();
         if (liveSessionStore != null)
         {
-            var liveSession = liveSessionStore.GetCurrentSession(decodedSignature);
+            var liveSession = liveSessionStore.GetCurrentSession(lookupKey);
             if (liveSession is { Count: >= 2 })
             {
                 var liveVector = BotDetection.Analysis.SessionVectorizer.Encode(liveSession);
@@ -2451,7 +2468,13 @@ public class StyloBotDashboardMiddleware
             return;
         }
 
-        var sessions = await sessionStore.GetSessionsAsync(Uri.UnescapeDataString(signature), 20);
+        var decodedSig = Uri.UnescapeDataString(signature);
+
+        // Bridge signature key spaces (multi-factor → waveform)
+        var sigMapper = context.RequestServices.GetService<BotDetection.Dashboard.SignatureMapper>();
+        var lookupSig = sigMapper?.GetWaveformSignature(decodedSig) ?? decodedSig;
+
+        var sessions = await sessionStore.GetSessionsAsync(lookupSig, 20);
 
         context.Response.ContentType = "text/html";
 
@@ -2462,6 +2485,10 @@ public class StyloBotDashboardMiddleware
             return;
         }
 
+        // Pre-compute inter-session velocity vectors
+        var vectors = sessions.Select(s => s.Vector is { Length: > 0 }
+            ? BotDetection.Data.SqliteSessionStore.DeserializeVector(s.Vector) : null).ToList();
+
         var html = new System.Text.StringBuilder();
         html.Append("<div class=\"overflow-x-auto\"><table class=\"table table-xs w-full\"><thead>");
         html.Append("<tr class=\"text-[10px] uppercase tracking-wider text-base-content/40\">");
@@ -2471,16 +2498,29 @@ public class StyloBotDashboardMiddleware
         html.Append("<th class=\"py-1\">Dominant</th>");
         html.Append("<th class=\"py-1 text-right\">Bot %</th>");
         html.Append("<th class=\"py-1\">Risk</th>");
-        html.Append("<th class=\"py-1 text-right\">Entropy</th>");
+        html.Append("<th class=\"py-1 text-right\">Drift</th>");
         html.Append("<th class=\"py-1 text-right\">Errors</th>");
         html.Append("<th class=\"py-1\">Paths</th>");
         html.Append("</tr></thead><tbody>");
 
-        foreach (var s in sessions)
+        for (var si = 0; si < sessions.Count; si++)
         {
+            var s = sessions[si];
             var duration = (s.EndedAt - s.StartedAt).TotalMinutes;
             var probClass = s.AvgBotProbability >= 0.7 ? "text-error" : s.AvgBotProbability >= 0.4 ? "text-warning" : "text-success";
             var riskClass = s.RiskBand is "VeryHigh" or "High" ? "text-error" : s.RiskBand is "Elevated" or "Medium" ? "text-warning" : "text-success";
+
+            // Compute inter-session velocity (drift from previous session)
+            double? velocity = null;
+            if (si < sessions.Count - 1 && vectors[si] != null && vectors[si + 1] != null)
+                velocity = BotDetection.Analysis.SessionVectorizer.VelocityMagnitude(
+                    BotDetection.Analysis.SessionVectorizer.ComputeVelocity(vectors[si]!, vectors[si + 1]!));
+            var driftClass = velocity switch
+            {
+                >= 0.6 => "text-error font-bold",
+                >= 0.3 => "text-warning",
+                _ => "text-base-content/40"
+            };
 
             // Parse paths JSON for preview
             var pathPreview = "";
@@ -2502,7 +2542,9 @@ public class StyloBotDashboardMiddleware
             html.Append($"<td class=\"py-1 text-[10px] text-base-content/60\">{s.DominantState}</td>");
             html.Append($"<td class=\"py-1 text-right text-xs font-bold {probClass}\">{s.AvgBotProbability:P0}</td>");
             html.Append($"<td class=\"py-1 text-[10px] {riskClass}\">{s.RiskBand}</td>");
-            html.Append($"<td class=\"py-1 text-right text-[10px] font-mono text-base-content/50\">{s.TimingEntropy:F2}</td>");
+            html.Append(velocity.HasValue
+                ? $"<td class=\"py-1 text-right text-[10px] font-mono {driftClass}\" title=\"Inter-session velocity: behavioral shift magnitude\">{velocity.Value:F2}</td>"
+                : "<td class=\"py-1 text-right text-[10px] text-base-content/20\">—</td>");
             html.Append($"<td class=\"py-1 text-right text-xs {(s.ErrorCount > 0 ? "text-error font-bold" : "text-base-content/40")}\">{s.ErrorCount}</td>");
             html.Append($"<td class=\"py-1 text-[10px] text-base-content/40 max-w-[250px] truncate\" title=\"{System.Net.WebUtility.HtmlEncode(pathPreview)}\">{System.Net.WebUtility.HtmlEncode(pathPreview)}</td>");
             html.Append("</tr>");

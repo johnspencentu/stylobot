@@ -318,6 +318,7 @@ public sealed class DashboardShellModel
     public required UserAgentsListModel UserAgents { get; init; }
     public required TopBotsListModel TopBots { get; init; }
     public required SessionsListModel Sessions { get; init; }
+    public required ThreatsListModel Threats { get; init; }
 
     /// <summary>License entitlement card model. Always present (renders the muted OSS line in the unconfigured case).</summary>
     public required LicenseCardModel License { get; init; }
@@ -433,4 +434,35 @@ public sealed class ApprovalFormModel
 
     /// <summary>Current signal values that can be locked as approval dimensions.</summary>
     public Dictionary<string, string>? CurrentSignals { get; init; }
+}
+
+/// <summary>
+///     View model for the threats list partial.
+///     Shows CVE probe activity, active honeypot sessions, and threat intelligence.
+/// </summary>
+public sealed class ThreatsListModel
+{
+    public IReadOnlyList<ThreatEntry> Threats { get; init; } = [];
+    public int TotalCount { get; init; }
+    public int ActiveHoneypotSessions { get; init; }
+}
+
+/// <summary>
+///     A single threat entry for the threats list.
+/// </summary>
+public sealed class ThreatEntry
+{
+    public required string Signature { get; init; }
+    public required string Path { get; init; }
+    public string? CveId { get; init; }
+    public string? CveSeverity { get; init; }
+    public string? PackId { get; init; }
+    public double ThreatScore { get; init; }
+    public string? ThreatBand { get; init; }
+    public string? BotName { get; init; }
+    public string? BotType { get; init; }
+    public double BotProbability { get; init; }
+    public string? CountryCode { get; init; }
+    public DateTime Timestamp { get; init; }
+    public bool InHoneypot { get; init; }
 }

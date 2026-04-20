@@ -94,6 +94,7 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             CREATE INDEX IF NOT EXISTS idx_det_path ON detections(path);
             CREATE INDEX IF NOT EXISTS idx_sig_last_seen ON signatures(last_seen DESC);
             CREATE INDEX IF NOT EXISTS idx_sig_is_bot ON signatures(is_bot);
+            CREATE INDEX IF NOT EXISTS idx_det_threat ON detections(threat_score DESC, timestamp DESC);
             """;
         await cmd.ExecuteNonQueryAsync(ct);
 
@@ -533,6 +534,105 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             TopBots = new List<DashboardTopBotEntry>(),
             RecentDetections = new List<SignatureDetectionRow>()
         };
+    }
+
+    public async Task<List<ThreatEntry>> GetThreatsAsync(int count = 20, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        await EnsureInitializedAsync();
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync();
+
+        await using var cmd = conn.CreateCommand();
+        var sql = """
+            SELECT timestamp, signature, path, bot_name, bot_type, bot_probability,
+                   threat_score, threat_band, country_code, action, status_code
+            FROM detections
+            WHERE (action = 'simulation-pack'
+                   OR path LIKE '/wp-%'
+                   OR path LIKE '/xmlrpc.php%'
+                   OR path LIKE '/.env%'
+                   OR path LIKE '/.git%'
+                   OR path LIKE '/.svn%'
+                   OR path LIKE '/phpmyadmin%'
+                   OR path LIKE '/wp-config%'
+                   OR (threat_score >= 0.55 AND threat_band IN ('Critical', 'High')))
+            """;
+
+        if (startTime.HasValue)
+        {
+            sql += " AND timestamp >= @start";
+            cmd.Parameters.AddWithValue("@start", startTime.Value.ToString("O"));
+        }
+        if (endTime.HasValue)
+        {
+            sql += " AND timestamp <= @end";
+            cmd.Parameters.AddWithValue("@end", endTime.Value.ToString("O"));
+        }
+
+        sql += " ORDER BY timestamp DESC LIMIT @count";
+        cmd.Parameters.AddWithValue("@count", count);
+        cmd.CommandText = sql;
+
+        var results = new List<ThreatEntry>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var path = reader.IsDBNull(reader.GetOrdinal("path")) ? "/" : reader.GetString(reader.GetOrdinal("path"));
+            var action = reader.IsDBNull(reader.GetOrdinal("action")) ? null : reader.GetString(reader.GetOrdinal("action"));
+            var threatScore = reader.IsDBNull(reader.GetOrdinal("threat_score")) ? 0 : reader.GetDouble(reader.GetOrdinal("threat_score"));
+
+            // Infer CVE and pack info from path patterns
+            string? cveId = null;
+            string? cveSeverity = null;
+            string? packId = null;
+
+            if (path.StartsWith("/wp-", StringComparison.OrdinalIgnoreCase))
+            {
+                packId = "wordpress-5.9";
+                cveSeverity = threatScore >= 0.8 ? "critical" : threatScore >= 0.55 ? "high" : "medium";
+            }
+            else if (path.StartsWith("/.env", StringComparison.OrdinalIgnoreCase))
+            {
+                cveSeverity = "high";
+            }
+            else if (path.StartsWith("/.git", StringComparison.OrdinalIgnoreCase))
+            {
+                cveSeverity = "high";
+            }
+            else if (threatScore >= 0.8)
+            {
+                cveSeverity = "critical";
+            }
+            else if (threatScore >= 0.55)
+            {
+                cveSeverity = "high";
+            }
+            else if (threatScore >= 0.35)
+            {
+                cveSeverity = "medium";
+            }
+
+            var inHoneypot = action != null && action.Contains("simulation-pack", StringComparison.OrdinalIgnoreCase);
+
+            results.Add(new ThreatEntry
+            {
+                Timestamp = DateTime.Parse(reader.GetString(reader.GetOrdinal("timestamp"))),
+                Signature = reader.GetString(reader.GetOrdinal("signature")),
+                Path = path,
+                BotName = reader.IsDBNull(reader.GetOrdinal("bot_name")) ? null : reader.GetString(reader.GetOrdinal("bot_name")),
+                BotType = reader.IsDBNull(reader.GetOrdinal("bot_type")) ? null : reader.GetString(reader.GetOrdinal("bot_type")),
+                BotProbability = reader.GetDouble(reader.GetOrdinal("bot_probability")),
+                ThreatScore = threatScore,
+                ThreatBand = reader.IsDBNull(reader.GetOrdinal("threat_band")) ? null : reader.GetString(reader.GetOrdinal("threat_band")),
+                CountryCode = reader.IsDBNull(reader.GetOrdinal("country_code")) ? null : reader.GetString(reader.GetOrdinal("country_code")),
+                CveId = cveId,
+                CveSeverity = cveSeverity,
+                PackId = packId,
+                InHoneypot = inHoneypot
+            });
+        }
+
+        return results;
     }
 
     private static DashboardSignatureEvent ReadSignature(SqliteDataReader reader)

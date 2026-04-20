@@ -1070,6 +1070,98 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
         }
     }
 
+    public async Task<List<ThreatEntry>> GetThreatsAsync(int count = 20, DateTime? startTime = null, DateTime? endTime = null)
+    {
+        if (IsCircuitOpen) return [];
+
+        var parameters = new DynamicParameters();
+        parameters.Add("Count", count);
+
+        var timeFilter = "";
+        if (startTime.HasValue)
+        {
+            timeFilter += " AND timestamp >= @StartTime";
+            parameters.Add("StartTime", startTime.Value);
+        }
+        if (endTime.HasValue)
+        {
+            timeFilter += " AND timestamp <= @EndTime";
+            parameters.Add("EndTime", endTime.Value);
+        }
+
+        var sql = $@"
+            SELECT timestamp, primary_signature AS signature, path, bot_name, bot_type,
+                   bot_probability, COALESCE((important_signals->>'threat.score')::double precision, 0) AS threat_score,
+                   important_signals->>'threat.band' AS threat_band, country_code, action, status_code
+            FROM dashboard_detections
+            WHERE (COALESCE((important_signals->>'threat.score')::double precision, 0) > 0.3
+                   OR path LIKE '/wp-%%'
+                   OR path LIKE '/.env%%'
+                   OR path LIKE '/.git%%'
+                   OR action = 'simulation-pack')
+            {timeFilter}
+            ORDER BY timestamp DESC
+            LIMIT @Count";
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+            var rows = await connection.QueryAsync(sql, parameters, commandTimeout: _options.CommandTimeoutSeconds);
+
+            return rows.Select(r =>
+            {
+                var path = (string?)r.path ?? "/";
+                var action = (string?)r.action;
+                var threatScore = (double?)r.threat_score ?? 0;
+
+                string? cveSeverity = null;
+                string? packId = null;
+
+                if (path.StartsWith("/wp-", StringComparison.OrdinalIgnoreCase))
+                {
+                    packId = "wordpress-5.9";
+                    cveSeverity = threatScore >= 0.8 ? "critical" : threatScore >= 0.55 ? "high" : "medium";
+                }
+                else if (path.StartsWith("/.env", StringComparison.OrdinalIgnoreCase) ||
+                         path.StartsWith("/.git", StringComparison.OrdinalIgnoreCase))
+                {
+                    cveSeverity = "high";
+                }
+                else if (threatScore >= 0.8) cveSeverity = "critical";
+                else if (threatScore >= 0.55) cveSeverity = "high";
+                else if (threatScore >= 0.35) cveSeverity = "medium";
+
+                return new ThreatEntry
+                {
+                    Timestamp = (DateTime)r.timestamp,
+                    Signature = (string?)r.signature ?? "",
+                    Path = path,
+                    BotName = (string?)r.bot_name,
+                    BotType = (string?)r.bot_type,
+                    BotProbability = (double?)r.bot_probability ?? 0,
+                    ThreatScore = threatScore,
+                    ThreatBand = (string?)r.threat_band,
+                    CountryCode = (string?)r.country_code,
+                    CveId = null,
+                    CveSeverity = cveSeverity,
+                    PackId = packId,
+                    InHoneypot = action?.Contains("simulation-pack", StringComparison.OrdinalIgnoreCase) == true
+                };
+            }).ToList();
+        }
+        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
+        {
+            TripCircuit();
+            _logger.LogError(ex, "Failed to get threats from PostgreSQL");
+            return [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get threats from PostgreSQL");
+            throw;
+        }
+    }
+
     /// <summary>
     /// Maps a TimeSpan bucket size to the nearest PostgreSQL date_trunc unit.
     /// </summary>

@@ -31,7 +31,8 @@ public partial class DetectionBroadcastMiddleware
         "ua.", "header.", "client.", "geo.", "ip.", "behavioral.",
         "detection.", "request.", "h2.", "tls.", "tcp.", "h3.",
         "cluster.", "reputation.", "honeypot.", "similarity.",
-        "attack.", "ato.", "intent.", "heuristic.", "referrer."
+        "attack.", "ato.", "intent.", "heuristic.", "referrer.",
+        "privacy."
     ];
 
     /// <summary>Signal keys that must never reach the dashboard.</summary>
@@ -98,6 +99,10 @@ public partial class DetectionBroadcastMiddleware
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
                 await hubContext.Clients.All.BroadcastInvalidation("summary");
 
+                // Invalidate threats widget for high-threat or honeypot detections
+                if (detection.ThreatScore is > 0.3 || detection.Action == "simulation-pack")
+                    await hubContext.Clients.All.BroadcastInvalidation("threats");
+
                 // Fan out to any out-of-process event publisher (commercial Redis → separate
                 // UI container). No-op in FOSS. Fire-and-forget: must not block the response.
                 _ = PublishEventAsync(detectionEventPublisher, detection, context);
@@ -144,6 +149,10 @@ public partial class DetectionBroadcastMiddleware
                 visitorListCache.Upsert(detection);
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
                 await hubContext.Clients.All.BroadcastInvalidation("summary");
+
+                // Invalidate threats widget for high-threat or honeypot detections
+                if (detection.ThreatScore is > 0.3 || detection.Action == "simulation-pack")
+                    await hubContext.Clients.All.BroadcastInvalidation("threats");
 
                 // Fan out to any out-of-process event publisher (commercial Redis → separate
                 // UI container). No-op in FOSS. Fire-and-forget: must not block the response.

@@ -67,4 +67,9 @@ public interface IDashboardEventStore
     ///     Get detailed statistics for a single endpoint.
     /// </summary>
     Task<DashboardEndpointDetail?> GetEndpointDetailAsync(string method, string path, DateTime? startTime = null, DateTime? endTime = null);
+
+    /// <summary>
+    ///     Get recent threat activity (CVE probes, honeypot engagements, high threat-score detections).
+    /// </summary>
+    Task<List<ThreatEntry>> GetThreatsAsync(int count = 20, DateTime? startTime = null, DateTime? endTime = null);
 }
