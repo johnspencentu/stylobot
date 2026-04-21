@@ -506,6 +506,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, CacheBehaviorContributor>();
         // Cookie behavior analysis - detects bots that ignore Set-Cookie headers
         services.AddSingleton<IContributingDetector, CookieBehaviorContributor>();
+        // Header correlation - detects UA rotation via identical non-UA header profiles (priority 21)
+        services.AddSingleton<IContributingDetector, HeaderCorrelationContributor>();
         // Resource waterfall detection - document-to-asset ratio analysis (priority 22)
         services.AddSingleton<IContributingDetector, ResourceWaterfallContributor>();
         // Advanced behavioral pattern detection - runs after basic behavioral

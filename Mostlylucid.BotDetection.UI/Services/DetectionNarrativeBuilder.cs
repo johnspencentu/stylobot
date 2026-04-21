@@ -56,7 +56,8 @@ public static class DetectionNarrativeBuilder
         ["Signature"] = "identity signature computation",
         ["CveFingerprint"] = "CVE threat intelligence matching",
         ["CookieBehavior"] = "cookie behavior analysis",
-        ["ResourceWaterfall"] = "resource loading pattern analysis"
+        ["ResourceWaterfall"] = "resource loading pattern analysis",
+        ["HeaderCorrelation"] = "UA rotation detection via header correlation"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -107,6 +108,7 @@ public static class DetectionNarrativeBuilder
         ["Signature"] = "Identity",
         ["CveFingerprint"] = "Security",
         ["CookieBehavior"] = "Behavioral",
+        ["HeaderCorrelation"] = "Identity",
         ["ResourceWaterfall"] = "Behavioral"
     };
 

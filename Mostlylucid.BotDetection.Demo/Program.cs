@@ -25,6 +25,22 @@ builder.Services.AddGeoRoutingSimple();
 builder.Services.AddBotDetection(options =>
 {
     options.ExcludeLocalIpFromBroadcast = false;
+    options.BdfReplay.Enabled = true;
+    options.BdfReplay.RequireApiKey = false;
+    // Programmatic API keys (config binding for Dictionary<string, ApiKeyConfig>
+    // is unreliable in .NET 10 with BindConfiguration)
+    options.ApiKeys["SB-DEMO-BYPASS"] = new Mostlylucid.BotDetection.Models.ApiKeyConfig
+    {
+        Name = "Demo Bypass Key",
+        ActionPolicyName = "logonly",
+        Enabled = true
+    };
+    options.ApiKeys["SB-BDF-TEST"] = new Mostlylucid.BotDetection.Models.ApiKeyConfig
+    {
+        Name = "BDF Replay Testing",
+        ActionPolicyName = "logonly",
+        Enabled = true
+    };
 });
 
 // Add telemetry instrumentation (required by BotDetectionMiddleware)

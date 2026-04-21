@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mostlylucid.BotDetection.Extensions;
@@ -200,11 +201,13 @@ public static class StyloBotDashboardServiceExtensions
             app.UseMiddleware<StyloBotDashboardMiddleware>();
 
             // SignalR hub for live updates
-            app.UseEndpoints(endpoints =>
+            // Use IEndpointRouteBuilder directly (not UseEndpoints) to avoid creating
+            // a terminal middleware that blocks endpoint routing for later MapGroup/MapGet calls.
+            if (app is IEndpointRouteBuilder routeBuilder)
             {
-                endpoints.MapHub<StyloBotDashboardHub>(options.HubPath)
+                routeBuilder.MapHub<StyloBotDashboardHub>(options.HubPath)
                     .WithMetadata(new BotDetection.Attributes.BotPolicyAttribute("default") { BlockThreshold = 0.95 });
-            });
+            }
         }
 
         return app;
@@ -224,11 +227,11 @@ public static class StyloBotDashboardServiceExtensions
         app.UseMiddleware<DetectionBroadcastMiddleware>();
         app.UseMiddleware<StyloBotDashboardMiddleware>();
 
-        app.UseEndpoints(endpoints =>
+        if (app is IEndpointRouteBuilder routeBuilder2)
         {
-            endpoints.MapHub<StyloBotDashboardHub>(options.HubPath)
+            routeBuilder2.MapHub<StyloBotDashboardHub>(options.HubPath)
                 .WithMetadata(new BotDetection.Attributes.BotPolicyAttribute("default") { BlockThreshold = 0.95 });
-        });
+        }
 
         return app;
     }
@@ -329,7 +332,8 @@ public static class StyloBotDashboardServiceExtensions
         // Map SignalR hub so dashboard clients (on other hosts) can connect
         var options = app.ApplicationServices.GetService<StyloBotDashboardOptions>();
         var hubPath = options?.HubPath ?? "/stylobot/hub";
-        app.UseEndpoints(endpoints => { endpoints.MapHub<StyloBotDashboardHub>(hubPath); });
+        if (app is IEndpointRouteBuilder erb)
+            erb.MapHub<StyloBotDashboardHub>(hubPath);
 
         return app;
     }

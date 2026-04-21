@@ -3275,9 +3275,10 @@ public class TrainingEndpointsOptions
 public class BdfReplayOptions
 {
     /// <summary>
-    ///     Enable or disable BDF replay endpoints. Default: false (must opt-in).
+    ///     Enable or disable BDF replay endpoints. Default: true.
+    ///     Security is via RequireApiKey (default: true), not via this flag.
     /// </summary>
-    public bool Enabled { get; set; }
+    public bool Enabled { get; set; } = true;
 
     /// <summary>
     ///     Require an API key via X-BdfReplay-Api-Key header. Default: true.
