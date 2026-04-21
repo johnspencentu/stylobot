@@ -106,6 +106,7 @@
         <EmbeddedResource Include="Orchestration\Manifests\pipelines\*.yaml" />
         <EmbeddedResource Include="Orchestration\Manifests\entities\*.yaml" />
         <EmbeddedResource Include="Orchestration\Manifests\schemas\*.json" />
+        <EmbeddedResource Include="Orchestration\Manifests\proxy-headers.yaml" />
     </ItemGroup>
 
     <!-- Embed simulation pack YAML definitions -->

@@ -41,6 +41,10 @@ public class BrowserFingerprintData
 
     [JsonPropertyName("cdc")] public int ChromeDevTools { get; set; }
 
+    [JsonPropertyName("playwright")] public int Playwright { get; set; }
+
+    [JsonPropertyName("chromeRuntime")] public int HasChromeRuntime { get; set; }
+
     [JsonPropertyName("plugins")] public int PluginCount { get; set; }
 
     [JsonPropertyName("chrome")] public bool HasChromeObject { get; set; }

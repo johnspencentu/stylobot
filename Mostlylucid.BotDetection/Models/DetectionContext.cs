@@ -1200,4 +1200,23 @@ public static class SignalKeys
 
     /// <summary>Boolean: true if this signature has requested /favicon.ico.</summary>
     public const string ResourceFaviconRequested = "resource.favicon_requested";
+
+    // ==========================================
+    // CDN / Proxy infrastructure signals
+    // Set by infrastructure detection when proxy/CDN headers are present
+    // ==========================================
+
+    /// <summary>String: detected CDN/proxy provider name (e.g., "cloudflare", "aws-alb")</summary>
+    public const string CdnProvider = "cdn.provider";
+
+    /// <summary>String: header name used to extract the real client IP for this provider</summary>
+    public const string CdnRealIpHeader = "cdn.real_ip_header";
+
+    // ==========================================
+    // Headless automation framework signals
+    // Set by ClientSideContributor / UserAgentContributor when automation is identified
+    // ==========================================
+
+    /// <summary>String: specific automation framework name (e.g., "Puppeteer", "Playwright", "Selenium")</summary>
+    public const string HeadlessFramework = "headless.framework";
 }

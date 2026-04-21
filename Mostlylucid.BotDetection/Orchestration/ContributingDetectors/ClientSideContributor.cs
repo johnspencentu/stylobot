@@ -81,6 +81,10 @@ public class ClientSideContributor : ConfiguredContributorBase
                     state.WriteSignal(SignalKeys.JsPerformanceResolution, fp.PerformanceResolution.Value);
                 if (fp.TimingAnomaly)
                     state.WriteSignal(SignalKeys.JsTimingAnomaly, true);
+
+                // Write headless automation framework signal for cross-detector consumption
+                if (!string.IsNullOrEmpty(fp.DetectedAutomation))
+                    state.WriteSignal(SignalKeys.HeadlessFramework, fp.DetectedAutomation);
             }
         }
         catch (Exception ex)

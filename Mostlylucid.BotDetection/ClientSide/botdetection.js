@@ -230,6 +230,8 @@
         data.nightmare = !!win.__nightmare ? 1 : 0;
         data.selenium = this.detectSelenium();
         data.cdc = this.detectCDP();
+        data.playwright = this.detectPlaywright();
+        data.chromeRuntime = (win.chrome && win.chrome.runtime && win.chrome.runtime.id) ? 1 : 0;
         data.plugins = nav.plugins ? nav.plugins.length : 0;
         data.chrome = !!win.chrome ? 1 : 0;
         data.permissions = this.checkPermissions();
@@ -363,12 +365,30 @@
 ,
 
     /**
-     * Detect Chrome DevTools Protocol markers (Puppeteer, Playwright)
+     * Detect Chrome DevTools Protocol markers (Puppeteer, other CDP tools)
      */
     detectCDP: function () {
         try {
             for (var key in window) {
                 if (key.match(/^cdc_|^__\$|^\$cdc_/)) {
+                    return 1;
+                }
+            }
+        } catch (e) {
+        }
+        return 0;
+    }
+,
+
+    /**
+     * Detect Playwright markers (__playwright, __pw_* globals)
+     */
+    detectPlaywright: function () {
+        try {
+            if (window.__playwright) return 1;
+            if (window.__pw_manual) return 1;
+            for (var key in window) {
+                if (key.indexOf('__pw_') === 0) {
                     return 1;
                 }
             }
@@ -497,6 +517,10 @@
         if (data.cdc) {
             score -= 40;
             reasons.push('cdp');
+        }
+        if (data.playwright) {
+            score -= 50;
+            reasons.push('playwright');
         }
 
         // Suspicious indicators

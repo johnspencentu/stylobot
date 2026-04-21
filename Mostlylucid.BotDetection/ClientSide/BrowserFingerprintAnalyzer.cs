@@ -47,24 +47,18 @@ public class BrowserFingerprintAnalyzer : IBrowserFingerprintAnalyzer
         var integrityDeductions = 0;
 
         // ===== Automation Detection =====
+        // Order matters: check specific frameworks before falling back to generic WebDriver.
+        // Each framework leaves distinct markers that let us name the exact tool.
 
-        // WebDriver flag (definitive)
-        if (data.WebDriver == 1)
-        {
-            headlessScore += 0.5;
-            reasons.Add("navigator.webdriver is true");
-            result.DetectedAutomation = "WebDriver";
-        }
-
-        // PhantomJS
+        // PhantomJS (window.callPhantom / window._phantom)
         if (data.Phantom == 1)
         {
             headlessScore += 0.5;
             reasons.Add("PhantomJS markers detected");
-            result.DetectedAutomation ??= "PhantomJS";
+            result.DetectedAutomation = "PhantomJS";
         }
 
-        // Nightmare
+        // Nightmare.js (window.__nightmare)
         if (data.Nightmare)
         {
             headlessScore += 0.5;
@@ -72,7 +66,7 @@ public class BrowserFingerprintAnalyzer : IBrowserFingerprintAnalyzer
             result.DetectedAutomation ??= "Nightmare";
         }
 
-        // Selenium
+        // Selenium (document.$cdc_ / document.$wdc_ / __selenium_unwrapped)
         if (data.Selenium)
         {
             headlessScore += 0.5;
@@ -80,12 +74,44 @@ public class BrowserFingerprintAnalyzer : IBrowserFingerprintAnalyzer
             result.DetectedAutomation ??= "Selenium";
         }
 
-        // Chrome DevTools Protocol
+        // Playwright (__playwright / __pw_* globals)
+        if (data.Playwright == 1)
+        {
+            headlessScore += 0.5;
+            reasons.Add("Playwright markers detected");
+            result.DetectedAutomation ??= "Playwright";
+        }
+
+        // Chrome DevTools Protocol (CDP markers - Puppeteer or other CDP-based tools)
         if (data.ChromeDevTools == 1)
         {
             headlessScore += 0.4;
             reasons.Add("Chrome DevTools Protocol markers detected");
             result.DetectedAutomation ??= "CDP/Puppeteer";
+        }
+
+        // WebDriver flag (navigator.webdriver = true) - generic fallback with framework inference
+        if (data.WebDriver == 1)
+        {
+            headlessScore += 0.5;
+            reasons.Add("navigator.webdriver is true");
+
+            // If no specific framework detected yet, infer from secondary signals
+            if (result.DetectedAutomation == null)
+            {
+                if (data.Playwright == 1)
+                    result.DetectedAutomation = "Playwright";
+                else if (data.Selenium)
+                    result.DetectedAutomation = "Selenium";
+                else if (data.ChromeDevTools == 1)
+                    // CDP + webdriver + no chrome.runtime = likely Puppeteer
+                    result.DetectedAutomation = "Puppeteer";
+                else if (data.HasChromeObject && data.HasChromeRuntime == 0)
+                    // Chrome without chrome.runtime = likely Puppeteer (it removes runtime)
+                    result.DetectedAutomation = "Puppeteer";
+                else
+                    result.DetectedAutomation = "WebDriver (unknown framework)";
+            }
         }
 
         // ===== Browser Consistency Checks =====

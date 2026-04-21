@@ -265,6 +265,7 @@ public partial class UserAgentContributor : ConfiguredContributorBase
         // Automation / scraping frameworks
         ("scrapy", BotType.Scraper, "Scrapy"),
         ("selenium", BotType.Scraper, "Selenium"),
+        ("HeadlessChrome", BotType.Scraper, "Headless Chrome (likely Puppeteer/Playwright)"),
         ("headless", BotType.Scraper, "Headless browser"),
         ("phantomjs", BotType.Scraper, "PhantomJS"),
         ("puppeteer", BotType.Scraper, "Puppeteer"),
