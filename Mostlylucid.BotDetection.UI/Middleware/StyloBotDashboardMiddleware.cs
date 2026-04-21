@@ -12,6 +12,7 @@ using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.BotDetection.Services;
+using Mostlylucid.BotDetection.Analysis;
 using Mostlylucid.BotDetection.UI.Configuration;
 using Mostlylucid.BotDetection.UI.Models;
 using Mostlylucid.BotDetection.UI.Services;
@@ -3675,11 +3676,94 @@ public class StyloBotDashboardMiddleware
         _ => "#6b7280"
     };
 
+    private static IReadOnlyList<FilterGroup> BuildFilterGroups()
+    {
+        return new List<FilterGroup>
+        {
+            new()
+            {
+                Id = "fingerprint", Label = "Fingerprint Signals",
+                Dimensions = new List<FilterDimension>
+                {
+                    new() { Name = "client_fingerprint", Label = "TLS/HTTP Fingerprint", AxisIndex = 7, InputType = "slider" },
+                    new() { Name = "ip_reputation", Label = "Datacenter", AxisIndex = 2, InputType = "toggle", Threshold = 0.7 },
+                    new() { Name = "inconsistency", Label = "Inconsistency", AxisIndex = 9, InputType = "slider" },
+                }
+            },
+            new()
+            {
+                Id = "traffic", Label = "Traffic Pattern",
+                Dimensions = new List<FilterDimension>
+                {
+                    new() { Name = "rate_pattern", Label = "Request Rate", AxisIndex = 14, InputType = "slider" },
+                    new() { Name = "advanced_behavioral", Label = "Timing Regularity", AxisIndex = 4, InputType = "slider" },
+                    new() { Name = "behavioral", Label = "Navigation Pattern", AxisIndex = 3, InputType = "slider" },
+                    new() { Name = "cache_behavior", Label = "Asset Loading", AxisIndex = 5, InputType = "slider" },
+                }
+            },
+            new()
+            {
+                Id = "detection", Label = "Detection Signals",
+                Dimensions = new List<FilterDimension>
+                {
+                    new() { Name = "ua_anomaly", Label = "UA Anomaly", AxisIndex = 0, InputType = "slider" },
+                    new() { Name = "header_anomaly", Label = "Header Anomaly", AxisIndex = 1, InputType = "slider" },
+                    new() { Name = "security_tool", Label = "Security Tool", AxisIndex = 6, InputType = "toggle", Threshold = 0.5 },
+                    new() { Name = "ai_classification", Label = "AI Classification", AxisIndex = 11, InputType = "slider" },
+                    new() { Name = "cluster_signal", Label = "Cluster Signal", AxisIndex = 12, InputType = "slider" },
+                    new() { Name = "reputation_match", Label = "Reputation Match", AxisIndex = 10, InputType = "slider" },
+                }
+            }
+        };
+    }
+
     private async Task ServeInvestigationAsync(HttpContext context)
     {
-        var filter = ParseInvestigationFilter(context);
-        var result = await _eventStore.GetInvestigationAsync(filter);
-        var vm = BuildInvestigationViewModel(filter, result);
+        var shapeFilter = ParseShapeSearchFilter(context);
+
+        InvestigationResult result;
+
+        // If shape dimensions are set and we have pgvector, use HNSW
+        var shapeStore = context.RequestServices.GetService<IShapeSearchStore>();
+        if (shapeFilter.TargetShape is not null && shapeStore is not null)
+        {
+            result = await shapeStore.SearchByShapeAsync(shapeFilter);
+        }
+        else
+        {
+            // Fall back to spec 1 SQL-based investigation
+            var investigationFilter = new InvestigationFilter
+            {
+                EntityType = context.Request.Query["type"].FirstOrDefault() ?? "signature",
+                EntityValue = context.Request.Query["value"].FirstOrDefault() ?? "",
+                Start = shapeFilter.Start,
+                End = shapeFilter.End,
+                Tab = shapeFilter.Tab,
+                Offset = shapeFilter.Offset
+            };
+            result = await _eventStore.GetInvestigationAsync(investigationFilter);
+        }
+
+        // Load presets
+        var presets = shapeStore is not null
+            ? await shapeStore.GetPresetsAsync()
+            : Array.Empty<InvestigationPreset>();
+
+        var hasCommercial = _options.EnableConfigEditing;
+        var tabs = new List<string> { "detections", "signatures", "endpoints", "geo", "signaltrace" };
+        if (hasCommercial) tabs.Insert(tabs.Count - 1, "fingerprints");
+
+        var vm = new ShapeInvestigationViewModel
+        {
+            Filter = shapeFilter,
+            Result = result,
+            BasePath = _options.BasePath,
+            FilterGroups = BuildFilterGroups(),
+            Presets = presets.ToList(),
+            AvailableTabs = tabs,
+            HasShapeSearch = shapeStore is not null,
+            IsPaid = hasCommercial
+        };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
             "/Views/StyloBot/Dashboard/_Investigate.cshtml", vm, context);
@@ -3745,6 +3829,52 @@ public class StyloBotDashboardMiddleware
             End = end,
             Tab = tab,
             Offset = offset
+        };
+    }
+
+    private ShapeSearchFilter ParseShapeSearchFilter(HttpContext context)
+    {
+        var query = context.Request.Query;
+        var range = query["range"].FirstOrDefault() ?? "24h";
+        var now = DateTime.UtcNow;
+        var start = range switch
+        {
+            "1h" => now.AddHours(-1), "6h" => now.AddHours(-6),
+            "24h" => now.AddHours(-24), "7d" => now.AddDays(-7),
+            "30d" => now.AddDays(-30), _ => now.AddHours(-24)
+        };
+
+        // Parse dimension values from dim_0 through dim_15
+        var shape = new float[RadarDimensions.Count];
+        var weights = new float[RadarDimensions.Count];
+        var hasAnyShape = false;
+
+        for (var i = 0; i < RadarDimensions.Count; i++)
+        {
+            if (float.TryParse(query[$"dim_{i}"].FirstOrDefault(), out var dimVal))
+            {
+                shape[i] = Math.Max(0f, Math.Min(1f, dimVal));
+                hasAnyShape = true;
+            }
+            weights[i] = float.TryParse(query[$"weight_{i}"].FirstOrDefault(), out var w) ? w : (shape[i] > 0.05f ? 1f : 0f);
+        }
+
+        var fuzz = double.TryParse(query["fuzz"].FirstOrDefault(), out var f) ? f : 0.2;
+
+        return new ShapeSearchFilter
+        {
+            Start = start,
+            EndpointPath = query["endpointPath"].FirstOrDefault(),
+            HttpMethod = query["httpMethod"].FirstOrDefault(),
+            UserAgent = query["userAgent"].FirstOrDefault(),
+            Country = query["country"].FirstOrDefault(),
+            BotName = query["botName"].FirstOrDefault(),
+            IpHmac = query["ipHmac"].FirstOrDefault(),
+            TargetShape = hasAnyShape ? shape : null,
+            DimensionWeights = weights,
+            FuzzThreshold = fuzz,
+            Tab = query["tab"].FirstOrDefault(),
+            Offset = int.TryParse(query["offset"].FirstOrDefault(), out var o) ? o : 0
         };
     }
 
