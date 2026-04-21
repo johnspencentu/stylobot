@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
+using Mostlylucid.BotDetection.SimulationPacks;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Benchmarks;
@@ -45,6 +47,14 @@ public class IndividualDetectorBenchmarks
     private BlackboardState _atoCleanState = null!;
     private BlackboardState _atoLoginState = null!;
 
+    // New identity + security detectors
+    private SignatureContributor _signatureDetector = null!;
+    private PeriodicityContributor _periodicityDetector = null!;
+    private CveProbeContributor _cveProbeDetector = null!;
+    private PiiQueryStringContributor _piiDetector = null!;
+    private BlackboardState _cveProbeState = null!;
+    private BlackboardState _piiState = null!;
+
     [GlobalSetup]
     public void GlobalSetup()
     {
@@ -77,6 +87,13 @@ public class IndividualDetectorBenchmarks
         _aiScraperDetector = allDetectors.OfType<AiScraperContributor>().First();
         _haxxorDetector = allDetectors.OfType<HaxxorContributor>().First();
         _atoDetector = allDetectors.OfType<AccountTakeoverContributor>().First();
+        _signatureDetector = allDetectors.OfType<SignatureContributor>().FirstOrDefault()!;
+        _periodicityDetector = allDetectors.OfType<PeriodicityContributor>().FirstOrDefault()!;
+        _cveProbeDetector = allDetectors.OfType<CveProbeContributor>().FirstOrDefault()!;
+        _piiDetector = allDetectors.OfType<PiiQueryStringContributor>().FirstOrDefault()!;
+
+        Console.WriteLine($"Resolved {allDetectors.Count} detectors: {string.Join(", ", allDetectors.Select(d => d.Name))}");
+        Console.WriteLine($"Signature={_signatureDetector != null}, Periodicity={_periodicityDetector != null}, CveProbe={_cveProbeDetector != null}, PII={_piiDetector != null}");
 
         // Setup test states
         _humanState = CreateHumanState();
@@ -88,6 +105,107 @@ public class IndividualDetectorBenchmarks
         _haxxorPathProbeState = CreateHaxxorPathProbeState();
         _atoCleanState = CreateAtoCleanState();
         _atoLoginState = CreateAtoLoginState();
+        _cveProbeState = CreateCveProbeState();
+        _piiState = CreatePiiState();
+    }
+
+    // =========================================
+    // Benchmark methods — one per detector × scenario
+    // =========================================
+
+    // --- Core detectors ---
+
+    [Benchmark(Description = "UserAgent: human Chrome")]
+    public Task UserAgent_Human() => _userAgentDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "UserAgent: curl bot")]
+    public Task UserAgent_Bot() => _userAgentDetector.ContributeAsync(_botState);
+
+    [Benchmark(Description = "Header: human with full headers")]
+    public Task Header_Human() => _headerDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "Header: bot with minimal headers")]
+    public Task Header_Bot() => _headerDetector.ContributeAsync(_botState);
+
+    [Benchmark(Description = "IP: public IP")]
+    public Task Ip_Public() => _ipDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "Behavioral: human")]
+    public Task Behavioral_Human() => _behavioralDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "Heuristic: human")]
+    public Task Heuristic_Human() => _heuristicDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "Heuristic: bot")]
+    public Task Heuristic_Bot() => _heuristicDetector.ContributeAsync(_botState);
+
+    // --- Fingerprint detectors ---
+
+    [Benchmark(Description = "HTTP/3: QUIC fingerprint")]
+    public Task Http3_Fingerprint() => _http3Detector.ContributeAsync(_http3State);
+
+    [Benchmark(Description = "AI Scraper: detection")]
+    public Task AiScraper_Detection() => _aiScraperDetector.ContributeAsync(_aiScraperState);
+
+    // --- Attack detectors ---
+
+    [Benchmark(Description = "Haxxor: clean request")]
+    public Task Haxxor_Clean() => _haxxorDetector.ContributeAsync(_haxxorCleanState);
+
+    [Benchmark(Description = "Haxxor: SQL injection")]
+    public Task Haxxor_SqlInjection() => _haxxorDetector.ContributeAsync(_haxxorSqliState);
+
+    [Benchmark(Description = "Haxxor: path probe")]
+    public Task Haxxor_PathProbe() => _haxxorDetector.ContributeAsync(_haxxorPathProbeState);
+
+    // --- Identity detectors ---
+
+    [Benchmark(Description = "AccountTakeover: clean GET")]
+    public Task ATO_Clean() => _atoDetector.ContributeAsync(_atoCleanState);
+
+    [Benchmark(Description = "AccountTakeover: login POST")]
+    public Task ATO_Login() => _atoDetector.ContributeAsync(_atoLoginState);
+
+    // --- NEW detectors (this session) ---
+
+    [Benchmark(Description = "Signature: compute PrimarySignature + header hashes")]
+    public Task Signature_Compute() => _signatureDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "Periodicity: timing analysis")]
+    public Task Periodicity_Analyze() => _periodicityDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "CveProbe: WordPress path")]
+    public Task CveProbe_WordPress() => _cveProbeDetector.ContributeAsync(_cveProbeState);
+
+    [Benchmark(Description = "CveProbe: clean path (no match)")]
+    public Task CveProbe_Clean() => _cveProbeDetector.ContributeAsync(_humanState);
+
+    [Benchmark(Description = "PII: query with email")]
+    public Task Pii_WithEmail() => _piiDetector.ContributeAsync(_piiState);
+
+    [Benchmark(Description = "PII: clean query")]
+    public Task Pii_Clean() => _piiDetector.ContributeAsync(_humanState);
+
+    private static BlackboardState CreateState(
+        DefaultHttpContext context,
+        Dictionary<string, object>? signals = null,
+        string requestId = "bench")
+    {
+        var signalDict = new System.Collections.Concurrent.ConcurrentDictionary<string, object>(
+            signals ?? new Dictionary<string, object>());
+
+        return new BlackboardState
+        {
+            HttpContext = context,
+            Signals = signalDict,
+            SignalWriter = signalDict,
+            CurrentRiskScore = 0.0,
+            CompletedDetectors = new HashSet<string>(),
+            FailedDetectors = new HashSet<string>(),
+            Contributions = new List<DetectionContribution>(),
+            RequestId = requestId,
+            Elapsed = TimeSpan.Zero
+        };
     }
 
     private BlackboardState CreateHumanState()
@@ -103,17 +221,7 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "GET";
         context.Request.Path = "/";
 
-        return new BlackboardState
-        {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-request",
-            Elapsed = TimeSpan.Zero
-        };
+        return CreateState(context, requestId: "bench-human");
     }
 
     private BlackboardState CreateBotState()
@@ -125,17 +233,7 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "GET";
         context.Request.Path = "/api/data";
 
-        return new BlackboardState
-        {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-request",
-            Elapsed = TimeSpan.Zero
-        };
+        return CreateState(context, requestId: "bench-bot");
     }
 
     [Benchmark(Description = "UserAgent Detector")]
@@ -193,17 +291,7 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "GET";
         context.Request.Path = "/";
 
-        return new BlackboardState
-        {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-request",
-            Elapsed = TimeSpan.Zero
-        };
+        return CreateState(context, requestId: "bench-http3");
     }
 
     private BlackboardState CreateAiScraperState()
@@ -216,17 +304,7 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "GET";
         context.Request.Path = "/";
 
-        return new BlackboardState
-        {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-request",
-            Elapsed = TimeSpan.Zero
-        };
+        return CreateState(context, requestId: "bench-ai-scraper");
     }
 
     // ===== Haxxor Benchmarks =====
@@ -276,17 +354,7 @@ public class IndividualDetectorBenchmarks
         context.Request.Path = "/products/widget-123";
         context.Request.QueryString = new QueryString("?color=blue&size=large");
 
-        return new BlackboardState
-        {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-haxxor-clean",
-            Elapsed = TimeSpan.Zero
-        };
+        return CreateState(context, requestId: "bench-haxxor-clean");
     }
 
     /// <summary>SQL injection in query string - should trigger detection.</summary>
@@ -299,17 +367,7 @@ public class IndividualDetectorBenchmarks
         context.Request.Path = "/search";
         context.Request.QueryString = new QueryString("?q=1' UNION SELECT username,password FROM users--");
 
-        return new BlackboardState
-        {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-haxxor-sqli",
-            Elapsed = TimeSpan.Zero
-        };
+        return CreateState(context, requestId: "bench-haxxor-sqli");
     }
 
     /// <summary>WordPress admin probe - should trigger path probe detection.</summary>
@@ -321,17 +379,39 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "GET";
         context.Request.Path = "/wp-admin/install.php";
 
-        return new BlackboardState
+        return CreateState(context, requestId: "bench-haxxor-probe");
+    }
+
+    /// <summary>WordPress probe path - should trigger CVE probe detection.</summary>
+    private BlackboardState CreateCveProbeState()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.UserAgent = "python-requests/2.31.0";
+        context.Connection.RemoteIpAddress = IPAddress.Parse("198.51.100.80");
+        context.Request.Method = "GET";
+        context.Request.Path = "/wp-login.php";
+
+        return CreateState(context, new Dictionary<string, object>
         {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>(),
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-haxxor-probe",
-            Elapsed = TimeSpan.Zero
-        };
+            [SignalKeys.PrimarySignature] = "sig_benchmark_cve"
+        }, requestId: "bench-cve-probe");
+    }
+
+    /// <summary>Query string with PII - should trigger PII detection.</summary>
+    private BlackboardState CreatePiiState()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.UserAgent =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
+        context.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.42");
+        context.Request.Method = "GET";
+        context.Request.Path = "/search";
+        context.Request.QueryString = new QueryString("?email=user@example.com&token=abc123def456ghi789jkl012mno345");
+
+        return CreateState(context, new Dictionary<string, object>
+        {
+            [SignalKeys.PrimarySignature] = "sig_benchmark_pii"
+        }, requestId: "bench-pii");
     }
 
     /// <summary>Normal GET - no waveform signature signal, returns immediately.</summary>
@@ -344,21 +424,11 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "GET";
         context.Request.Path = "/dashboard";
 
-        return new BlackboardState
+        return CreateState(context, new Dictionary<string, object>
         {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>
-            {
-                [Models.SignalKeys.UserAgentFamily] = "Chrome",
-                [Models.SignalKeys.WaveformSignature] = "sig_benchmark_clean"
-            },
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-ato-clean",
-            Elapsed = TimeSpan.Zero
-        };
+            [Models.SignalKeys.UserAgentFamily] = "Chrome",
+            [Models.SignalKeys.PrimarySignature] = "sig_benchmark_clean"
+        }, requestId: "bench-ato-clean");
     }
 
     /// <summary>POST to /login - triggers login tracking.</summary>
@@ -370,20 +440,10 @@ public class IndividualDetectorBenchmarks
         context.Request.Method = "POST";
         context.Request.Path = "/login";
 
-        return new BlackboardState
+        return CreateState(context, new Dictionary<string, object>
         {
-            HttpContext = context,
-            Signals = new Dictionary<string, object>
-            {
-                [Models.SignalKeys.UserAgentFamily] = "Python",
-                [Models.SignalKeys.WaveformSignature] = "sig_benchmark_login"
-            },
-            CurrentRiskScore = 0.0,
-            CompletedDetectors = new HashSet<string>(),
-            FailedDetectors = new HashSet<string>(),
-            Contributions = new List<DetectionContribution>(),
-            RequestId = "test-ato-login",
-            Elapsed = TimeSpan.Zero
-        };
+            [Models.SignalKeys.UserAgentFamily] = "Python",
+            [Models.SignalKeys.PrimarySignature] = "sig_benchmark_login"
+        }, requestId: "bench-ato-login");
     }
 }

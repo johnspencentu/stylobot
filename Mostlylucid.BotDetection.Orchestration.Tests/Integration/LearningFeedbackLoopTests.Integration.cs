@@ -197,8 +197,8 @@ public class LearningFeedbackLoopTests : IAsyncLifetime
         var stats = await store.GetStatsAsync(CancellationToken.None);
         _output.WriteLine($"After high-confidence detection: {stats.TotalWeights} weights recorded");
 
-        // Should have UA pattern, IP range, path pattern, and combined signature
-        Assert.True(stats.TotalWeights >= 3, $"Expected at least 3 weights, got {stats.TotalWeights}");
+        // Should have UA pattern, path pattern, PrimarySignature (IP range removed — reputation anchors on PrimarySignature)
+        Assert.True(stats.TotalWeights >= 2, $"Expected at least 2 weights, got {stats.TotalWeights}");
 
         // Verify logging
         var logs = collector.GetSnapshot();
