@@ -52,7 +52,9 @@ public static class DetectionNarrativeBuilder
         ["FingerprintApproval"] = "fingerprint approval check",
         ["CveProbe"] = "CVE probe detection",
         ["PiiQueryString"] = "PII query string detection",
-        ["Periodicity"] = "temporal periodicity analysis"
+        ["Periodicity"] = "temporal periodicity analysis",
+        ["Signature"] = "identity signature computation",
+        ["CveFingerprint"] = "CVE threat intelligence matching"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -99,7 +101,9 @@ public static class DetectionNarrativeBuilder
         ["FingerprintApproval"] = "Access Control",
         ["CveProbe"] = "Security",
         ["PiiQueryString"] = "Privacy",
-        ["Periodicity"] = "Identity"
+        ["Periodicity"] = "Identity",
+        ["Signature"] = "Identity",
+        ["CveFingerprint"] = "Security"
     };
 
     private static readonly Dictionary<string, string> BotTypeFriendlyNames = new(StringComparer.OrdinalIgnoreCase)
