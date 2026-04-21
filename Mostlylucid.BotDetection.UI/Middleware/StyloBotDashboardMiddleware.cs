@@ -371,6 +371,10 @@ public class StyloBotDashboardMiddleware
                 await ServeInvestigationTabAsync(context, relativePath["investigate/tab/".Length..]);
                 break;
 
+            case "investigate/load-preset":
+                await ServeLoadPresetAsync(context);
+                break;
+
             case var p when p.StartsWith("signature/", StringComparison.OrdinalIgnoreCase):
                 // Use original relativePath (not lowercased) to preserve signature case
                 await ServeSignatureDetailAsync(context, relativePath.Substring("signature/".Length));
@@ -3769,6 +3773,46 @@ public class StyloBotDashboardMiddleware
             "/Views/StyloBot/Dashboard/_Investigate.cshtml", vm, context);
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.WriteAsync(html);
+    }
+
+    private async Task ServeLoadPresetAsync(HttpContext context)
+    {
+        var presetId = context.Request.Query["preset"].FirstOrDefault();
+        if (string.IsNullOrEmpty(presetId) || !Guid.TryParse(presetId, out _))
+        {
+            // No preset selected -- re-render with empty filter
+            await ServeInvestigationAsync(context);
+            return;
+        }
+
+        var shapeStore = context.RequestServices.GetService<IShapeSearchStore>();
+        if (shapeStore is null)
+        {
+            await ServeInvestigationAsync(context);
+            return;
+        }
+
+        var presets = await shapeStore.GetPresetsAsync();
+        var preset = presets.FirstOrDefault(p => p.Id.ToString() == presetId);
+        if (preset is null)
+        {
+            await ServeInvestigationAsync(context);
+            return;
+        }
+
+        // Build query string from preset and redirect back to investigate
+        var qs = new List<string>();
+        for (var i = 0; i < preset.TargetShape.Length; i++)
+        {
+            if (preset.TargetShape[i] > 0.01f)
+                qs.Add($"dim_{i}={preset.TargetShape[i]:F2}");
+        }
+        qs.Add($"fuzz={preset.FuzzThreshold:F2}");
+        var range = context.Request.Query["range"].FirstOrDefault() ?? "24h";
+        qs.Add($"range={range}");
+
+        context.Response.Headers["HX-Redirect"] = $"{_options.BasePath}/investigate?{string.Join("&", qs)}";
+        context.Response.StatusCode = 200;
     }
 
     private async Task ServeInvestigationTabAsync(HttpContext context, string tab)
