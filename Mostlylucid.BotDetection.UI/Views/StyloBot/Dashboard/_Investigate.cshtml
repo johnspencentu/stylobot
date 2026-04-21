@@ -1,47 +1,30 @@
-@model Mostlylucid.BotDetection.UI.Models.InvestigationViewModel
+@model Mostlylucid.BotDetection.UI.Models.ShapeInvestigationViewModel
 @{
-    var f = Model.Filter;
     var s = Model.Result.Summary;
     var bp = Model.BasePath;
+
+    // Build compatibility ViewModel for tab partials that still expect InvestigationViewModel
+    var tabVm = new Mostlylucid.BotDetection.UI.Models.InvestigationViewModel
+    {
+        Filter = new Mostlylucid.BotDetection.UI.Models.InvestigationFilter
+        {
+            EntityType = "shape",
+            EntityValue = "",
+            Start = Model.Filter.Start,
+            End = Model.Filter.End,
+            Tab = Model.ActiveTab,
+            Offset = Model.Filter.Offset,
+            Limit = Model.Filter.Limit
+        },
+        Result = Model.Result,
+        BasePath = Model.BasePath,
+        AvailableTabs = Model.AvailableTabs
+    };
 }
 
 <div id="investigate-view" data-sb-widget="investigate" class="sb-investigate">
 
-    <div class="sb-investigate-filter"
-         style="display:flex; gap:0.5rem; align-items:center; padding:0.75rem 1rem; background:var(--sb-card-bg); border:1px solid var(--sb-card-border); border-radius:8px; margin-bottom:1rem;">
-
-        <select id="inv-entity-type" name="type" style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--sb-card-border); background:var(--sb-surface); color:inherit; font-size:0.85rem;">
-            @foreach (var opt in Model.AvailableFilters)
-            {
-                <option value="@opt.Value" @(opt.Value == f.EntityType ? "selected" : "")>@opt.Label</option>
-            }
-        </select>
-
-        <input id="inv-entity-value" name="value" type="text" value="@f.EntityValue"
-               placeholder="Enter value..."
-               style="flex:1; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--sb-card-border); background:var(--sb-surface); color:inherit; font-size:0.85rem;" />
-
-        <div style="display:flex; gap:2px;">
-            @foreach (var val in new[] { "1h", "6h", "24h", "7d", "30d" })
-            {
-                <button class="sb-pill"
-                        hx-get="@bp/investigate?type=@f.EntityType&value=@f.EntityValue&range=@val"
-                        hx-target="#investigate-view"
-                        hx-swap="outerHTML transition:true"
-                        style="padding:0.3rem 0.6rem; border-radius:4px; border:1px solid var(--sb-card-border); background:var(--sb-surface); color:inherit; font-size:0.75rem; cursor:pointer;">
-                    @val
-                </button>
-            }
-        </div>
-
-        <button hx-get="@bp/investigate"
-                hx-include="#inv-entity-type, #inv-entity-value"
-                hx-target="#investigate-view"
-                hx-swap="outerHTML transition:true"
-                style="padding:0.4rem 0.8rem; border-radius:6px; background:var(--sb-accent); color:white; border:none; cursor:pointer; font-size:0.85rem;">
-            Apply
-        </button>
-    </div>
+    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_ShapeFilterBar.cshtml", Model)
 
     @if (s.TotalDetections > 0)
     {
@@ -68,7 +51,7 @@
             {
                 var isActive = tab == Model.ActiveTab;
                 var displayName = tab switch { "signaltrace" => "Signal Trace", "ua_family" => "UA Family", _ => char.ToUpper(tab[0]) + tab[1..] };
-                <button hx-get="@bp/investigate/tab/@tab?type=@f.EntityType&value=@f.EntityValue&start=@f.Start?.ToString("o")&end=@f.End?.ToString("o")"
+                <button hx-get="@bp/investigate/tab/@tab?start=@Model.Filter.Start?.ToString("o")&end=@Model.Filter.End?.ToString("o")"
                         hx-target="#investigate-tab-content"
                         hx-swap="innerHTML transition:true"
                         style="padding:0.5rem 1rem; border:none; background:@(isActive ? "var(--sb-card-bg)" : "transparent"); color:@(isActive ? "var(--sb-accent)" : "inherit"); border-bottom:2px solid @(isActive ? "var(--sb-accent)" : "transparent"); cursor:pointer; font-size:0.85rem; font-weight:@(isActive ? "600" : "400");">
@@ -81,33 +64,33 @@
             @switch (Model.ActiveTab)
             {
                 case "detections":
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateDetections.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateDetections.cshtml", tabVm)
                     break;
                 case "signatures":
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateSignatures.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateSignatures.cshtml", tabVm)
                     break;
                 case "endpoints":
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateEndpoints.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateEndpoints.cshtml", tabVm)
                     break;
                 case "geo":
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateGeo.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateGeo.cshtml", tabVm)
                     break;
                 case "fingerprints":
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateFingerprints.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateFingerprints.cshtml", tabVm)
                     break;
                 case "signaltrace":
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateSignaltrace.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateSignaltrace.cshtml", tabVm)
                     break;
                 default:
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateDetections.cshtml", Model)
+                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_InvestigateDetections.cshtml", tabVm)
                     break;
             }
         </div>
     }
-    else if (!string.IsNullOrEmpty(f.EntityValue))
+    else
     {
         <div style="padding:2rem; text-align:center; color:var(--sb-brand-muted);">
-            No detections found for this filter. Try a different entity or time range.
+            No detections found. Adjust the shape filters or time range above.
         </div>
     }
 </div>

@@ -41,10 +41,7 @@
               stroke="var(--sb-card-border)" stroke-width="0.5" opacity="0.3" />
         @if (weights[i] > 0)
         {
-            <text x="@lx" y="@ly" text-anchor="middle" dominant-baseline="middle"
-                  fill="var(--sb-brand-muted)" font-size="6" transform="rotate(0)">
-                @labels[i].Replace("_", " ").Substring(0, Math.Min(labels[i].Length, 8))
-            </text>
+            @:<text x="@lx" y="@ly" text-anchor="middle" dominant-baseline="middle" fill="var(--sb-brand-muted)" font-size="6">@labels[i].Replace("_", " ").Substring(0, Math.Min(labels[i].Length, 8))</text>
         }
     }
 
