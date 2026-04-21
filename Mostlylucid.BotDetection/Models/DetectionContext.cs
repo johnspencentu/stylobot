@@ -1148,4 +1148,56 @@ public static class SignalKeys
 
     /// <summary>Boolean: true if PII was detected in an unencrypted (HTTP) request.</summary>
     public const string PrivacyUnencryptedPii = "privacy.unencrypted_pii";
+
+    // ==========================================
+    // JS Execution Timing signals
+    // Set by BrowserFingerprintAnalyzer from client-side timing probes
+    // Detects headless browsers with different timing characteristics
+    // ==========================================
+
+    /// <summary>Double: DOM layout timing in ms from requestAnimationFrame + getBoundingClientRect</summary>
+    public const string JsLayoutTimeMs = "js.layout_time_ms";
+
+    /// <summary>Double: setTimeout(1ms) actual drift in ms (actual - requested)</summary>
+    public const string JsSetTimeoutDrift = "js.settimeout_drift";
+
+    /// <summary>Double: minimum observable performance.now() resolution in ms</summary>
+    public const string JsPerformanceResolution = "js.performance_resolution";
+
+    /// <summary>Boolean: true if any JS timing anomaly was detected</summary>
+    public const string JsTimingAnomaly = "js.timing_anomaly";
+
+    // ==========================================
+    // Cookie behavior signals
+    // Set by CookieBehaviorContributor when analyzing cookie acceptance patterns
+    // ==========================================
+
+    /// <summary>Double: cookie acceptance rate (cookies returned / Set-Cookie sent). -1 if no Set-Cookie observed.</summary>
+    public const string CookieAcceptanceRate = "cookie.acceptance_rate";
+
+    /// <summary>Int: number of cookies in the current request's Cookie header.</summary>
+    public const string CookieCount = "cookie.count";
+
+    /// <summary>Boolean: true if cookies are being ignored (Set-Cookie sent but no cookies returned).</summary>
+    public const string CookieIgnored = "cookie.ignored";
+
+    // ==========================================
+    // Resource Waterfall signals
+    // Set by ResourceWaterfallContributor for document-to-asset ratio analysis
+    // ==========================================
+
+    /// <summary>Int: number of document/HTML requests from this signature.</summary>
+    public const string ResourceDocumentCount = "resource.document_count";
+
+    /// <summary>Int: number of sub-resource (CSS, JS, image, font) requests from this signature.</summary>
+    public const string ResourceAssetCount = "resource.asset_count";
+
+    /// <summary>Double: ratio of asset requests to document requests (healthy browsers >= 2.0).</summary>
+    public const string ResourceAssetRatio = "resource.asset_ratio";
+
+    /// <summary>Boolean: true if this signature has ever requested a font file.</summary>
+    public const string ResourceFontRequested = "resource.font_requested";
+
+    /// <summary>Boolean: true if this signature has requested /favicon.ico.</summary>
+    public const string ResourceFaviconRequested = "resource.favicon_requested";
 }

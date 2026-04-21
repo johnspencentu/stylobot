@@ -594,6 +594,55 @@
 ,
 
     /**
+     * Collect JS execution timing probes (async).
+     * Measures DOM layout timing, setTimeout accuracy, and performance.now() resolution
+     * to detect headless browsers that pass all static fingerprint checks but have
+     * different timing characteristics (Puppeteer stealth, Playwright, etc.).
+     */
+    collectTiming: function (data, callback) {
+        var pending = 2;
+        var done = function () {
+            pending--;
+            if (pending === 0) callback(data);
+        };
+
+        // 1. DOM layout timing: requestAnimationFrame + getBoundingClientRect
+        // Real browsers have non-trivial layout time; headless = instant
+        var layoutStart = performance.now();
+        requestAnimationFrame(function () {
+            var el = document.createElement('div');
+            el.style.cssText = 'position:absolute;top:-9999px;width:100px';
+            document.body.appendChild(el);
+            el.getBoundingClientRect();
+            data.layoutTimeMs = performance.now() - layoutStart;
+            document.body.removeChild(el);
+            done();
+        });
+
+        // 2. setTimeout accuracy: measure actual vs requested 1ms delay
+        // Headless environments often have near-zero drift (no timer coalescing)
+        var stStart = performance.now();
+        setTimeout(function () {
+            data.setTimeoutDrift = performance.now() - stStart - 1;
+            done();
+        }, 1);
+
+        // 3. Performance.now() resolution: find minimum observable delta
+        // Post-Spectre browsers reduce resolution (~100us); unpatched/headless differ
+        var prev = performance.now(), count = 0;
+        while (count < 100) {
+            var now = performance.now();
+            if (now !== prev) {
+                data.perfResolution = now - prev;
+                break;
+            }
+            count++;
+        }
+        if (!data.perfResolution) data.perfResolution = 0;
+    }
+,
+
+    /**
      * Main entry point
      */
     run: function () {
@@ -617,7 +666,10 @@
                         data.interacted = getInteracted();
                     }
 
-                    self.send(data);
+                    // Collect timing probes (async), then send
+                    self.collectTiming(data, function (data) {
+                        self.send(data);
+                    });
                 });
             } catch (e) {
                 // Send error report

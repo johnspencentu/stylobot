@@ -69,6 +69,13 @@ public class BrowserFingerprintData
     // Optional Canvas
     [JsonPropertyName("canvasHash")] public string? CanvasHash { get; set; }
 
+    // JS execution timing probes
+    [JsonPropertyName("layoutTimeMs")] public double? LayoutTimeMs { get; set; }
+
+    [JsonPropertyName("setTimeoutDrift")] public double? SetTimeoutDrift { get; set; }
+
+    [JsonPropertyName("perfResolution")] public double? PerformanceResolution { get; set; }
+
     // Client-calculated score
     [JsonPropertyName("score")] public int ClientScore { get; set; }
 
@@ -123,6 +130,26 @@ public class BrowserFingerprintResult
     ///     Detailed reasons for the scores.
     /// </summary>
     public List<string> Reasons { get; set; } = [];
+
+    /// <summary>
+    ///     Whether any JS execution timing anomaly was detected.
+    /// </summary>
+    public bool TimingAnomaly { get; set; }
+
+    /// <summary>
+    ///     Raw DOM layout time in ms (from client-side timing probe).
+    /// </summary>
+    public double? LayoutTimeMs { get; set; }
+
+    /// <summary>
+    ///     Raw setTimeout drift in ms (from client-side timing probe).
+    /// </summary>
+    public double? SetTimeoutDrift { get; set; }
+
+    /// <summary>
+    ///     Raw performance.now() resolution in ms (from client-side timing probe).
+    /// </summary>
+    public double? PerformanceResolution { get; set; }
 
     /// <summary>
     ///     When this fingerprint was processed.

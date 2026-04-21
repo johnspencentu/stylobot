@@ -142,6 +142,68 @@ public class BrowserFingerprintAnalyzer : IBrowserFingerprintAnalyzer
             reasons.Add("Permission state inconsistent with plugin count");
         }
 
+        // ===== JS Execution Timing Analysis =====
+        // Detects headless browsers (Puppeteer stealth, Playwright) that pass static checks
+        // but have different timing characteristics due to lack of real rendering pipeline
+
+        if (data.LayoutTimeMs.HasValue)
+        {
+            var layoutTime = data.LayoutTimeMs.Value;
+            // Instant layout = no real rendering pipeline (headless)
+            if (layoutTime < 0.5)
+            {
+                headlessScore += 0.25;
+                integrityDeductions += 20;
+                reasons.Add($"Instant DOM layout ({layoutTime:F3}ms) - no rendering pipeline");
+            }
+            // Artificially slow layout = delay injection to evade timing detection
+            else if (layoutTime > 50)
+            {
+                headlessScore += 0.15;
+                integrityDeductions += 10;
+                reasons.Add($"Suspiciously slow DOM layout ({layoutTime:F1}ms) - possible delay injection");
+            }
+        }
+
+        if (data.SetTimeoutDrift.HasValue)
+        {
+            var drift = data.SetTimeoutDrift.Value;
+            // Near-zero setTimeout drift = headless environments bypass timer coalescing
+            if (drift < 0.5)
+            {
+                headlessScore += 0.2;
+                integrityDeductions += 15;
+                reasons.Add($"Near-zero setTimeout drift ({drift:F3}ms) - timer coalescing absent");
+            }
+            // Excessively high drift = deliberately throttled to appear human
+            else if (drift > 50)
+            {
+                headlessScore += 0.1;
+                integrityDeductions += 10;
+                reasons.Add($"Excessively high setTimeout drift ({drift:F1}ms) - possible throttling");
+            }
+        }
+
+        if (data.PerformanceResolution.HasValue)
+        {
+            var resolution = data.PerformanceResolution.Value;
+            // Post-Spectre reduced resolution (> 100us) - most real browsers have this
+            // but some headless configs use non-standard values
+            if (resolution > 0.1)
+            {
+                headlessScore += 0.1;
+                integrityDeductions += 10;
+                reasons.Add($"Coarse performance.now() resolution ({resolution:F4}ms)");
+            }
+            // Unrealistically fine resolution (< 1us) - unpatched or non-standard environment
+            else if (resolution < 0.001 && resolution > 0)
+            {
+                headlessScore += 0.15;
+                integrityDeductions += 15;
+                reasons.Add($"Unrealistically fine performance.now() resolution ({resolution:F6}ms)");
+            }
+        }
+
         // ===== Platform Consistency =====
 
         // Check platform vs other signals
@@ -161,6 +223,15 @@ public class BrowserFingerprintAnalyzer : IBrowserFingerprintAnalyzer
 
         // ===== Generate Fingerprint Hash =====
         result.FingerprintHash = GenerateFingerprintHash(data);
+
+        // ===== Populate timing probe results =====
+        result.LayoutTimeMs = data.LayoutTimeMs;
+        result.SetTimeoutDrift = data.SetTimeoutDrift;
+        result.PerformanceResolution = data.PerformanceResolution;
+        result.TimingAnomaly = reasons.Exists(r =>
+            r.Contains("layout", StringComparison.OrdinalIgnoreCase) ||
+            r.Contains("setTimeout", StringComparison.OrdinalIgnoreCase) ||
+            r.Contains("performance.now()", StringComparison.OrdinalIgnoreCase));
 
         // ===== Calculate Final Scores =====
         result.HeadlessLikelihood = Math.Min(1.0, headlessScore);

@@ -504,6 +504,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, AiScraperContributor>();
         // Cache behavior analysis - runs early alongside behavioral
         services.AddSingleton<IContributingDetector, CacheBehaviorContributor>();
+        // Cookie behavior analysis - detects bots that ignore Set-Cookie headers
+        services.AddSingleton<IContributingDetector, CookieBehaviorContributor>();
+        // Resource waterfall detection - document-to-asset ratio analysis (priority 22)
+        services.AddSingleton<IContributingDetector, ResourceWaterfallContributor>();
         // Advanced behavioral pattern detection - runs after basic behavioral
         services.AddSingleton<IContributingDetector, AdvancedBehavioralContributor>();
         // Advanced fingerprinting detectors (Wave 0 - network/protocol layer)

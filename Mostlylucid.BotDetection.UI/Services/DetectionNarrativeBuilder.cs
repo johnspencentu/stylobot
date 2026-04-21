@@ -54,7 +54,9 @@ public static class DetectionNarrativeBuilder
         ["PiiQueryString"] = "PII query string detection",
         ["Periodicity"] = "temporal periodicity analysis",
         ["Signature"] = "identity signature computation",
-        ["CveFingerprint"] = "CVE threat intelligence matching"
+        ["CveFingerprint"] = "CVE threat intelligence matching",
+        ["CookieBehavior"] = "cookie behavior analysis",
+        ["ResourceWaterfall"] = "resource loading pattern analysis"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -103,7 +105,9 @@ public static class DetectionNarrativeBuilder
         ["PiiQueryString"] = "Privacy",
         ["Periodicity"] = "Identity",
         ["Signature"] = "Identity",
-        ["CveFingerprint"] = "Security"
+        ["CveFingerprint"] = "Security",
+        ["CookieBehavior"] = "Behavioral",
+        ["ResourceWaterfall"] = "Behavioral"
     };
 
     private static readonly Dictionary<string, string> BotTypeFriendlyNames = new(StringComparer.OrdinalIgnoreCase)

@@ -94,6 +94,9 @@ public class ClientSideDetector : IDetector
                 return Task.FromResult(result);
             }
 
+            // Store fingerprint result on HttpContext for contributor signal writing
+            context.Items["__mlbotd_fingerprint"] = fingerprint;
+
             // Use fingerprint data for detection
             var opts = _options.ClientSide;
 

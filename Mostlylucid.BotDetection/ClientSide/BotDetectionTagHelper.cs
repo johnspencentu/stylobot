@@ -146,7 +146,8 @@ var MLBotD={{
   getCanvasHash:function(){{try{{var c=document.createElement('canvas');c.width=200;c.height=50;var ctx=c.getContext('2d');ctx.textBaseline='top';ctx.font='14px Arial';ctx.fillStyle='#f60';ctx.fillRect(125,1,62,20);ctx.fillStyle='#069';ctx.fillText('BotD',2,15);return this.h(c.toDataURL());}}catch(e){{return '';}}}},
   calcScore:function(d){{var score=100;if(d.webdriver)score-=50;if(d.phantom)score-=50;if(d.nightmare)score-=50;if(d.selenium)score-=50;if(d.cdc)score-=40;if(d.plugins===0&&d.chrome)score-=20;if(d.outerW===0||d.outerH===0)score-=30;if(d.innerW===d.outerW&&d.innerH===d.outerH)score-=10;if(!d.bindNative)score-=20;if(d.evalLen<30||d.evalLen>50)score-=15;if(d.permissions==='suspicious')score-=25;return Math.max(0,score);}},
   send:function(data){{var xhr=new XMLHttpRequest();xhr.open('POST',this.e,true);xhr.setRequestHeader('Content-Type','application/json');xhr.setRequestHeader('X-ML-BotD-Token',this.t);xhr.onload=function(){{if(xhr.status>=200&&xhr.status<300){{window.__mlbotd_done=true;try{{document.dispatchEvent(new CustomEvent('mlbotd:fingerprint',{{detail:JSON.parse(xhr.responseText)}}));}}catch(e){{}}}}}};xhr.send(JSON.stringify(data));}},
-  run:function(){{var self=this;setTimeout(function(){{try{{var d=self.collect();d.ts=Date.now();self.send(d);}}catch(e){{self.send({{error:e.message,ts:Date.now()}});}}}},100);}}
+  timing:function(d,cb){{var pending=2;var done=function(){{pending--;if(pending===0)cb(d);}};var ls=performance.now();requestAnimationFrame(function(){{var el=document.createElement('div');el.style.cssText='position:absolute;top:-9999px;width:100px';document.body.appendChild(el);el.getBoundingClientRect();d.layoutTimeMs=performance.now()-ls;document.body.removeChild(el);done();}});var ss=performance.now();setTimeout(function(){{d.setTimeoutDrift=performance.now()-ss-1;done();}},1);var prev=performance.now(),cnt=0;while(cnt<100){{var now=performance.now();if(now!==prev){{d.perfResolution=now-prev;break;}}cnt++;}}if(!d.perfResolution)d.perfResolution=0;}},
+  run:function(){{var self=this;setTimeout(function(){{try{{var d=self.collect();d.ts=Date.now();self.timing(d,function(d){{self.send(d);}});}}catch(e){{self.send({{error:e.message,ts:Date.now()}});}}}},100);}}
 }};
 if(document.readyState==='loading'){{document.addEventListener('DOMContentLoaded',function(){{MLBotD.run();}});}}else{{MLBotD.run();}}
 }})();";
@@ -158,5 +159,5 @@ if(document.readyState==='loading'){{document.addEventListener('DOMContentLoaded
 /// </summary>
 public static class BotDetectionScript
 {
-    public const string Version = "1.0.0";
+    public const string Version = "1.1.0";
 }

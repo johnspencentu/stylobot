@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Mostlylucid.BotDetection.ClientSide;
 using Mostlylucid.BotDetection.Detectors;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
@@ -67,6 +68,19 @@ public class ClientSideContributor : ConfiguredContributorBase
                     BotType = result.BotType?.ToString(),
                     BotName = result.BotName
                 });
+            }
+
+            // Write JS execution timing signals for cross-detector consumption
+            if (state.HttpContext.Items["__mlbotd_fingerprint"] is BrowserFingerprintResult fp)
+            {
+                if (fp.LayoutTimeMs.HasValue)
+                    state.WriteSignal(SignalKeys.JsLayoutTimeMs, fp.LayoutTimeMs.Value);
+                if (fp.SetTimeoutDrift.HasValue)
+                    state.WriteSignal(SignalKeys.JsSetTimeoutDrift, fp.SetTimeoutDrift.Value);
+                if (fp.PerformanceResolution.HasValue)
+                    state.WriteSignal(SignalKeys.JsPerformanceResolution, fp.PerformanceResolution.Value);
+                if (fp.TimingAnomaly)
+                    state.WriteSignal(SignalKeys.JsTimingAnomaly, true);
             }
         }
         catch (Exception ex)
