@@ -605,8 +605,8 @@ try
                 GetDemoClientSideSessionCacheKey(callbackToken),
                 new DemoClientSideSession(
                     context.IsBot(),
-                    context.BotConfidenceScore(),
-                    context.BotName(),
+                    context.GetBotConfidence(),
+                    context.GetBotName(),
                     NormalizeRemoteIp(context),
                     DateTimeOffset.UtcNow),
                 TimeSpan.FromMinutes(5));
@@ -615,8 +615,8 @@ try
                 $"{context.Request.Scheme}://{context.Request.Host}/api/bot-detection/client-result";
             var responseJson = BuildDemoTestStatusJson(
                 context.IsBot(),
-                context.BotConfidenceScore(),
-                context.BotName(),
+                context.GetBotConfidence(),
+                context.GetBotName(),
                 callbackUrl,
                 callbackToken);
 
