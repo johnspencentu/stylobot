@@ -356,6 +356,13 @@ public sealed class ConfigurationEditorModel
     ///     Default: true (read-only).
     /// </summary>
     public bool ReadOnly { get; init; } = true;
+
+    /// <summary>
+    ///     Control plane URL for loading the commercial config editor via HTMX.
+    ///     When set, the Configuration tab loads the editor from this URL.
+    ///     When null, falls back to the FOSS Monaco YAML editor.
+    /// </summary>
+    public string? ControlPlaneUrl { get; init; }
 }
 
 /// <summary>
