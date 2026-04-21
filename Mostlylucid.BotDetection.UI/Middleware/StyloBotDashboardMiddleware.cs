@@ -362,6 +362,14 @@ public class StyloBotDashboardMiddleware
                 await ServeOobUpdateAsync(context);
                 break;
 
+            case "investigate":
+                await ServeInvestigationAsync(context);
+                break;
+
+            case var p when p.StartsWith("investigate/tab/", StringComparison.OrdinalIgnoreCase):
+                await ServeInvestigationTabAsync(context, relativePath["investigate/tab/".Length..]);
+                break;
+
             case var p when p.StartsWith("signature/", StringComparison.OrdinalIgnoreCase):
                 // Use original relativePath (not lowercased) to preserve signature case
                 await ServeSignatureDetailAsync(context, relativePath.Substring("signature/".Length));
@@ -3656,4 +3664,108 @@ public class StyloBotDashboardMiddleware
         "browsing" => "#10b981",
         _ => "#6b7280"
     };
+
+    private async Task ServeInvestigationAsync(HttpContext context)
+    {
+        var filter = ParseInvestigationFilter(context);
+        var result = await _eventStore.GetInvestigationAsync(filter);
+        var vm = BuildInvestigationViewModel(filter, result);
+
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/StyloBot/Dashboard/_Investigate.cshtml", vm, context);
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(html);
+    }
+
+    private async Task ServeInvestigationTabAsync(HttpContext context, string tab)
+    {
+        var filter = ParseInvestigationFilter(context) with { Tab = tab };
+        var result = await _eventStore.GetInvestigationAsync(filter);
+        var vm = BuildInvestigationViewModel(filter, result);
+
+        var partialName = tab.ToLowerInvariant() switch
+        {
+            "detections" => "_InvestigateDetections",
+            "signatures" => "_InvestigateSignatures",
+            "endpoints" => "_InvestigateEndpoints",
+            "geo" => "_InvestigateGeo",
+            "fingerprints" => "_InvestigateFingerprints",
+            "signaltrace" => "_InvestigateSignaltrace",
+            _ => "_InvestigateDetections"
+        };
+
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            $"/Views/StyloBot/Dashboard/{partialName}.cshtml", vm, context);
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(html);
+    }
+
+    private InvestigationFilter ParseInvestigationFilter(HttpContext context)
+    {
+        var query = context.Request.Query;
+        var entityType = query["type"].FirstOrDefault() ?? "signature";
+        var entityValue = query["value"].FirstOrDefault() ?? "";
+        var tab = query["tab"].FirstOrDefault();
+        var range = query["range"].FirstOrDefault() ?? "24h";
+        var offset = int.TryParse(query["offset"].FirstOrDefault(), out var o) ? o : 0;
+
+        var now = DateTime.UtcNow;
+        var start = range switch
+        {
+            "1h" => now.AddHours(-1),
+            "6h" => now.AddHours(-6),
+            "24h" => now.AddHours(-24),
+            "7d" => now.AddDays(-7),
+            "30d" => now.AddDays(-30),
+            _ => now.AddHours(-24)
+        };
+
+        if (DateTime.TryParse(query["start"].FirstOrDefault(), out var customStart))
+            start = customStart;
+
+        DateTime? end = null;
+        if (DateTime.TryParse(query["end"].FirstOrDefault(), out var customEnd))
+            end = customEnd;
+
+        return new InvestigationFilter
+        {
+            EntityType = entityType,
+            EntityValue = entityValue,
+            Start = start,
+            End = end,
+            Tab = tab,
+            Offset = offset
+        };
+    }
+
+    private InvestigationViewModel BuildInvestigationViewModel(
+        InvestigationFilter filter, InvestigationResult result)
+    {
+        var filters = new List<FilterOption>
+        {
+            new() { Value = "signature", Label = "Signature" },
+            new() { Value = "country", Label = "Country" },
+            new() { Value = "path", Label = "Path" },
+            new() { Value = "ua_family", Label = "UA Family" }
+        };
+
+        var tabs = new List<string> { "detections", "signatures", "endpoints", "geo", "signaltrace" };
+
+        // Commercial features -- check if config editing is enabled (proxy for paid license)
+        if (_options.EnableConfigEditing)
+        {
+            filters.Add(new FilterOption { Value = "ip", Label = "IP Address" });
+            filters.Add(new FilterOption { Value = "fingerprint", Label = "Fingerprint" });
+            tabs.Insert(tabs.Count - 1, "fingerprints");
+        }
+
+        return new InvestigationViewModel
+        {
+            Filter = filter,
+            Result = result,
+            BasePath = _options.BasePath,
+            AvailableFilters = filters,
+            AvailableTabs = tabs
+        };
+    }
 }
