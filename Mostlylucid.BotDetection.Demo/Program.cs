@@ -9,6 +9,7 @@ using Mostlylucid.BotDetection.Endpoints;
 using Mostlylucid.BotDetection.Extensions;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Orchestration;
+using Mostlylucid.BotDetection.Api;
 using Mostlylucid.BotDetection.UI.Extensions;
 using Mostlylucid.GeoDetection.Contributor.Extensions;
 using Mostlylucid.GeoDetection.Extensions;
@@ -68,6 +69,13 @@ builder.Services.AddStyloBotDashboard(options =>
     options.AllowUnauthenticatedAccess = true; // Demo: no auth required
 });
 
+// Add StyloBot Public API (detect, read, me endpoints + API key auth)
+builder.Services.AddStyloBotApi(options =>
+{
+    options.EnableOpenApi = false; // Demo already registers its own OpenAPI doc
+    options.InjectResponseHeaders = true;
+});
+
 // Add ApiHolodeck for honeypot detection and bot redirection
 // Configuration from BotDetection:Holodeck section in appsettings.json
 builder.Services.AddApiHolodeck();
@@ -121,6 +129,9 @@ app.UseRouting();
 // Broadcast middleware wraps detection so blocked requests are always recorded.
 app.UseStyloBot();
 
+// Inject X-StyloBot-* response headers (confidence, bot type, risk band)
+app.UseStyloBotResponseHeaders();
+
 // Add signature capture middleware (MUST be after UseStyloBot to capture evidence)
 app.UseSignatureCapture();
 
@@ -142,6 +153,9 @@ app.MapHub<SignatureHub>("/hubs/signatures");
 // ==========================================
 // Maps: /bot-detection/check, /bot-detection/stats, /bot-detection/health
 app.MapBotDetectionEndpoints();
+
+// Maps StyloBot Public API: /api/v1/detect, /api/v1/read/*, /api/v1/me
+app.MapStyloBotApi();
 
 // Map the fingerprint endpoint for client-side JS to POST data to
 app.MapBotDetectionFingerprintEndpoint();
