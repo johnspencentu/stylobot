@@ -471,3 +471,4 @@ TestSite/
 stylobot-react/
 *.playwright-mcp/
 docs/legacy/
+.worktrees/
