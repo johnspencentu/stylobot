@@ -11,13 +11,16 @@ learning**, auto-updated blocklists, YARP integration, and full observability.
 
 ## Key Features
 
-- **30 detectors in 4 waves**: User-Agent, headers, IP, behavioral, protocol fingerprinting, AI classification, intent classification, cluster detection, and more
+- **45 detectors in 4 waves**: User-Agent, headers, IP, behavioral, protocol fingerprinting, AI classification, intent classification, cluster detection, cookie behavior, resource waterfall, JS timing probes, periodicity, CVE probes, and more
+- **Anonymous entity resolution**: Progressive identity that learns who keeps coming back — even when they rotate IPs, UAs, or TLS fingerprints. Merge/split/rewind operations backed by immutable session snapshots. L0-L5 confidence levels.
 - **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent and assigns threat scores orthogonal to bot probability
 - **Protocol-deep fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 - catch bots even when they spoof everything
+- **Simulation packs**: Honeypots that look like real products (WordPress 5.9 included). CVE probe detection feeds threat intelligence.
 - **Stream-aware detection**: WebSocket, SSE, SignalR, gRPC traffic classified early; downstream false positives suppressed; dedicated stream abuse detection
-- **AI-powered classification**: Heuristic model (<1ms, ~50 features) with optional LLM escalation for complex cases
-- **Continuous learning**: Heuristic weights adapt over time based on detection feedback
-- **Bot network discovery**: Leiden clustering finds coordinated campaigns across thousands of signatures
+- **AI-powered classification**: Heuristic model (<1ms, ~50 features) with optional LLM escalation (default: gemma4 with thinking support)
+- **Continuous learning**: Heuristic weights adapt over time based on detection feedback; identity anchors scored by PersonalStability × GlobalRarity
+- **Bot network discovery**: Leiden clustering finds coordinated campaigns; convergence detection identifies related entities across devices
+- **Headless framework identification**: Names specific automation (Puppeteer, Playwright, Selenium) instead of "Unknown Bot"
 - **Geo intelligence**: Country reputation, geographic drift detection, VPN/proxy/Tor/datacenter identification
 - **Composable policies**: Separate detection (WHAT) from action (HOW) for maximum flexibility
 - **Stealth responses**: Throttle, challenge, or honeypot bots without revealing detection
@@ -434,7 +437,7 @@ builder.Services.AddBotDetection();
 builder.Services.AddStylobotLlamaSharp();
 
 // OR: Add external Ollama HTTP provider (GPU capable)
-builder.Services.AddStylobotOllama("http://localhost:11434", "qwen3:0.6b");
+builder.Services.AddStylobotOllama("http://localhost:11434", "gemma4");
 
 // User-agent only (fastest, minimal)
 builder.Services.AddSimpleBotDetection();

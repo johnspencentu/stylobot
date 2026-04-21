@@ -1,6 +1,6 @@
 # StyloBot
 
-**Self-hosted bot defense. Free forever.** 31 detectors, sub-millisecond inference, 129-dimensional session vectors, intent classification, and reverse-proxy integration. One binary. No cloud dependency. Your traffic never leaves your perimeter.
+**Self-hosted bot defense. Free forever.** 45 detectors, sub-millisecond inference, anonymous entity resolution, 129-dimensional session vectors, intent classification, simulation packs, and reverse-proxy integration. One binary. No cloud dependency. Your traffic never leaves your perimeter.
 
 [![NuGet](https://img.shields.io/nuget/v/mostlylucid.botdetection)](https://www.nuget.org/packages/mostlylucid.botdetection)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
