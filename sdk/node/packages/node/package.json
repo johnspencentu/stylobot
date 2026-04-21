@@ -8,7 +8,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-strip-types --test src/__tests__/*.test.ts",
+    "test": "node --experimental-strip-types --loader ../../ts-loader.mjs --test src/__tests__/*.test.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {

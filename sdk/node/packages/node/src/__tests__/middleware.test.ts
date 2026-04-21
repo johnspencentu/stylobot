@@ -2,11 +2,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
-import { styloBotMiddleware } from '../middleware.js';
+import { styloBotMiddleware } from '../middleware.ts';
 
 function mockExpressReq(headers: Record<string, string> = {}): any {
   const socket = new Socket();
-  (socket as any).remoteAddress = '127.0.0.1';
+  Object.defineProperty(socket, 'remoteAddress', { value: '127.0.0.1', writable: true, configurable: true });
   const req = new IncomingMessage(socket);
   req.method = 'GET'; req.url = '/test'; req.headers = headers;
   (req as any).originalUrl = '/test'; (req as any).ip = '127.0.0.1'; (req as any).protocol = 'https';

@@ -2,11 +2,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
-import { extractDetectRequest } from '../extract.js';
+import { extractDetectRequest } from '../extract.ts';
 
 function mockReq(overrides: Record<string, any> = {}): IncomingMessage & Record<string, any> {
   const socket = new Socket();
-  (socket as any).remoteAddress = '192.168.1.1';
+  Object.defineProperty(socket, 'remoteAddress', { value: '192.168.1.1', writable: true, configurable: true });
   const req = new IncomingMessage(socket);
   req.method = overrides.method ?? 'GET';
   req.url = overrides.url ?? '/test';
