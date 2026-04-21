@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Models;
@@ -70,12 +71,16 @@ public static class BdfReplayEndpoints
             .AddEndpointFilter(async (context, next) =>
             {
                 var options = context.HttpContext.RequestServices
-                    .GetService(typeof(IOptions<BotDetectionOptions>)) as IOptions<BotDetectionOptions>;
-                var config = options?.Value.BdfReplay ?? new BdfReplayOptions();
+                    .GetRequiredService<IOptions<BotDetectionOptions>>();
+                var config = options.Value.BdfReplay;
 
                 // Gate: endpoints disabled (off by default)
                 if (!config.Enabled)
+                {
+                    var logger = context.HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("BdfReplay");
+                    logger?.LogWarning("BDF replay disabled. BdfReplay.Enabled={Enabled}", config.Enabled);
                     return Results.NotFound();
+                }
 
                 // Gate: API key required
                 if (config.RequireApiKey)

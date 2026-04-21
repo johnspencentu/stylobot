@@ -88,6 +88,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.BotDetection.Ll
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.BotDetection.Llm.Cloud", "Mostlylucid.BotDetection.Llm.Cloud\Mostlylucid.BotDetection.Llm.Cloud.csproj", "{BB2DA910-91C0-4A86-9A5F-F639FDAF511C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.BotDetection.Api", "Mostlylucid.BotDetection.Api\Mostlylucid.BotDetection.Api.csproj", "{D673789A-B11B-478B-96F7-56566A3B7E5B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -434,6 +436,18 @@ Global
 		{BB2DA910-91C0-4A86-9A5F-F639FDAF511C}.Release|x64.Build.0 = Release|Any CPU
 		{BB2DA910-91C0-4A86-9A5F-F639FDAF511C}.Release|x86.ActiveCfg = Release|Any CPU
 		{BB2DA910-91C0-4A86-9A5F-F639FDAF511C}.Release|x86.Build.0 = Release|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Debug|x64.Build.0 = Debug|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Debug|x86.Build.0 = Debug|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Release|x64.ActiveCfg = Release|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Release|x64.Build.0 = Release|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Release|x86.ActiveCfg = Release|Any CPU
+		{D673789A-B11B-478B-96F7-56566A3B7E5B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
