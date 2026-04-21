@@ -673,6 +673,219 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
         };
     }
 
+    public async Task<InvestigationResult> GetInvestigationAsync(InvestigationFilter filter, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+
+        var whereClause = filter.EntityType switch
+        {
+            "signature" => "d.signature = @Value",
+            "country"   => "d.country_code = @Value",
+            "path"      => "d.path LIKE @Value",
+            "ua_family" => "d.user_agent_raw LIKE @Value || '%'",
+            _           => "1=0"
+        };
+
+        var timeFilter = "";
+        if (filter.Start.HasValue) timeFilter += " AND d.timestamp >= @Start";
+        if (filter.End.HasValue)   timeFilter += " AND d.timestamp <= @End";
+
+        var baseSql = $"FROM detections d WHERE {whereClause}{timeFilter}";
+        var paramValue = filter.EntityType == "path" ? $"%{filter.EntityValue}%" : filter.EntityValue;
+
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        // ── Summary ──────────────────────────────────────────────────────────
+        await using var summaryCmd = conn.CreateCommand();
+        summaryCmd.CommandText = $"""
+            SELECT
+                COUNT(*) AS TotalDetections,
+                MIN(timestamp) AS FirstSeen,
+                MAX(timestamp) AS LastSeen,
+                SUM(CASE WHEN risk_band = 'high'   THEN 1 ELSE 0 END) AS HighRisk,
+                SUM(CASE WHEN risk_band = 'medium' THEN 1 ELSE 0 END) AS MediumRisk,
+                SUM(CASE WHEN risk_band = 'low'    THEN 1 ELSE 0 END) AS LowRisk
+            {baseSql}
+            """;
+        summaryCmd.Parameters.AddWithValue("@Value", paramValue);
+        if (filter.Start.HasValue) summaryCmd.Parameters.AddWithValue("@Start", filter.Start.Value.ToString("o"));
+        if (filter.End.HasValue)   summaryCmd.Parameters.AddWithValue("@End",   filter.End.Value.ToString("o"));
+
+        InvestigationSummary summary;
+        await using (var r = await summaryCmd.ExecuteReaderAsync(ct))
+        {
+            if (await r.ReadAsync(ct))
+            {
+                summary = new InvestigationSummary
+                {
+                    TotalDetections = r.IsDBNull(0) ? 0 : r.GetInt64(0),
+                    FirstSeen  = r.IsDBNull(1) ? null : DateTime.Parse(r.GetString(1)),
+                    LastSeen   = r.IsDBNull(2) ? null : DateTime.Parse(r.GetString(2)),
+                    HighRisk   = r.IsDBNull(3) ? 0 : r.GetInt32(3),
+                    MediumRisk = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    LowRisk    = r.IsDBNull(5) ? 0 : r.GetInt32(5)
+                };
+            }
+            else
+            {
+                summary = new InvestigationSummary();
+            }
+        }
+
+        // ── Detections (paginated) ────────────────────────────────────────────
+        await using var detCmd = conn.CreateCommand();
+        detCmd.CommandText = $"""
+            SELECT
+                d.signature, d.timestamp, d.method, d.path,
+                d.is_bot, d.bot_probability, d.confidence, d.risk_band,
+                d.bot_name, d.bot_type, d.action, d.country_code,
+                d.processing_time_ms, d.status_code, d.user_agent_raw,
+                d.threat_score, d.threat_band
+            {baseSql}
+            ORDER BY d.timestamp DESC
+            LIMIT @Limit OFFSET @Offset
+            """;
+        detCmd.Parameters.AddWithValue("@Value",  paramValue);
+        detCmd.Parameters.AddWithValue("@Limit",  filter.Limit);
+        detCmd.Parameters.AddWithValue("@Offset", filter.Offset);
+        if (filter.Start.HasValue) detCmd.Parameters.AddWithValue("@Start", filter.Start.Value.ToString("o"));
+        if (filter.End.HasValue)   detCmd.Parameters.AddWithValue("@End",   filter.End.Value.ToString("o"));
+
+        var detections = new List<DashboardDetectionEvent>();
+        await using (var r = await detCmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                detections.Add(new DashboardDetectionEvent
+                {
+                    PrimarySignature = r.GetString(0),
+                    RequestId        = r.GetString(0),
+                    Timestamp        = DateTime.Parse(r.GetString(1)),
+                    Method           = r.IsDBNull(2)  ? null : r.GetString(2),
+                    Path             = r.IsDBNull(3)  ? null : r.GetString(3),
+                    IsBot            = r.GetInt32(4) == 1,
+                    BotProbability   = r.GetDouble(5),
+                    Confidence       = r.GetDouble(6),
+                    RiskBand         = r.IsDBNull(7)  ? null : r.GetString(7),
+                    BotName          = r.IsDBNull(8)  ? null : r.GetString(8),
+                    BotType          = r.IsDBNull(9)  ? null : r.GetString(9),
+                    Action           = r.IsDBNull(10) ? null : r.GetString(10),
+                    CountryCode      = r.IsDBNull(11) ? null : r.GetString(11),
+                    ProcessingTimeMs = r.IsDBNull(12) ? 0    : r.GetDouble(12),
+                    StatusCode       = r.IsDBNull(13) ? 0    : r.GetInt32(13),
+                    UserAgentRaw     = r.IsDBNull(14) ? null : r.GetString(14),
+                    ThreatScore      = r.IsDBNull(15) ? 0    : r.GetDouble(15),
+                    ThreatBand       = r.IsDBNull(16) ? null : r.GetString(16)
+                });
+            }
+        }
+
+        // ── Signatures (distinct within result set) ───────────────────────────
+        await using var sigCmd = conn.CreateCommand();
+        sigCmd.CommandText = $"""
+            SELECT
+                s.signature, s.hit_count, s.bot_name, s.bot_type,
+                s.risk_band, s.is_bot, s.last_seen
+            FROM signatures s
+            WHERE s.signature IN (SELECT DISTINCT d.signature {baseSql})
+            ORDER BY s.hit_count DESC
+            LIMIT 50
+            """;
+        sigCmd.Parameters.AddWithValue("@Value", paramValue);
+        if (filter.Start.HasValue) sigCmd.Parameters.AddWithValue("@Start", filter.Start.Value.ToString("o"));
+        if (filter.End.HasValue)   sigCmd.Parameters.AddWithValue("@End",   filter.End.Value.ToString("o"));
+
+        var signatures = new List<SignatureSummary>();
+        await using (var r = await sigCmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                signatures.Add(new SignatureSummary
+                {
+                    PrimarySignature = r.GetString(0),
+                    HitCount         = r.IsDBNull(1) ? 0     : r.GetInt32(1),
+                    BotName          = r.IsDBNull(2) ? null  : r.GetString(2),
+                    BotType          = r.IsDBNull(3) ? null  : r.GetString(3),
+                    RiskBand         = r.IsDBNull(4) ? null  : r.GetString(4),
+                    IsKnownBot       = !r.IsDBNull(5) && r.GetInt32(5) == 1,
+                    LastSeen         = r.IsDBNull(6) ? default : DateTime.Parse(r.GetString(6))
+                });
+            }
+        }
+
+        // ── Endpoint stats ────────────────────────────────────────────────────
+        await using var epCmd = conn.CreateCommand();
+        epCmd.CommandText = $"""
+            SELECT
+                d.method, d.path,
+                COUNT(*) AS Count,
+                AVG(d.bot_probability) AS AvgBotProb
+            {baseSql}
+            GROUP BY d.method, d.path
+            ORDER BY Count DESC
+            LIMIT 50
+            """;
+        epCmd.Parameters.AddWithValue("@Value", paramValue);
+        if (filter.Start.HasValue) epCmd.Parameters.AddWithValue("@Start", filter.Start.Value.ToString("o"));
+        if (filter.End.HasValue)   epCmd.Parameters.AddWithValue("@End",   filter.End.Value.ToString("o"));
+
+        var endpoints = new List<EndpointStat>();
+        await using (var r = await epCmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                endpoints.Add(new EndpointStat
+                {
+                    Method             = r.IsDBNull(0) ? "GET" : r.GetString(0),
+                    Path               = r.IsDBNull(1) ? "/"   : r.GetString(1),
+                    Count              = r.IsDBNull(2) ? 0     : r.GetInt32(2),
+                    AvgBotProbability  = r.IsDBNull(3) ? 0     : r.GetDouble(3)
+                });
+            }
+        }
+
+        // ── Country breakdown ─────────────────────────────────────────────────
+        await using var ctryCmd = conn.CreateCommand();
+        ctryCmd.CommandText = $"""
+            SELECT
+                d.country_code,
+                COUNT(*) AS Count,
+                SUM(CASE WHEN d.is_bot = 1 THEN 1 ELSE 0 END) AS BotCount
+            {baseSql} AND d.country_code IS NOT NULL
+            GROUP BY d.country_code
+            ORDER BY Count DESC
+            LIMIT 50
+            """;
+        ctryCmd.Parameters.AddWithValue("@Value", paramValue);
+        if (filter.Start.HasValue) ctryCmd.Parameters.AddWithValue("@Start", filter.Start.Value.ToString("o"));
+        if (filter.End.HasValue)   ctryCmd.Parameters.AddWithValue("@End",   filter.End.Value.ToString("o"));
+
+        var countries = new List<CountryStat>();
+        await using (var r = await ctryCmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                countries.Add(new CountryStat
+                {
+                    CountryCode = r.IsDBNull(0) ? "XX" : r.GetString(0),
+                    Count       = r.IsDBNull(1) ? 0    : r.GetInt32(1),
+                    BotCount    = r.IsDBNull(2) ? 0    : r.GetInt32(2)
+                });
+            }
+        }
+
+        return new InvestigationResult
+        {
+            Summary          = summary,
+            Detections       = detections,
+            Signatures       = signatures,
+            EndpointStats    = endpoints,
+            CountryBreakdown = countries,
+            TotalCount       = (int)summary.TotalDetections
+        };
+    }
+
     public async Task<List<UserAgentSearchResult>> SearchUserAgentsAsync(string query, int limit = 20)
     {
         await EnsureInitializedAsync();

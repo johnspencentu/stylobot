@@ -77,4 +77,7 @@ public interface IDashboardEventStore
     ///     Search detections by raw User-Agent substring match.
     /// </summary>
     Task<List<UserAgentSearchResult>> SearchUserAgentsAsync(string query, int limit = 20);
+
+    /// <summary>Unified investigation query -- filter by any entity type, get cross-associated results.</summary>
+    Task<InvestigationResult> GetInvestigationAsync(InvestigationFilter filter, CancellationToken ct = default);
 }

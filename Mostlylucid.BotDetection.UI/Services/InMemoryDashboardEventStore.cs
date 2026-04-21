@@ -513,6 +513,15 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
         return Task.FromResult(results);
     }
 
+    public Task<InvestigationResult> GetInvestigationAsync(InvestigationFilter filter, CancellationToken ct = default)
+    {
+        return Task.FromResult(new InvestigationResult
+        {
+            Summary = new InvestigationSummary(),
+            TotalCount = 0
+        });
+    }
+
     public Task<List<DashboardTimeSeriesPoint>> GetTimeSeriesAsync(
         DateTime startTime,
         DateTime endTime,
