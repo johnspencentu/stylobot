@@ -3835,6 +3835,20 @@ public class StyloBotDashboardMiddleware
         await context.Response.WriteAsync(html);
     }
 
+    private static DateTime ParseRangeStart(string range)
+    {
+        var now = DateTime.UtcNow;
+        return range switch
+        {
+            "1h" => now.AddHours(-1),
+            "6h" => now.AddHours(-6),
+            "24h" => now.AddHours(-24),
+            "7d" => now.AddDays(-7),
+            "30d" => now.AddDays(-30),
+            _ => now.AddHours(-24)
+        };
+    }
+
     private InvestigationFilter ParseInvestigationFilter(HttpContext context)
     {
         var query = context.Request.Query;
@@ -3844,16 +3858,7 @@ public class StyloBotDashboardMiddleware
         var range = query["range"].FirstOrDefault() ?? "24h";
         var offset = int.TryParse(query["offset"].FirstOrDefault(), out var o) ? o : 0;
 
-        var now = DateTime.UtcNow;
-        var start = range switch
-        {
-            "1h" => now.AddHours(-1),
-            "6h" => now.AddHours(-6),
-            "24h" => now.AddHours(-24),
-            "7d" => now.AddDays(-7),
-            "30d" => now.AddDays(-30),
-            _ => now.AddHours(-24)
-        };
+        var start = ParseRangeStart(range);
 
         if (DateTime.TryParse(query["start"].FirstOrDefault(), out var customStart))
             start = customStart;
@@ -3876,14 +3881,7 @@ public class StyloBotDashboardMiddleware
     private ShapeSearchFilter ParseShapeSearchFilter(HttpContext context)
     {
         var query = context.Request.Query;
-        var range = query["range"].FirstOrDefault() ?? "24h";
-        var now = DateTime.UtcNow;
-        var start = range switch
-        {
-            "1h" => now.AddHours(-1), "6h" => now.AddHours(-6),
-            "24h" => now.AddHours(-24), "7d" => now.AddDays(-7),
-            "30d" => now.AddDays(-30), _ => now.AddHours(-24)
-        };
+        var start = ParseRangeStart(query["range"].FirstOrDefault() ?? "24h");
 
         // Parse dimension values from dim_0 through dim_15
         var shape = new float[RadarDimensions.Count];

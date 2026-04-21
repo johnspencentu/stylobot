@@ -66,8 +66,8 @@
     {
         if (weights[i] > 0 && shape[i] > 0.05f)
         {
-            <circle cx="@Point(i, shape[i]).Split(',')[0]" cy="@Point(i, shape[i]).Split(',')[1]"
-                    r="3" fill="var(--sb-accent)" />
+            var pt = Point(i, shape[i]).Split(',');
+            <circle cx="@pt[0]" cy="@pt[1]" r="3" fill="var(--sb-accent)" />
         }
     }
 </svg>
