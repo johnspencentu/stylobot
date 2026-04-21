@@ -1,0 +1,11 @@
+{
+  "scenarioName": "curl-minimal-headers",
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/data",
+      "headers": { "User-Agent": "curl/8.4.0", "Accept": "*/*" },
+      "expectedDetection": { "isBot": true, "botProbability": 0.9 }
+    }
+  ]
+}
