@@ -67,6 +67,7 @@ public class StyloBotDashboardMiddleware
         "api/sessions",
         "api/sessions/recent",
         "api/threats",
+        "api/ua/search",
         "api/license",
         "api/config/manifests",
         "api/config/schema"
@@ -207,6 +208,10 @@ public class StyloBotDashboardMiddleware
 
             case "api/threats":
                 await ServeThreatsApiAsync(context);
+                break;
+
+            case "api/ua/search":
+                await ServeUaSearchApiAsync(context);
                 break;
 
             case "api/me":
@@ -2413,6 +2418,26 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "application/json";
         await JsonSerializer.SerializeAsync(context.Response.Body, threats, CamelCaseJson);
+    }
+
+    private async Task ServeUaSearchApiAsync(HttpContext context)
+    {
+        var query = context.Request.Query["q"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("{\"error\":\"Query parameter 'q' is required\"}");
+            return;
+        }
+
+        var limitStr = context.Request.Query["limit"].FirstOrDefault();
+        var limit = int.TryParse(limitStr, out var l) ? Math.Clamp(l, 1, 100) : 20;
+
+        var results = await _eventStore.SearchUserAgentsAsync(query, limit);
+
+        context.Response.ContentType = "application/json";
+        await JsonSerializer.SerializeAsync(context.Response.Body, results, CamelCaseJson);
     }
 
     private async Task ServeThreatsPartialAsync(HttpContext context)

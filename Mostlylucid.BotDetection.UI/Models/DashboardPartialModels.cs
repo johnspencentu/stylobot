@@ -464,6 +464,18 @@ public sealed class ThreatsListModel
 }
 
 /// <summary>
+///     Search result for the UA search API.
+/// </summary>
+public sealed class UserAgentSearchResult
+{
+    public required string UserAgent { get; init; }
+    public required string Signature { get; init; }
+    public double BotProbability { get; init; }
+    public DateTime Timestamp { get; init; }
+    public string? BotName { get; init; }
+}
+
+/// <summary>
 ///     A single threat entry for the threats list.
 /// </summary>
 public sealed class ThreatEntry

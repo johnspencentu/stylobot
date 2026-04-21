@@ -493,6 +493,26 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
         return Task.FromResult(threats);
     }
 
+    public Task<List<UserAgentSearchResult>> SearchUserAgentsAsync(string query, int limit = 20)
+    {
+        var results = _detections
+            .Where(d => !string.IsNullOrEmpty(d.UserAgentRaw) &&
+                        d.UserAgentRaw.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(d => d.Timestamp)
+            .Take(limit)
+            .Select(d => new UserAgentSearchResult
+            {
+                UserAgent = d.UserAgentRaw!,
+                Signature = d.PrimarySignature ?? "",
+                BotProbability = d.BotProbability,
+                Timestamp = d.Timestamp,
+                BotName = d.BotName
+            })
+            .ToList();
+
+        return Task.FromResult(results);
+    }
+
     public Task<List<DashboardTimeSeriesPoint>> GetTimeSeriesAsync(
         DateTime startTime,
         DateTime endTime,

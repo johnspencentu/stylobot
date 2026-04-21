@@ -74,7 +74,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                 error_count INTEGER DEFAULT 0,
                 timing_entropy REAL DEFAULT 0,
                 narrative TEXT,
-                header_hashes_json TEXT
+                header_hashes_json TEXT,
+                user_agent_raw TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_sessions_signature ON sessions(signature, ended_at DESC);
@@ -180,14 +181,14 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                     action, bot_name, bot_type, country_code, top_reasons_json,
                     transition_counts_json, paths_json, avg_processing_time_ms,
                     error_count, timing_entropy, narrative,
-                    header_hashes_json
+                    header_hashes_json, user_agent_raw
                 ) VALUES (
                     @sig, @started, @ended, @reqCount, @vector, @maturity,
                     @domState, @isBot, @avgProb, @avgConf, @risk,
                     @action, @botName, @botType, @country, @reasons,
                     @transitions, @paths, @avgTime,
                     @errors, @entropy, @narrative,
-                    @headerHashes
+                    @headerHashes, @uaRaw
                 )
             """;
             cmd.Parameters.AddWithValue("@sig", session.Signature);
@@ -213,6 +214,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             cmd.Parameters.AddWithValue("@entropy", session.TimingEntropy);
             cmd.Parameters.AddWithValue("@narrative", (object?)session.Narrative ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@headerHashes", (object?)session.HeaderHashesJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@uaRaw", (object?)session.UserAgentRaw ?? DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync(ct);
         }
@@ -874,8 +876,23 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         AvgProcessingTimeMs = reader.IsDBNull(reader.GetOrdinal("avg_processing_time_ms")) ? 0 : reader.GetDouble(reader.GetOrdinal("avg_processing_time_ms")),
         ErrorCount = reader.IsDBNull(reader.GetOrdinal("error_count")) ? 0 : reader.GetInt32(reader.GetOrdinal("error_count")),
         TimingEntropy = reader.IsDBNull(reader.GetOrdinal("timing_entropy")) ? 0 : reader.GetFloat(reader.GetOrdinal("timing_entropy")),
-        Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative"))
+        Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative")),
+        UserAgentRaw = SafeGetString(reader, "user_agent_raw")
     };
+
+    /// <summary>Safe column read that handles missing columns (for DBs created before migration).</summary>
+    private static string? SafeGetString(SqliteDataReader reader, string column)
+    {
+        try
+        {
+            var ordinal = reader.GetOrdinal(column);
+            return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null; // Column doesn't exist yet (pre-migration DB)
+        }
+    }
 
     private static PersistedSignature ReadSignature(SqliteDataReader reader) => new()
     {

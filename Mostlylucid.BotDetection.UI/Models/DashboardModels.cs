@@ -56,6 +56,12 @@ public sealed record DashboardDetectionEvent
     public double? ThreatScore { get; init; }
     public string? ThreatBand { get; init; }
 
+    /// <summary>
+    ///     PII-stripped raw User-Agent string for search and analytics.
+    ///     Emails, credential URLs, and phone numbers are redacted before storage.
+    /// </summary>
+    public string? UserAgentRaw { get; init; }
+
     // Sparkline history removed from SignalR broadcasts to reduce payload bloat.
     // Clients fetch sparkline data on-demand via the dashboard API endpoints.
 }

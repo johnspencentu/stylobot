@@ -89,6 +89,12 @@ public sealed record PersistedSession
     ///     Used for retroactive stability analysis per entity.
     /// </summary>
     public string? HeaderHashesJson { get; init; }
+
+    /// <summary>
+    ///     PII-stripped raw User-Agent string from the session's first request.
+    ///     Emails, credential URLs, and phone numbers are redacted before storage.
+    /// </summary>
+    public string? UserAgentRaw { get; init; }
 }
 
 /// <summary>

@@ -1159,6 +1159,41 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
         }
     }
 
+    public async Task<List<UserAgentSearchResult>> SearchUserAgentsAsync(string query, int limit = 20)
+    {
+        if (IsCircuitOpen) return [];
+
+        var sql = """
+            SELECT user_agent_raw, primary_signature AS signature, bot_probability, timestamp, bot_name
+            FROM dashboard_detections
+            WHERE user_agent_raw ILIKE @Query
+            ORDER BY timestamp DESC LIMIT @Limit
+            """;
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+            var rows = await connection.QueryAsync(sql,
+                new { Query = $"%{query}%", Limit = Math.Clamp(limit, 1, 100) },
+                commandTimeout: _options.CommandTimeoutSeconds);
+
+            return rows.Select(r => new UserAgentSearchResult
+            {
+                UserAgent = (string?)r.user_agent_raw ?? "",
+                Signature = (string?)r.signature ?? "",
+                BotProbability = (double?)r.bot_probability ?? 0,
+                Timestamp = (DateTime)r.timestamp,
+                BotName = (string?)r.bot_name
+            }).ToList();
+        }
+        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
+        {
+            TripCircuit();
+            _logger.LogError(ex, "Failed to search user agents from PostgreSQL");
+            return [];
+        }
+    }
+
     /// <summary>
     /// Maps a TimeSpan bucket size to the nearest PostgreSQL date_trunc unit.
     /// </summary>

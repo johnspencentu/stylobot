@@ -1,8 +1,10 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Privacy;
 using Mostlylucid.BotDetection.UI.Models;
 
 namespace Mostlylucid.BotDetection.UI.Services;
@@ -64,7 +66,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 processing_time_ms REAL,
                 threat_score REAL DEFAULT 0,
                 threat_band TEXT,
-                status_code INTEGER DEFAULT 0
+                status_code INTEGER DEFAULT 0,
+                user_agent_raw TEXT
             );
 
             CREATE TABLE IF NOT EXISTS signatures (
@@ -95,6 +98,19 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             CREATE INDEX IF NOT EXISTS idx_sig_last_seen ON signatures(last_seen DESC);
             CREATE INDEX IF NOT EXISTS idx_sig_is_bot ON signatures(is_bot);
             CREATE INDEX IF NOT EXISTS idx_det_threat ON detections(threat_score DESC, timestamp DESC);
+
+            CREATE TABLE IF NOT EXISTS user_agent_stats (
+                ua_family TEXT NOT NULL,
+                ua_version TEXT NOT NULL DEFAULT '',
+                ua_os TEXT NOT NULL DEFAULT '',
+                is_bot INTEGER NOT NULL DEFAULT 0,
+                first_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 1,
+                unique_signatures INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (ua_family, ua_version, ua_os)
+            );
+            CREATE INDEX IF NOT EXISTS idx_ua_family ON user_agent_stats(ua_family, hit_count DESC);
             """;
         await cmd.ExecuteNonQueryAsync(ct);
 
@@ -121,8 +137,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 INSERT INTO detections (timestamp, signature, method, path, is_bot, bot_probability, confidence,
-                    risk_band, bot_name, bot_type, action, country_code, processing_time_ms, threat_score, threat_band, status_code)
-                VALUES (@ts, @sig, @method, @path, @isBot, @prob, @conf, @risk, @name, @type, @action, @country, @ms, @threat, @band, @status)
+                    risk_band, bot_name, bot_type, action, country_code, processing_time_ms, threat_score, threat_band, status_code, user_agent_raw)
+                VALUES (@ts, @sig, @method, @path, @isBot, @prob, @conf, @risk, @name, @type, @action, @country, @ms, @threat, @band, @status, @uaRaw)
                 """;
             cmd.Parameters.AddWithValue("@ts", detection.Timestamp.ToString("O"));
             cmd.Parameters.AddWithValue("@sig", detection.PrimarySignature ?? "unknown");
@@ -140,7 +156,12 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             cmd.Parameters.AddWithValue("@threat", (double)(detection.ThreatScore ?? 0.0));
             cmd.Parameters.AddWithValue("@band", (object?)detection.ThreatBand ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@status", (int)detection.StatusCode);
+            var strippedUa = UaPiiStripper.Strip(detection.UserAgentRaw);
+            cmd.Parameters.AddWithValue("@uaRaw", string.IsNullOrEmpty(strippedUa) ? (object)DBNull.Value : strippedUa);
             await cmd.ExecuteNonQueryAsync();
+
+            // Upsert UA stats for analytics
+            await UpsertUserAgentStatsAsync(conn, strippedUa, detection.IsBot);
         }
         finally
         {
@@ -258,7 +279,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 ProcessingTimeMs = reader.GetDouble(reader.GetOrdinal("processing_time_ms")),
                 ThreatScore = reader.GetDouble(reader.GetOrdinal("threat_score")),
                 ThreatBand = reader.IsDBNull(reader.GetOrdinal("threat_band")) ? null : reader.GetString(reader.GetOrdinal("threat_band")),
-                StatusCode = reader.GetInt32(reader.GetOrdinal("status_code"))
+                StatusCode = reader.GetInt32(reader.GetOrdinal("status_code")),
+                UserAgentRaw = SafeGetString(reader, "user_agent_raw")
             });
         }
         return results;
@@ -649,6 +671,121 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             ThreatBand = reader.IsDBNull(reader.GetOrdinal("threat_band")) ? null : reader.GetString(reader.GetOrdinal("threat_band")),
             Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative"))
         };
+    }
+
+    public async Task<List<UserAgentSearchResult>> SearchUserAgentsAsync(string query, int limit = 20)
+    {
+        await EnsureInitializedAsync();
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync();
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT user_agent_raw, signature, bot_probability, timestamp, bot_name
+            FROM detections
+            WHERE user_agent_raw LIKE @query
+            ORDER BY timestamp DESC LIMIT @limit
+            """;
+        cmd.Parameters.AddWithValue("@query", $"%{query}%");
+        cmd.Parameters.AddWithValue("@limit", Math.Clamp(limit, 1, 100));
+
+        var results = new List<UserAgentSearchResult>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            results.Add(new UserAgentSearchResult
+            {
+                UserAgent = reader.IsDBNull(0) ? "" : reader.GetString(0),
+                Signature = reader.GetString(1),
+                BotProbability = reader.GetDouble(2),
+                Timestamp = DateTime.Parse(reader.GetString(3)),
+                BotName = reader.IsDBNull(4) ? null : reader.GetString(4)
+            });
+        }
+        return results;
+    }
+
+    // ─── UA stats helpers ────────────────────────────────────────────────
+
+    private static readonly Regex UaFamilyRegex = new(
+        @"^(?<family>[A-Za-z][A-Za-z0-9 _-]*)/?(?<version>\d[\d.]*)?",
+        RegexOptions.Compiled);
+
+    private static async Task UpsertUserAgentStatsAsync(SqliteConnection conn, string? strippedUa, bool isBot)
+    {
+        if (string.IsNullOrWhiteSpace(strippedUa)) return;
+
+        var (family, version) = ParseUaFamily(strippedUa);
+        if (string.IsNullOrEmpty(family)) return;
+
+        var now = DateTime.UtcNow.ToString("O");
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO user_agent_stats (ua_family, ua_version, ua_os, is_bot, first_seen, last_seen, hit_count)
+            VALUES (@family, @version, @os, @isBot, @now, @now, 1)
+            ON CONFLICT(ua_family, ua_version, ua_os) DO UPDATE SET
+                last_seen = @now,
+                hit_count = hit_count + 1,
+                is_bot = MAX(is_bot, @isBot)
+            """;
+        cmd.Parameters.AddWithValue("@family", family);
+        cmd.Parameters.AddWithValue("@version", version ?? "");
+        cmd.Parameters.AddWithValue("@os", ""); // OS extraction can be added later
+        cmd.Parameters.AddWithValue("@isBot", isBot ? 1 : 0);
+        cmd.Parameters.AddWithValue("@now", now);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static (string? Family, string? Version) ParseUaFamily(string ua)
+    {
+        // Try common browser patterns first
+        if (ua.Contains("Firefox/", StringComparison.Ordinal))
+            return ("Firefox", ExtractToken(ua, "Firefox/"));
+        if (ua.Contains("Edg/", StringComparison.Ordinal))
+            return ("Edge", ExtractToken(ua, "Edg/"));
+        if (ua.Contains("OPR/", StringComparison.Ordinal))
+            return ("Opera", ExtractToken(ua, "OPR/"));
+        if (ua.Contains("Chrome/", StringComparison.Ordinal) && !ua.Contains("Chromium", StringComparison.Ordinal))
+            return ("Chrome", ExtractToken(ua, "Chrome/"));
+        if (ua.Contains("Safari/", StringComparison.Ordinal) && ua.Contains("Version/", StringComparison.Ordinal))
+            return ("Safari", ExtractToken(ua, "Version/"));
+
+        // Fallback: first token of the UA (handles "MyBot/1.0 (...)" patterns)
+        var match = UaFamilyRegex.Match(ua);
+        if (match.Success)
+            return (match.Groups["family"].Value.Trim(), match.Groups["version"].Value);
+
+        return (null, null);
+    }
+
+    private static string? ExtractToken(string ua, string token)
+    {
+        var idx = ua.IndexOf(token, StringComparison.Ordinal);
+        if (idx < 0) return null;
+        var start = idx + token.Length;
+        var end = start;
+        while (end < ua.Length && (char.IsDigit(ua[end]) || ua[end] == '.'))
+            end++;
+        if (end == start) return null;
+        var full = ua[start..end];
+        var dot = full.IndexOf('.');
+        return dot > 0 ? full[..dot] : full;
+    }
+
+    /// <summary>Safe column read that handles missing columns (for DBs created before migration).</summary>
+    private static string? SafeGetString(SqliteDataReader reader, string column)
+    {
+        try
+        {
+            var ordinal = reader.GetOrdinal(column);
+            return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null; // Column doesn't exist yet (pre-migration DB)
+        }
     }
 
     public ValueTask DisposeAsync()
