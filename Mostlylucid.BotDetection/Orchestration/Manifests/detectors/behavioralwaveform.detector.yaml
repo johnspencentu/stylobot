@@ -63,7 +63,7 @@ emits:
   on_start:
     - detector.behavioralwaveform.started
   on_complete:
-    - key: waveform.signature
+    - key: signature.primary
       type: string
       description: Client signature for waveform tracking
   on_failure:

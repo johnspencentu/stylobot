@@ -22,7 +22,7 @@ input:
       signal_pattern: waveform.*
 
   required_signals:
-    - waveform.signature
+    - signature.primary
 
   optional_signals:
     - transport.is_streaming
@@ -51,7 +51,7 @@ output:
 
 triggers:
   requires:
-    - signal: waveform.signature
+    - signal: signature.primary
       description: Needs client signature from behavioral waveform
 
 emits:

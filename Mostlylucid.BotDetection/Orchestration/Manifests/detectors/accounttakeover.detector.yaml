@@ -23,7 +23,7 @@ input:
   required_signals: []
   optional_signals:
     - ua.family
-    - waveform.signature
+    - signature.primary
     - geo.country_code
     - geo.change.drift_detected
     - behavioral.anomaly
@@ -51,7 +51,7 @@ output:
 triggers:
   requires:
     - ua.family
-    - waveform.signature
+    - signature.primary
   mode: any  # Any of the triggers is sufficient
 
 emits:

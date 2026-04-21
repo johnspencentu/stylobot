@@ -226,7 +226,7 @@ public class ActionPolicyRegistry : IActionPolicyRegistry
             LogFullEvidence = true,
             AddResponseHeaders = false,
             AddToContextItems = true,
-            ActionMarker = "mask-pii",
+            ActionMarker = "strip-pii",
             WouldBlockThreshold = 0.85
         }));
 

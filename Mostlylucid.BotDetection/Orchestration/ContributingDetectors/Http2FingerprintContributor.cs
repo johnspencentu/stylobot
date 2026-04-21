@@ -107,7 +107,7 @@ public class Http2FingerprintContributor : ConfiguredContributorBase
     }
 
     public override string Name => "Http2Fingerprint";
-    public override int Priority => Manifest?.Priority ?? 10;
+    public override int Priority => Manifest?.Priority ?? 13;
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 

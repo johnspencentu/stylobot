@@ -22,7 +22,7 @@ input:
       description: HTTP request with waveform signature and geo signals
 
   required_signals:
-    - waveform.signature
+    - signature.primary
 
   optional_signals:
     - geo.country_code
@@ -114,7 +114,7 @@ output:
 triggers:
   requires:
     - type: signal_exists
-      signal: waveform.signature
+      signal: signature.primary
 
   skip_when:
     - detection.early_exit

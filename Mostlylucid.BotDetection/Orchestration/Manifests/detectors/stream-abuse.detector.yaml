@@ -23,7 +23,7 @@ input:
 
   required_signals:
     - transport.protocol
-    - waveform.signature
+    - signature.primary
 
   optional_signals:
     - transport.is_streaming
@@ -59,7 +59,7 @@ output:
 triggers:
   requires:
     - transport.protocol
-    - waveform.signature
+    - signature.primary
   skip_when:
     - detection.early_exit
 
@@ -78,7 +78,7 @@ emits:
 listens:
   required:
     - transport.protocol
-    - waveform.signature
+    - signature.primary
   optional:
     - transport.is_streaming
     - transport.sse_reconnect
