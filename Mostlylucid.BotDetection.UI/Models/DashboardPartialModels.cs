@@ -494,3 +494,27 @@ public sealed class ThreatEntry
     public DateTime Timestamp { get; init; }
     public bool InHoneypot { get; init; }
 }
+
+/// <summary>View model for the unified investigation view.</summary>
+public sealed class InvestigationViewModel
+{
+    public required InvestigationFilter Filter { get; init; }
+    public required InvestigationResult Result { get; init; }
+    public required string BasePath { get; init; }
+
+    /// <summary>Available entity types for the filter dropdown (permission-gated).</summary>
+    public IReadOnlyList<FilterOption> AvailableFilters { get; init; } = [];
+
+    /// <summary>Available tabs (permission-gated).</summary>
+    public IReadOnlyList<string> AvailableTabs { get; init; } = [];
+
+    public string ActiveTab => Filter.Tab ?? "detections";
+    public int TotalPages => Result.TotalCount > 0 ? (int)Math.Ceiling(Result.TotalCount / (double)Filter.Limit) : 0;
+    public int CurrentPage => (Filter.Offset / Filter.Limit) + 1;
+}
+
+public sealed record FilterOption
+{
+    public required string Value { get; init; }   // "signature", "country", etc.
+    public required string Label { get; init; }   // "Signature", "Country", etc.
+}
