@@ -3680,46 +3680,43 @@ public class StyloBotDashboardMiddleware
         _ => "#6b7280"
     };
 
-    private static IReadOnlyList<FilterGroup> BuildFilterGroups()
+    private static readonly IReadOnlyList<FilterGroup> ShapeFilterGroups = new List<FilterGroup>
     {
-        return new List<FilterGroup>
+        new()
         {
-            new()
+            Id = "fingerprint", Label = "Fingerprint Signals",
+            Dimensions = new List<FilterDimension>
             {
-                Id = "fingerprint", Label = "Fingerprint Signals",
-                Dimensions = new List<FilterDimension>
-                {
-                    new() { Name = "client_fingerprint", Label = "TLS/HTTP Fingerprint", AxisIndex = 7, InputType = "slider" },
-                    new() { Name = "ip_reputation", Label = "Datacenter", AxisIndex = 2, InputType = "toggle", Threshold = 0.7 },
-                    new() { Name = "inconsistency", Label = "Inconsistency", AxisIndex = 9, InputType = "slider" },
-                }
-            },
-            new()
-            {
-                Id = "traffic", Label = "Traffic Pattern",
-                Dimensions = new List<FilterDimension>
-                {
-                    new() { Name = "rate_pattern", Label = "Request Rate", AxisIndex = 14, InputType = "slider" },
-                    new() { Name = "advanced_behavioral", Label = "Timing Regularity", AxisIndex = 4, InputType = "slider" },
-                    new() { Name = "behavioral", Label = "Navigation Pattern", AxisIndex = 3, InputType = "slider" },
-                    new() { Name = "cache_behavior", Label = "Asset Loading", AxisIndex = 5, InputType = "slider" },
-                }
-            },
-            new()
-            {
-                Id = "detection", Label = "Detection Signals",
-                Dimensions = new List<FilterDimension>
-                {
-                    new() { Name = "ua_anomaly", Label = "UA Anomaly", AxisIndex = 0, InputType = "slider" },
-                    new() { Name = "header_anomaly", Label = "Header Anomaly", AxisIndex = 1, InputType = "slider" },
-                    new() { Name = "security_tool", Label = "Security Tool", AxisIndex = 6, InputType = "toggle", Threshold = 0.5 },
-                    new() { Name = "ai_classification", Label = "AI Classification", AxisIndex = 11, InputType = "slider" },
-                    new() { Name = "cluster_signal", Label = "Cluster Signal", AxisIndex = 12, InputType = "slider" },
-                    new() { Name = "reputation_match", Label = "Reputation Match", AxisIndex = 10, InputType = "slider" },
-                }
+                new() { Name = "client_fingerprint", Label = "TLS/HTTP Fingerprint", AxisIndex = 7, InputType = "slider" },
+                new() { Name = "ip_reputation", Label = "Datacenter", AxisIndex = 2, InputType = "toggle", Threshold = 0.7 },
+                new() { Name = "inconsistency", Label = "Inconsistency", AxisIndex = 9, InputType = "slider" },
             }
-        };
-    }
+        },
+        new()
+        {
+            Id = "traffic", Label = "Traffic Pattern",
+            Dimensions = new List<FilterDimension>
+            {
+                new() { Name = "rate_pattern", Label = "Request Rate", AxisIndex = 14, InputType = "slider" },
+                new() { Name = "advanced_behavioral", Label = "Timing Regularity", AxisIndex = 4, InputType = "slider" },
+                new() { Name = "behavioral", Label = "Navigation Pattern", AxisIndex = 3, InputType = "slider" },
+                new() { Name = "cache_behavior", Label = "Asset Loading", AxisIndex = 5, InputType = "slider" },
+            }
+        },
+        new()
+        {
+            Id = "detection", Label = "Detection Signals",
+            Dimensions = new List<FilterDimension>
+            {
+                new() { Name = "ua_anomaly", Label = "UA Anomaly", AxisIndex = 0, InputType = "slider" },
+                new() { Name = "header_anomaly", Label = "Header Anomaly", AxisIndex = 1, InputType = "slider" },
+                new() { Name = "security_tool", Label = "Security Tool", AxisIndex = 6, InputType = "toggle", Threshold = 0.5 },
+                new() { Name = "ai_classification", Label = "AI Classification", AxisIndex = 11, InputType = "slider" },
+                new() { Name = "cluster_signal", Label = "Cluster Signal", AxisIndex = 12, InputType = "slider" },
+                new() { Name = "reputation_match", Label = "Reputation Match", AxisIndex = 10, InputType = "slider" },
+            }
+        }
+    };
 
     private async Task ServeInvestigationAsync(HttpContext context)
     {
@@ -3762,7 +3759,7 @@ public class StyloBotDashboardMiddleware
             Filter = shapeFilter,
             Result = result,
             BasePath = _options.BasePath,
-            FilterGroups = BuildFilterGroups(),
+            FilterGroups = ShapeFilterGroups,
             Presets = presets.ToList(),
             AvailableTabs = tabs,
             HasShapeSearch = shapeStore is not null,

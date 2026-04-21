@@ -111,30 +111,46 @@ public static class SearchProjection
         }
     }
 
-    private static int MapDetectorToAxis(string detectorName)
+    /// <summary>Map contributor Name values to RadarDimensions axis indices.</summary>
+    private static readonly Dictionary<string, int> DetectorAxisMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Map common detector names to RadarDimensions axis indices
-        return detectorName.ToLowerInvariant() switch
-        {
-            "useragent" or "useragentcontributor" => 0,   // ua_anomaly
-            "header" or "headercontributor" => 1,          // header_anomaly
-            "ipreputation" => 2,                           // ip_reputation
-            "heuristic" or "behavioral" => 3,              // behavioral
-            "advanced" or "markov" => 4,                   // advanced_behavioral
-            "cache" => 5,                                  // cache_behavior
-            "securitytool" => 6,                           // security_tool
-            "fingerprint" or "clientfingerprint" => 7,     // client_fingerprint
-            "versionage" => 8,                             // version_age
-            "inconsistency" => 9,                          // inconsistency
-            "reputation" => 10,                            // reputation_match
-            "ai" or "llm" => 11,                           // ai_classification
-            "cluster" => 12,                               // cluster_signal
-            "country" or "geo" => 13,                      // country_reputation
-            "ratelimit" or "rate" => 14,                   // rate_pattern
-            "payload" => 15,                               // payload_signature
-            _ => -1
-        };
-    }
+        // Axis 0: ua_anomaly
+        ["UserAgent"] = 0,
+        // Axis 1: header_anomaly
+        ["Header"] = 1, ["HeaderCorrelation"] = 1,
+        // Axis 2: ip_reputation
+        ["Ip"] = 2, ["FastPathReputation"] = 2, ["ProjectHoneypot"] = 2,
+        // Axis 3: behavioral
+        ["Behavioral"] = 3, ["Heuristic"] = 3, ["HeuristicLate"] = 3, ["BehavioralWaveform"] = 3,
+        // Axis 4: advanced_behavioral
+        ["AdvancedBehavioral"] = 4, ["SessionVector"] = 4, ["Periodicity"] = 4,
+        // Axis 5: cache_behavior
+        ["CacheBehavior"] = 5, ["ResourceWaterfall"] = 5, ["CookieBehavior"] = 5,
+        // Axis 6: security_tool
+        ["SecurityTool"] = 6, ["Haxxor"] = 6, ["CveProbe"] = 6, ["CveFingerprint"] = 6,
+        // Axis 7: client_fingerprint
+        ["TlsFingerprint"] = 7, ["Http2Fingerprint"] = 7, ["Http3Fingerprint"] = 7,
+        ["TcpIpFingerprint"] = 7, ["FingerprintApproval"] = 7, ["ClientSide"] = 7,
+        // Axis 8: version_age
+        ["VersionAge"] = 8,
+        // Axis 9: inconsistency
+        ["Inconsistency"] = 9, ["TransportProtocol"] = 9,
+        // Axis 10: reputation_match
+        ["TimescaleReputation"] = 10, ["ReputationBias"] = 10, ["Similarity"] = 10, ["VerifiedBot"] = 10,
+        // Axis 11: ai_classification
+        ["Llm"] = 11, ["AI"] = 11, ["AiScraper"] = 11,
+        // Axis 12: cluster_signal
+        ["ClusterContributor"] = 12, ["MultiLayerCorrelation"] = 12,
+        // Axis 13: country_reputation
+        ["GeoChange"] = 13,
+        // Axis 14: rate_pattern
+        ["StreamAbuse"] = 14, ["Intent"] = 14,
+        // Axis 15: payload_signature
+        ["ResponseBehavior"] = 15, ["PiiQueryString"] = 15,
+    };
+
+    private static int MapDetectorToAxis(string detectorName) =>
+        DetectorAxisMap.TryGetValue(detectorName, out var idx) ? idx : -1;
 
     private static float Clamp(float value) => Math.Max(0f, Math.Min(1f, Math.Abs(value)));
 

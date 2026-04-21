@@ -76,7 +76,9 @@ public sealed class ShapeInvestigationViewModel
     public bool HasShapeSearch { get; init; }  // whether pgvector is available
     public bool IsPaid { get; init; }
 
-    /// <summary>Current shape as JSON for the radar SVG (16 values).</summary>
-    public float[] CurrentShape => Filter.TargetShape ?? new float[RadarDimensions.Count];
-    public float[] CurrentWeights => Filter.DimensionWeights ?? Enumerable.Repeat(0f, RadarDimensions.Count).ToArray();
+    private static readonly float[] EmptyShape = new float[RadarDimensions.Count];
+    private static readonly float[] EmptyWeights = new float[RadarDimensions.Count];
+
+    public float[] CurrentShape => Filter.TargetShape ?? EmptyShape;
+    public float[] CurrentWeights => Filter.DimensionWeights ?? EmptyWeights;
 }
