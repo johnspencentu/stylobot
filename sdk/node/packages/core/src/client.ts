@@ -78,9 +78,16 @@ export class StyloBotClient {
 }
 
 export class StyloBotApiError extends Error {
-  constructor(public readonly status: number, public readonly body: string, public readonly url: string) {
+  readonly status: number;
+  readonly body: string;
+  readonly url: string;
+
+  constructor(status: number, body: string, url: string) {
     super(`StyloBot API error ${status}: ${body.slice(0, 200)}`);
     this.name = 'StyloBotApiError';
+    this.status = status;
+    this.body = body;
+    this.url = url;
   }
 }
 
