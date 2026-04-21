@@ -1,0 +1,32 @@
+{
+  "name": "@stylobot/node",
+  "version": "0.1.0",
+  "description": "StyloBot SDK for Node.js - Express and Fastify middleware",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test src/__tests__/*.test.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@stylobot/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "fastify": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": { "optional": true },
+    "fastify": { "optional": true }
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0",
+    "@types/express": "^5.0.0",
+    "express": "^5.0.0"
+  },
+  "license": "MIT"
+}

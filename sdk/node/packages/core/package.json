@@ -1,0 +1,19 @@
+{
+  "name": "@stylobot/core",
+  "version": "0.1.0",
+  "description": "StyloBot SDK core - types, client, and header parser",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test 'src/__tests__/*.test.ts'",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  },
+  "license": "MIT"
+}
