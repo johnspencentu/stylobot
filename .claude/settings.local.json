@@ -324,7 +324,9 @@
       "Bash(identify Mostlylucid.BotDetection/icon.png)",
       "Bash(sips -g pixelHeight -g pixelWidth Mostlylucid.BotDetection/icon.png)",
       "Bash(cp /Users/scottgalloway/RiderProjects/stylobot-commercial/mostlylucid.stylobot.website/src/Stylobot.Website/wwwroot/img/stylowall.png Mostlylucid.BotDetection/icon.png)",
-      "Bash(sips -z 256 256 Mostlylucid.BotDetection/icon.png)"
+      "Bash(sips -z 256 256 Mostlylucid.BotDetection/icon.png)",
+      "Bash(git check-ignore:*)",
+      "Bash(npm test:*)"
     ]
   }
 }
