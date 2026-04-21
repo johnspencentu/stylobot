@@ -64,4 +64,16 @@ public static class RadarDimensions
             vector[i] = dimensions.TryGetValue(All[i], out var val) ? (float)val : 0f;
         return vector;
     }
+
+    /// <summary>Project a 129-dim session vector to a RadarDimensions dictionary.</summary>
+    public static Dictionary<string, double>? FromSessionVector(float[] sessionVector)
+    {
+        var projected = SearchProjection.Project(sessionVector);
+        if (projected is null) return null;
+
+        var dims = new Dictionary<string, double>(Count);
+        for (var i = 0; i < All.Count; i++)
+            dims[All[i]] = projected[i];
+        return dims;
+    }
 }
