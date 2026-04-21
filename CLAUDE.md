@@ -65,6 +65,7 @@ dotnet pack Mostlylucid.BotDetection -c Release
 | `Mostlylucid.GeoDetection` | Geographic routing (MaxMind, ip-api) |
 | `Mostlylucid.GeoDetection.Contributor` | Geo enrichment for bot detection |
 | `Mostlylucid.Common` | Shared utilities (caching, telemetry) |
+| `Mostlylucid.BotDetection.Api` | Public REST API for detection & dashboard data |
 
 **Test Projects**: `*.Test`, `*.Tests` - xUnit + Moq
 
@@ -290,6 +291,33 @@ Session-centric dashboard at `/_stylobot` with:
 - **User Agents** - UA family breakdown with version distribution
 
 **API endpoints:** `/api/sessions`, `/api/sessions/recent`, `/api/sessions/signature/{id}`, `/api/detections`, `/api/summary`, `/api/timeseries`, `/api/clusters`, `/api/countries`, `/api/endpoints`, `/api/topbots`, `/api/me`, `/api/diagnostics`, `/api/export`
+
+## Public API & SDKs
+
+**Canonical REST API** (`Mostlylucid.BotDetection.Api`) at `/api/v1/*` — the foundation for all SDK clients.
+
+**Auth tiers:** Tier 1 (proxy headers, zero-latency), Tier 2 (`X-SB-Api-Key` for detection + read), Tier 3 (OIDC bearer for management, commercial).
+
+**Key endpoints:** `POST /api/v1/detect`, `POST /api/v1/detect/batch`, `GET /api/v1/detections`, `/summary`, `/timeseries`, `/signatures`, `/countries`, `/endpoints`, `/topbots`, `/threats`, `/me`. OpenAPI spec at `/api/v1/openapi.json`.
+
+**Gateway header injection:** `X-StyloBot-IsBot`, `X-StyloBot-Probability`, `X-StyloBot-Confidence`, `X-StyloBot-BotType`, `X-StyloBot-BotName`, `X-StyloBot-RiskBand`, `X-StyloBot-Action`, `X-StyloBot-ThreatScore`, `X-StyloBot-ThreatBand`, `X-StyloBot-Policy`.
+
+### Node SDK
+
+Two npm packages in `sdk/node/`:
+- **`@stylobot/core`** — Zero-dep types, `StyloBotClient`, header parser. Works in Node/Deno/Bun.
+- **`@stylobot/node`** — Express middleware (`styloBotMiddleware`), Fastify plugin (`styloBotPlugin`).
+
+Two modes: `headers` (behind Gateway, zero-latency) or `api` (sidecar, calls `POST /api/v1/detect`).
+
+```bash
+# Build
+cd sdk/node && npm install && npm run build --workspaces
+
+# Test
+cd sdk/node/packages/core && node --experimental-strip-types --test src/__tests__/*.test.ts
+cd sdk/node/packages/node && node --experimental-strip-types --loader ../../ts-loader.mjs --test src/__tests__/*.test.ts
+```
 
 ## Production Architecture
 
