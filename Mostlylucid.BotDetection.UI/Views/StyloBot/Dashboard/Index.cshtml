@@ -172,6 +172,7 @@
             <a href="@TabUrl("threats")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("threats")">Threats</a>
             <a href="@TabUrl("useragents")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("useragents")">User Agents</a>
             <a href="@TabUrl("configuration")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("configuration")">Configuration</a>
+            <a href="@TabUrl("investigate")" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all @TabClass("investigate")">Investigate</a>
         </div>
 
         @if (tab == "overview")
@@ -298,6 +299,10 @@
         {
             ViewBag.CspNonce = Model.CspNonce;
             @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_ConfigurationEditor.cshtml", Model.Configuration)
+        }
+        else if (tab == "investigate" && Model.Investigation is not null)
+        {
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_Investigate.cshtml", Model.Investigation)
         }
 
     </main>

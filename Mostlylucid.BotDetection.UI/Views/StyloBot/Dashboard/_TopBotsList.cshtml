@@ -73,7 +73,7 @@
                             var probPct = (bot.BotProbability * 100).ToString("F0");
                             <tr class="hover:bg-base-300/50 cursor-pointer transition-colors">
                                 <td class="py-1 w-6">
-                                    <a href="@bp/signature/@Uri.EscapeDataString(bot.PrimarySignature)" class="block">
+                                    <a href="@bp?tab=investigate&type=signature&value=@Uri.EscapeDataString(bot.PrimarySignature)&range=24h" class="block">
                                     @if (HasFlag(bot.CountryCode))
                                     {
                                         <img src="@FlagUrl(bot.CountryCode!)" alt="@bot.CountryCode" class="w-6 h-4 object-cover rounded-sm" loading="lazy" />
@@ -85,7 +85,7 @@
                                     </a>
                                 </td>
                                 <td class="py-1 font-medium text-xs truncate max-w-[140px]" title="@displayName">
-                                    <a href="@bp/signature/@Uri.EscapeDataString(bot.PrimarySignature)" class="hover:underline">@displayName</a>
+                                    <a href="@bp?tab=investigate&type=signature&value=@Uri.EscapeDataString(bot.PrimarySignature)&range=24h" class="hover:underline">@displayName</a>
                                 </td>
                                 <td class="py-1 text-center">
                                     @if (!string.IsNullOrEmpty(bot.ThreatBand) && bot.ThreatBand != "None")

@@ -521,6 +521,14 @@ public class StyloBotDashboardMiddleware
             ? _aggregateCache.Current.UserAgents
             : await ComputeUserAgentsFallbackAsync();
 
+        InvestigationViewModel? investigationVm = null;
+        if (tab.Equals("investigate", StringComparison.OrdinalIgnoreCase))
+        {
+            var invFilter = ParseInvestigationFilter(context);
+            var invResult = await _eventStore.GetInvestigationAsync(invFilter);
+            investigationVm = BuildInvestigationViewModel(invFilter, invResult);
+        }
+
         var model = new DashboardShellModel
         {
             CspNonce = cspNonce,
@@ -544,11 +552,13 @@ public class StyloBotDashboardMiddleware
             Sessions = BuildSessionsModel(context),
             Threats = await BuildThreatsModelAsync(),
             License = BuildLicenseCardModel(context),
-            // Only build the editor model when the operator is on the Configuration tab —
+            // Only build the editor model when the operator is on the Configuration tab --
             // listing all 30+ embedded manifests on every dashboard render is wasteful.
             Configuration = tab.Equals("configuration", StringComparison.OrdinalIgnoreCase)
                 ? BuildConfigurationModel(context)
-                : null
+                : null,
+            // Only run investigation queries when the operator is on the Investigate tab.
+            Investigation = investigationVm
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(

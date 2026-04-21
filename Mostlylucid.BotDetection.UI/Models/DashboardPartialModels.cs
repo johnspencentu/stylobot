@@ -326,10 +326,16 @@ public sealed class DashboardShellModel
     public required LicenseCardModel License { get; init; }
 
     /// <summary>
-    ///     Configuration editor model. Optional — only set when the active tab is "configuration"
+    ///     Configuration editor model. Optional -- only set when the active tab is "configuration"
     ///     so we don't pay the embedded-manifest enumeration cost on every dashboard render.
     /// </summary>
     public ConfigurationEditorModel? Configuration { get; init; }
+
+    /// <summary>
+    ///     Investigation view model. Optional -- only set when the active tab is "investigate"
+    ///     to avoid running investigation queries on every dashboard render.
+    /// </summary>
+    public InvestigationViewModel? Investigation { get; init; }
 }
 
 /// <summary>
