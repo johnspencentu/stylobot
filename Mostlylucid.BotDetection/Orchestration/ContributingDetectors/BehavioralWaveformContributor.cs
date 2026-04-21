@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -18,14 +19,10 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     - Session behavior tracking (cookie consistency, session lifetime)
 ///     - Mouse/keyboard interaction patterns (from client-side signals)
 ///     This runs late and correlates signals across multiple requests from the same signature.
-///     Raises signals:
-///     - waveform.request_interval_stddev
-///     - waveform.request_rate
-///     - waveform.path_pattern
-///     - waveform.timing_regularity_score
-///     - waveform.burst_detection
+///     Configuration loaded from: behavioralwaveform.detector.yaml
+///     Override via: appsettings.json -> BotDetection:Detectors:BehavioralWaveformContributor:*
 /// </summary>
-public partial class BehavioralWaveformContributor : ContributingDetectorBase
+public partial class BehavioralWaveformContributor : ConfiguredContributorBase
 {
     // Cache request history per signature for waveform analysis
     private const string CacheKeyPrefix = "waveform:";
@@ -38,14 +35,16 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
 
     public BehavioralWaveformContributor(
         ILogger<BehavioralWaveformContributor> logger,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
         _cache = cache;
     }
 
     public override string Name => "BehavioralWaveform";
-    public override int Priority => 3; // Run late, after individual detectors
+    public override int Priority => Manifest?.Priority ?? 3;
 
     // Requires basic Wave 0 detection to have completed (UA signal is always present after Wave 0)
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
@@ -158,32 +157,33 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
         ]);
 
         // Very low CV = too regular = likely bot
-        if (cv < 0.15 && intervals.Count >= 5)
+        if (cv < GetParam("timing_cv_too_regular", 0.15) && intervals.Count >= GetParam("timing_min_intervals", 5))
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.7,
+                Name, "Waveform", GetParam("timing_regular_confidence", 0.7),
                 $"Requests arrive at almost identical intervals (typical automated behavior)",
-                weight: 1.6,
+                weight: GetParam("timing_regular_weight", 1.6),
                 botType: BotType.Scraper.ToString()));
         // Moderate CV = human-like
-        else if (cv >= 0.3 && cv <= 2.0)
+        else if (cv >= GetParam("timing_cv_human_low", 0.3) && cv <= GetParam("timing_cv_human_high", 2.0))
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
                 Category = "Waveform",
-                ConfidenceDelta = -0.15,
-                Weight = 1.3,
+                ConfidenceDelta = GetParam("timing_human_confidence", -0.15),
+                Weight = GetParam("timing_human_weight", 1.3),
                 Reason = "Request timing shows natural human variation"
             });
 
         // Check for burst patterns (many requests in short time)
-        var recentCutoff = DateTimeOffset.UtcNow.AddSeconds(-10);
+        var burstWindow = GetParam("burst_window_seconds", 10);
+        var recentCutoff = DateTimeOffset.UtcNow.AddSeconds(-burstWindow);
         var recentNonStreaming = history.Count(r => r.Timestamp > recentCutoff
             && r.ContentClass is not (ContentClass.WebSocket or ContentClass.SSE or ContentClass.SignalR));
         var recentWs = history.Count(r => r.Timestamp > recentCutoff && r.ContentClass == ContentClass.WebSocket);
         var recentSse = history.Count(r => r.Timestamp > recentCutoff && r.ContentClass == ContentClass.SSE);
         var recentSignalR = history.Count(r => r.Timestamp > recentCutoff && r.ContentClass == ContentClass.SignalR);
         var recentRequests = recentNonStreaming;
-        if (recentRequests >= 10)
+        if (recentRequests >= GetParam("burst_threshold", 10))
         {
             state.WriteSignals([
                 new(SignalKeys.WaveformBurstDetected, true),
@@ -191,16 +191,16 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             ]);
 
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.65,
-                $"Burst pattern detected: {recentRequests} requests in 10 seconds",
-                weight: 1.5,
+                Name, "Waveform", GetParam("burst_confidence", 0.65),
+                $"Burst pattern detected: {recentRequests} requests in {burstWindow} seconds",
+                weight: GetParam("burst_weight", 1.5),
                 botType: BotType.Scraper.ToString()));
         }
 
         // WebSocket-specific burst detection with a higher threshold
         // SignalR reconnects a few times on disconnect - that's normal.
         // But 20+ WebSocket upgrades in 10 seconds is abuse (connection flooding).
-        if (recentWs >= 20)
+        if (recentWs >= GetParam("ws_burst_threshold", 20))
         {
             state.WriteSignals([
                 new(SignalKeys.WaveformBurstDetected, true),
@@ -208,15 +208,15 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             ]);
 
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.7,
-                $"WebSocket connection flood: {recentWs} upgrade requests in 10 seconds",
-                weight: 1.6,
+                Name, "Waveform", GetParam("ws_burst_confidence", 0.7),
+                $"WebSocket connection flood: {recentWs} upgrade requests in {burstWindow} seconds",
+                weight: GetParam("ws_burst_weight", 1.6),
                 botType: BotType.MaliciousBot.ToString()));
         }
 
         // SSE burst detection - reconnect storms from broken EventSource implementations
         // Normal SSE: 1-3 reconnects on disconnect. 30+ in 10s = reconnect loop.
-        if (recentSse >= 30)
+        if (recentSse >= GetParam("sse_burst_threshold", 30))
         {
             state.WriteSignals([
                 new(SignalKeys.WaveformBurstDetected, true),
@@ -224,15 +224,15 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             ]);
 
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.6,
-                $"SSE reconnect storm: {recentSse} event-stream requests in 10 seconds",
-                weight: 1.5,
+                Name, "Waveform", GetParam("sse_burst_confidence", 0.6),
+                $"SSE reconnect storm: {recentSse} event-stream requests in {burstWindow} seconds",
+                weight: GetParam("sse_burst_weight", 1.5),
                 botType: BotType.MaliciousBot.ToString()));
         }
 
         // SignalR burst detection - long-polling is inherently high-frequency,
         // but 40+ in 10s still indicates abuse or a broken reconnect loop.
-        if (recentSignalR >= 40)
+        if (recentSignalR >= GetParam("signalr_burst_threshold", 40))
         {
             state.WriteSignals([
                 new(SignalKeys.WaveformBurstDetected, true),
@@ -240,9 +240,9 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             ]);
 
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.55,
-                $"SignalR connection flood: {recentSignalR} requests in 10 seconds",
-                weight: 1.4,
+                Name, "Waveform", GetParam("signalr_burst_confidence", 0.55),
+                $"SignalR connection flood: {recentSignalR} requests in {burstWindow} seconds",
+                weight: GetParam("signalr_burst_weight", 1.4),
                 botType: BotType.MaliciousBot.ToString()));
         }
     }
@@ -260,11 +260,11 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             .Select(r => r.Path).Distinct().ToList();
 
         // Bot signal: WebSocket upgrades to many distinct endpoints (probing for hubs)
-        if (recentWsPaths.Count >= 3)
+        if (recentWsPaths.Count >= GetParam("ws_probe_min_paths", 3))
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.5,
+                Name, "Waveform", GetParam("ws_probe_confidence", 0.5),
                 $"WebSocket upgrades to {recentWsPaths.Count} distinct endpoints (hub probing)",
-                weight: 1.3,
+                weight: GetParam("ws_probe_weight", 1.3),
                 botType: BotType.Scraper.ToString()));
 
         if (recentNonWs.Count < 5) return;
@@ -276,13 +276,13 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
         state.WriteSignal(SignalKeys.WaveformPathDiversity, pathDiversity);
 
         // Very low diversity = scanning/crawling same paths
-        if (pathDiversity < 0.3 && recentPaths.Count >= 10)
+        if (pathDiversity < GetParam("path_diversity_threshold", 0.3) && recentPaths.Count >= GetParam("path_diversity_min_requests", 10))
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
                 Category = "Waveform",
-                ConfidenceDelta = 0.3,
-                Weight = 1.2,
+                ConfidenceDelta = GetParam("path_low_diversity_confidence", 0.3),
+                Weight = GetParam("path_low_diversity_weight", 1.2),
                 Reason = $"Only visiting {uniquePaths} unique pages out of {recentPaths.Count} requests (possible automated scanning)"
             });
 
@@ -293,9 +293,9 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             state.WriteSignal("waveform.sequential_pattern", true);
 
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.6,
+                Name, "Waveform", GetParam("path_sequential_confidence", 0.6),
                 "Sequential path traversal detected (systematic crawling pattern)",
-                weight: 1.4,
+                weight: GetParam("path_sequential_weight", 1.4),
                 botType: BotType.Scraper.ToString()));
         }
 
@@ -309,8 +309,8 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "Waveform",
-                ConfidenceDelta = 0.25,
-                Weight = 1.1,
+                ConfidenceDelta = GetParam("path_depth_first_confidence", 0.25),
+                Weight = GetParam("path_depth_first_weight", 1.1),
                 Reason = "Strict depth-first traversal (common for crawlers)"
             });
     }
@@ -345,29 +345,29 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
         var rateLabel = hasAssetTraffic ? "page navigation" : "request";
 
         // Very high rate = likely bot
-        if (effectiveRate > 30) // 30+ page navigations/minute = definitely bot
+        if (effectiveRate > GetParam("rate_very_high_threshold", 30.0)) // 30+ page navigations/minute = definitely bot
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.75,
+                Name, "Waveform", GetParam("rate_very_high_confidence", 0.75),
                 $"High {rateLabel} rate: {effectiveRate:F1}/min (total: {totalRate:F1}/min)",
-                weight: 1.7,
+                weight: GetParam("rate_very_high_weight", 1.7),
                 botType: BotType.Scraper.ToString()));
-        else if (effectiveRate > 10) // 10-30 page navigations/minute = elevated
+        else if (effectiveRate > GetParam("rate_elevated_threshold", 10.0)) // 10-30 page navigations/minute = elevated
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
                 Category = "Waveform",
-                ConfidenceDelta = 0.3,
-                Weight = 1.3,
+                ConfidenceDelta = GetParam("rate_elevated_confidence", 0.3),
+                Weight = GetParam("rate_elevated_weight", 1.3),
                 Reason = $"Elevated request rate: {effectiveRate:F0} page requests per minute"
             });
         // High total rate but normal page rate = probably HTTP/2 multiplexing (human-like)
-        else if (totalRate > 30 && hasAssetTraffic && pageRate <= 10)
+        else if (totalRate > GetParam("rate_very_high_threshold", 30.0) && hasAssetTraffic && pageRate <= GetParam("rate_multiplex_max_page_rate", 10.0))
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
                 Category = "Waveform",
-                ConfidenceDelta = -0.15,
-                Weight = 1.2,
+                ConfidenceDelta = GetParam("rate_multiplex_human_confidence", -0.15),
+                Weight = GetParam("rate_multiplex_weight", 1.2),
                 Reason = $"Normal browser multiplexing: high total traffic but only {pageRate:F0} page visits per minute ({assetRequests} sub-resources loaded)"
             });
 
@@ -379,11 +379,11 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             var wsRate = wsRequests / timeSpan;
             state.WriteSignal("waveform.ws_rate", wsRate);
 
-            if (wsRate > 15) // 15+ WebSocket upgrades/minute = connection flooding
+            if (wsRate > GetParam("ws_rate_threshold", 15.0)) // 15+ WebSocket upgrades/minute = connection flooding
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Waveform", 0.6,
+                    Name, "Waveform", GetParam("ws_rate_confidence", 0.6),
                     $"Excessive WebSocket upgrade rate: {wsRate:F0}/min ({wsRequests} upgrades)",
-                    weight: 1.4,
+                    weight: GetParam("ws_rate_weight", 1.4),
                     botType: BotType.MaliciousBot.ToString()));
         }
     }
@@ -395,11 +395,11 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
         var userAgents = history.Select(r => r.UserAgent).Distinct().Count();
         state.WriteSignal("waveform.user_agent_changes", userAgents);
 
-        if (userAgents > 1 && history.Count >= 5)
+        if (userAgents > 1 && history.Count >= GetParam("session_ua_change_min_requests", 5))
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", 0.8,
+                Name, "Waveform", GetParam("session_ua_change_confidence", 0.8),
                 $"User-Agent changed {userAgents} times in session (IP rotation or spoofing)",
-                weight: 1.8,
+                weight: GetParam("session_ua_change_weight", 1.8),
                 botType: BotType.MaliciousBot.ToString()));
 
         // Session duration analysis
@@ -409,11 +409,11 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             state.WriteSignal("waveform.session_duration_minutes", sessionDuration);
 
             // Very short session with many requests = bot
-            if (sessionDuration < 1 && history.Count >= 10)
+            if (sessionDuration < GetParam("session_short_duration_minutes", 1.0) && history.Count >= GetParam("session_short_duration_min_requests", 10))
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Waveform", 0.7,
+                    Name, "Waveform", GetParam("session_short_confidence", 0.7),
                     $"High-speed session: {history.Count} requests in {sessionDuration:F1} minutes",
-                    weight: 1.6,
+                    weight: GetParam("session_short_weight", 1.6),
                     botType: BotType.Scraper.ToString()));
         }
     }
@@ -433,8 +433,8 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "Waveform",
-                    ConfidenceDelta = 0.4,
-                    Weight = 1.5,
+                    ConfidenceDelta = GetParam("interaction_no_mouse_confidence", 0.4),
+                    Weight = GetParam("interaction_no_mouse_weight", 1.5),
                     Reason = "No mouse movement detected (headless browser indicator)"
                 });
         }
@@ -629,32 +629,32 @@ public partial class BehavioralWaveformContributor : ContributingDetectorBase
             ]);
 
             // High Page→Page ratio = scraper (doesn't load assets, just fetches HTML pages)
-            if (pageToPage > 0.7 && pageCt >= 5)
+            if (pageToPage > GetParam("transition_page_to_page_threshold", 0.7) && pageCt >= GetParam("transition_min_page_requests", 5))
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Waveform", 0.6,
+                    Name, "Waveform", GetParam("transition_scraper_confidence", 0.6),
                     $"Pages requested without loading images, scripts, or stylesheets (scraper-like behavior)",
-                    weight: 1.5,
+                    weight: GetParam("transition_scraper_weight", 1.5),
                     botType: BotType.Scraper.ToString()));
             // Normal Page→Asset ratio = human-like (browser loads sub-resources)
-            else if (pageToAsset > 0.5 && assetCt > pageCt * 2)
+            else if (pageToAsset > GetParam("transition_normal_page_asset_ratio", 0.5) && assetCt > pageCt * 2)
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "Waveform",
-                    ConfidenceDelta = -0.2,
-                    Weight = 1.3,
+                    ConfidenceDelta = GetParam("transition_normal_confidence", -0.2),
+                    Weight = GetParam("transition_normal_weight", 1.3),
                     Reason = $"Normal browsing pattern: page loads trigger {assetCt} sub-resource requests (images, scripts, stylesheets)"
                 });
         }
 
         // Pure API access pattern (no page requests at all)
-        if (apiCt > 5 && pageCt == 0 && assetCt == 0)
+        if (apiCt > GetParam("transition_pure_api_min", 5) && pageCt == 0 && assetCt == 0)
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
                 Category = "Waveform",
-                ConfidenceDelta = 0.35,
-                Weight = 1.4,
+                ConfidenceDelta = GetParam("transition_pure_api_confidence", 0.35),
+                Weight = GetParam("transition_pure_api_weight", 1.4),
                 Reason = $"Only accessing data endpoints ({apiCt} calls) without visiting any web pages"
             });
 

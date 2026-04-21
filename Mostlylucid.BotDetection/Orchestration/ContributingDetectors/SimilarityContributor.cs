@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Detectors;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.BotDetection.Similarity;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
@@ -12,14 +13,11 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     past signatures and adjust bot confidence accordingly.
 ///     Runs after the Heuristic contributor (Priority 50) to leverage its feature extraction,
 ///     but before HeuristicLate (Priority 100) so its signals influence final scoring.
+///     Configuration loaded from: similarity.detector.yaml
+///     Override via: appsettings.json -> BotDetection:Detectors:SimilarityContributor:*
 /// </summary>
-public class SimilarityContributor : ContributingDetectorBase
+public class SimilarityContributor : ConfiguredContributorBase
 {
-    private const float BotSimilarityThreshold = 0.85f;
-    private const float HumanSimilarityThreshold = 0.85f;
-    private const double BotBoostConfidence = 0.3;
-    private const double HumanReduceConfidence = -0.2;
-
     private readonly FeatureVectorizer _vectorizer;
     private readonly ISignatureSimilaritySearch _search;
     private readonly ILogger<SimilarityContributor> _logger;
@@ -27,7 +25,9 @@ public class SimilarityContributor : ContributingDetectorBase
     public SimilarityContributor(
         FeatureVectorizer vectorizer,
         ISignatureSimilaritySearch search,
-        ILogger<SimilarityContributor> logger)
+        ILogger<SimilarityContributor> logger,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _vectorizer = vectorizer;
         _search = search;
@@ -35,7 +35,13 @@ public class SimilarityContributor : ContributingDetectorBase
     }
 
     public override string Name => "Similarity";
-    public override int Priority => 60; // After Heuristic (50), before HeuristicLate (100)
+    public override int Priority => Manifest?.Priority ?? 60;
+
+    // Config-driven thresholds
+    private float BotSimilarityThreshold => (float)GetParam("bot_similarity_threshold", 0.85);
+    private float HumanSimilarityThreshold => (float)GetParam("human_similarity_threshold", 0.85);
+    private double BotBoostConfidence => GetParam("bot_boost_confidence", 0.3);
+    private double HumanReduceConfidence => GetParam("human_reduce_confidence", -0.2);
 
     // Requires heuristic prediction to have completed (ensures features are available)
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
@@ -100,7 +106,7 @@ public class SimilarityContributor : ContributingDetectorBase
                     contributions.Add(DetectionContribution.Bot(
                         Name, "Similarity", boost,
                         $"Resembles {botMatches} previously identified bot(s) ({topSimilarity:P0} match)",
-                        weight: 1.4,
+                        weight: GetParam("bot_match_weight", 1.4),
                         botType: BotType.Scraper.ToString()));
                 }
                 else if (humanMatches > botMatches && topSimilarity >= HumanSimilarityThreshold)
@@ -111,7 +117,7 @@ public class SimilarityContributor : ContributingDetectorBase
                         DetectorName = Name,
                         Category = "Similarity",
                         ConfidenceDelta = HumanReduceConfidence * topSimilarity,
-                        Weight = 1.3,
+                        Weight = GetParam("human_match_weight", 1.3),
                         Reason =
                             $"Resembles {humanMatches} previously verified human visitor(s) ({topSimilarity:P0} match)"
                     });

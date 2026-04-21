@@ -1,0 +1,84 @@
+# Client-Side Fingerprint Detector - Browser fingerprint analysis
+name: ClientSideContributor
+priority: 18  # Run early
+enabled: true
+description: Analyzes client-side browser fingerprint data for headless browser detection
+
+scope:
+  sink: botdetection
+  coordinator: detection
+  atom: clientside
+
+taxonomy:
+  kind: classifier
+  determinism: deterministic
+  persistence: ephemeral
+
+input:
+  accepts:
+    - type: botdetection.request
+      required: true
+      description: HTTP request with optional client-side fingerprint
+
+  required_signals: []
+  optional_signals: []
+
+output:
+  produces:
+    - type: botdetection.contribution
+      description: Client-side fingerprint contribution
+
+  signals:
+    - key: fingerprint.headless_score
+      entity_type: float
+      salience: 0.9
+      description: Headless browser detection score
+
+triggers:
+  requires: []
+
+emits:
+  on_start:
+    - detector.clientside.started
+  on_complete:
+    - key: fingerprint.headless_score
+      type: float
+      description: Headless score
+  on_failure:
+    - detector.clientside.failed
+
+# ============================================
+# DEFAULT CONFIGURATION - NO MAGIC NUMBERS
+# Override via appsettings.json: BotDetection:Detectors:ClientSideContributor:*
+# ============================================
+defaults:
+  weights:
+    base: 1.0
+    bot_signal: 1.8
+    human_signal: 1.5
+    verified: 2.0
+
+  confidence:
+    neutral: 0.0
+    bot_detected: 0.5
+    human_indicated: -0.2
+    strong_signal: 0.8
+
+  timing:
+    timeout_ms: 10
+    cache_refresh_sec: 0
+
+  features:
+    detailed_logging: true
+    enable_cache: false
+    can_early_exit: false
+    can_escalate: false
+
+  parameters:
+    # Weight for client-side fingerprint contributions
+    fingerprint_weight: 1.8
+
+tags:
+  - clientside
+  - fingerprint
+  - headless

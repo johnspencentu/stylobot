@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Detectors;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -8,22 +9,31 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// <summary>
 ///     Version age analysis contributor - detects outdated browser/OS combinations.
 ///     Runs in Wave 1 after UserAgent provides the UA signal.
+///     Configuration loaded from: versionage.detector.yaml
+///     Override via: appsettings.json → BotDetection:Detectors:VersionAgeContributor:*
 /// </summary>
-public class VersionAgeContributor : ContributingDetectorBase
+public class VersionAgeContributor : ConfiguredContributorBase
 {
     private readonly VersionAgeDetector _detector;
     private readonly ILogger<VersionAgeContributor> _logger;
 
     public VersionAgeContributor(
         ILogger<VersionAgeContributor> logger,
-        VersionAgeDetector detector)
+        VersionAgeDetector detector,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
         _detector = detector;
     }
 
     public override string Name => "VersionAge";
-    public override int Priority => 25; // Run after UserAgent (10)
+    public override int Priority => Manifest?.Priority ?? 25;
+
+    // Config-driven thresholds
+    private double VersionAgeWeight => GetParam("version_age_weight", 1.2);
+    private double CurrentVersionConfidence => GetParam("current_version_confidence", -0.05);
+    private double CurrentVersionWeight => GetParam("current_version_weight", 0.8);
 
     // Trigger after UserAgent has run and provided the UA signal
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
@@ -49,8 +59,8 @@ public class VersionAgeContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "VersionAge",
-                    ConfidenceDelta = -0.05,
-                    Weight = 0.8,
+                    ConfidenceDelta = CurrentVersionConfidence,
+                    Weight = CurrentVersionWeight,
                     Reason = "Browser/OS versions appear current"
                 });
             else
@@ -61,7 +71,7 @@ public class VersionAgeContributor : ContributingDetectorBase
                         DetectorName = Name,
                         Category = reason.Category,
                         ConfidenceDelta = reason.ConfidenceImpact,
-                        Weight = 1.2, // Version age is a strong signal
+                        Weight = VersionAgeWeight,
                         Reason = reason.Detail,
                         BotType = result.BotType?.ToString()
                     });

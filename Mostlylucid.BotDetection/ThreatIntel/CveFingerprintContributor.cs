@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Analysis;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.ThreatIntel;
@@ -13,34 +14,30 @@ namespace Mostlylucid.BotDetection.ThreatIntel;
 ///
 ///     When a match is found, emits signals with CVE correlation metadata and contributes
 ///     a bot detection signal proportional to match confidence and advisory severity.
+///     Configuration loaded from: cvefingerprint.detector.yaml
+///     Override via: appsettings.json -> BotDetection:Detectors:CveFingerprintContributor:*
 /// </summary>
-public sealed class CveFingerprintContributor : ContributingDetectorBase
+public sealed class CveFingerprintContributor : ConfiguredContributorBase
 {
     private readonly ICveFingerprintMatcher _matcher;
     private readonly ILogger<CveFingerprintContributor> _logger;
 
-    /// <summary>Minimum similarity to consider a CVE fingerprint match actionable.</summary>
-    private const double MatchThreshold = 0.80;
-
-    /// <summary>Confidence boost per severity level when a CVE matches.</summary>
-    private static readonly IReadOnlyDictionary<string, double> SeverityBoost = new Dictionary<string, double>
-    {
-        ["critical"] = 0.35,
-        ["high"] = 0.25,
-        ["medium"] = 0.15,
-        ["low"] = 0.08
-    };
-
     public CveFingerprintContributor(
         ICveFingerprintMatcher matcher,
-        ILogger<CveFingerprintContributor> logger)
+        ILogger<CveFingerprintContributor> logger,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _matcher = matcher;
         _logger = logger;
     }
 
     public override string Name => "CveFingerprint";
-    public override int Priority => 55; // After Heuristic (50), before Similarity (60)
+    public override int Priority => Manifest?.Priority ?? 55;
+
+    // Config-driven thresholds
+    private double MatchThreshold => GetParam("match_threshold", 0.80);
+    private double CveWeight => GetParam("cve_weight", 1.5);
 
     // Requires heuristic to have run so we have feature signals to build the radar shape from
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
@@ -86,7 +83,14 @@ public sealed class CveFingerprintContributor : ContributingDetectorBase
                 string.Join(",", matches.Select(m => m.AdvisoryId)));
 
             // Calculate confidence boost based on severity and similarity
-            var severityBoost = SeverityBoost.GetValueOrDefault(topMatch.Severity, 0.10);
+            var severityBoost = topMatch.Severity switch
+            {
+                "critical" => GetParam("severity_boost_critical", 0.35),
+                "high" => GetParam("severity_boost_high", 0.25),
+                "medium" => GetParam("severity_boost_medium", 0.15),
+                "low" => GetParam("severity_boost_low", 0.08),
+                _ => GetParam("severity_boost_default", 0.10)
+            };
             var confidence = severityBoost * topMatch.Similarity;
 
             _logger.LogInformation(
@@ -102,7 +106,7 @@ public sealed class CveFingerprintContributor : ContributingDetectorBase
                 "CveFingerprint",
                 confidence,
                 reason,
-                weight: 1.5, // High weight -- CVE matches are strong evidence
+                weight: CveWeight, // High weight -- CVE matches are strong evidence
                 botType: BotType.ExploitScanner.ToString()));
         }
         catch (Exception ex)

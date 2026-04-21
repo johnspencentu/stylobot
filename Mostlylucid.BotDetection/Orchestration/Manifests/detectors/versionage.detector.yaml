@@ -149,6 +149,11 @@ defaults:
       Edge: 120
     # Maximum acceptable version age (years)
     max_acceptable_age_years: 3
+    # Weight for version age bot signal contributions
+    version_age_weight: 1.2
+    # Current version human indicator
+    current_version_confidence: -0.05
+    current_version_weight: 0.8
 
 tags:
   - ua-analysis

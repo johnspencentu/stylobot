@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Analysis;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -12,8 +13,10 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     Advanced behavioral analysis using statistical pattern detection.
 ///     Applies entropy analysis, Markov chains, and time-series anomaly detection.
 ///     Runs after basic behavioral detection to provide deeper insights.
+///     Configuration loaded from: advancedbehavioral.detector.yaml
+///     Override via: appsettings.json → BotDetection:Detectors:AdvancedBehavioralContributor:*
 /// </summary>
-public class AdvancedBehavioralContributor : ContributingDetectorBase
+public class AdvancedBehavioralContributor : ConfiguredContributorBase
 {
     private readonly BehavioralPatternAnalyzer _analyzer;
     private readonly ILogger<AdvancedBehavioralContributor> _logger;
@@ -22,7 +25,9 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
     public AdvancedBehavioralContributor(
         ILogger<AdvancedBehavioralContributor> logger,
         IMemoryCache cache,
-        IOptions<BotDetectionOptions> options)
+        IOptions<BotDetectionOptions> options,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
         _options = options.Value;
@@ -33,7 +38,31 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
     }
 
     public override string Name => "AdvancedBehavioral";
-    public override int Priority => 25; // Run after basic behavioral (priority 20)
+    public override int Priority => Manifest?.Priority ?? 25;
+
+    // Config-driven thresholds
+    private double PathEntropyHigh => GetParam("path_entropy_high", 3.5);
+    private double PathEntropyLow => GetParam("path_entropy_low", 0.5);
+    private double PathEntropyHighConfidence => GetParam("path_entropy_high_confidence", 0.35);
+    private double PathEntropyLowConfidence => GetParam("path_entropy_low_confidence", 0.25);
+    private double PathEntropyHighWeight => GetParam("path_entropy_high_weight", 1.3);
+    private double PathEntropyLowWeight => GetParam("path_entropy_low_weight", 1.2);
+    private double TimingEntropyLow => GetParam("timing_entropy_low", 0.3);
+    private double TimingEntropyConfidence => GetParam("timing_entropy_confidence", 0.3);
+    private double TimingEntropyWeight => GetParam("timing_entropy_weight", 1.3);
+    private double TimingAnomalyConfidence => GetParam("timing_anomaly_confidence", 0.25);
+    private double TimingAnomalyWeight => GetParam("timing_anomaly_weight", 1.1);
+    private double RegularPatternConfidence => GetParam("regular_pattern_confidence", 0.35);
+    private double RegularPatternWeight => GetParam("regular_pattern_weight", 1.4);
+    private double NavigationPatternWeight => GetParam("navigation_pattern_weight", 1.2);
+    private int BurstWindowSeconds => GetParam("burst_window_seconds", 30);
+    private double BurstConfidence => GetParam("burst_confidence", 0.4);
+    private double BurstWeight => GetParam("burst_weight", 1.5);
+    private double NaturalPatternsConfidence => GetParam("natural_patterns_confidence", -0.2);
+    private double NaturalPatternsWeight => GetParam("natural_patterns_weight", 1.0);
+    private double NaturalEntropyMin => GetParam("natural_entropy_min", 0.5);
+    private double NaturalEntropyMax => GetParam("natural_entropy_max", 3.0);
+    private double NaturalCvMin => GetParam("natural_cv_min", 0.3);
 
     // No triggers - runs in first wave alongside basic behavioral
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
@@ -94,27 +123,27 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 {
                     // Very high entropy (>3.5) = random scanning (bot)
                     // Very low entropy (<0.5) = too repetitive (bot)
-                    if (pathEntropy > 3.5)
+                    if (pathEntropy > PathEntropyHigh)
                     {
                         state.WriteSignals([new("PathEntropy", pathEntropy), new("PathEntropyHigh", true)]);
                         contributions.Add(new DetectionContribution
                         {
                             DetectorName = Name,
                             Category = "AdvancedBehavioral",
-                            ConfidenceDelta = 0.35,
-                            Weight = 1.3,
+                            ConfidenceDelta = PathEntropyHighConfidence,
+                            Weight = PathEntropyHighWeight,
                             Reason = "Visiting many random URLs in no logical order (random scanning pattern)"
                         });
                     }
-                    else if (pathEntropy < 0.5)
+                    else if (pathEntropy < PathEntropyLow)
                     {
                         state.WriteSignals([new("PathEntropy", pathEntropy), new("PathEntropyLow", true)]);
                         contributions.Add(new DetectionContribution
                         {
                             DetectorName = Name,
                             Category = "AdvancedBehavioral",
-                            ConfidenceDelta = 0.25,
-                            Weight = 1.2,
+                            ConfidenceDelta = PathEntropyLowConfidence,
+                            Weight = PathEntropyLowWeight,
                             Reason = "Repeatedly visiting the same few URLs (too repetitive for a real user)"
                         });
                     }
@@ -125,15 +154,15 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
             var timingEntropy = _analyzer.CalculateTimingEntropy(clientIp);
             if (timingEntropy > 0)
                 // Very low timing entropy (<0.3) = too regular (bot)
-                if (timingEntropy < 0.3)
+                if (timingEntropy < TimingEntropyLow)
                 {
                     state.WriteSignals([new("TimingEntropy", timingEntropy), new("TimingTooRegular", true)]);
                     contributions.Add(new DetectionContribution
                     {
                         DetectorName = Name,
                         Category = "AdvancedBehavioral",
-                        ConfidenceDelta = 0.3,
-                        Weight = 1.3,
+                        ConfidenceDelta = TimingEntropyConfidence,
+                        Weight = TimingEntropyWeight,
                         Reason = "Requests arrive at suspiciously regular intervals (machine-like timing)"
                     });
                 }
@@ -147,8 +176,8 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "AdvancedBehavioral",
-                    ConfidenceDelta = 0.25,
-                    Weight = 1.1,
+                    ConfidenceDelta = TimingAnomalyConfidence,
+                    Weight = TimingAnomalyWeight,
                     Reason = anomalyDesc
                 });
             }
@@ -162,8 +191,8 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "AdvancedBehavioral",
-                    ConfidenceDelta = 0.35,
-                    Weight = 1.4,
+                    ConfidenceDelta = RegularPatternConfidence,
+                    Weight = RegularPatternWeight,
                     Reason = cvDesc
                 });
             }
@@ -180,7 +209,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                         DetectorName = Name,
                         Category = "AdvancedBehavioral",
                         ConfidenceDelta = transitionScore,
-                        Weight = 1.2,
+                        Weight = NavigationPatternWeight,
                         Reason = navPattern
                     });
                 }
@@ -190,7 +219,7 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
             // BehavioralWaveformContributor handles streaming-specific bursts with higher thresholds)
             if (!isStreaming)
             {
-                var burstWindow = TimeSpan.FromSeconds(30);
+                var burstWindow = TimeSpan.FromSeconds(BurstWindowSeconds);
                 var (isBurst, burstSize, burstDuration) = _analyzer.DetectBurstPattern(clientIp, burstWindow);
                 if (isBurst)
                 {
@@ -203,23 +232,23 @@ public class AdvancedBehavioralContributor : ContributingDetectorBase
                     {
                         DetectorName = Name,
                         Category = "AdvancedBehavioral",
-                        ConfidenceDelta = 0.4,
-                        Weight = 1.5,
+                        ConfidenceDelta = BurstConfidence,
+                        Weight = BurstWeight,
                         Reason = $"Burst detected: {burstSize} requests in {burstDuration.TotalSeconds:F0} seconds"
                     });
                 }
             }
 
             // 7. Positive signal: Good patterns detected
-            if (contributions.Count == 0 && pathEntropy > 0.5 && pathEntropy < 3.0 && cv > 0.3)
+            if (contributions.Count == 0 && pathEntropy > NaturalEntropyMin && pathEntropy < NaturalEntropyMax && cv > NaturalCvMin)
             {
                 state.WriteSignal("NaturalPatterns", true);
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "AdvancedBehavioral",
-                    ConfidenceDelta = -0.2,
-                    Weight = 1.0,
+                    ConfidenceDelta = NaturalPatternsConfidence,
+                    Weight = NaturalPatternsWeight,
                     Reason = "Natural browsing patterns detected (entropy, timing variation)"
                 });
             }

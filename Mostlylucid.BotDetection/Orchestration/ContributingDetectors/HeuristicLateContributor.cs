@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Detectors;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -28,22 +29,28 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///         The orchestrator defers this detector until it is the only ready detector left
 ///         in the current request, so it executes after the other contributing detectors.
 ///     </para>
+///     <para>
+///         Configuration loaded from: heuristiclate.detector.yaml
+///         Override via: appsettings.json -> BotDetection:Detectors:HeuristicLateContributor:*
+///     </para>
 /// </remarks>
-public class HeuristicLateContributor : ContributingDetectorBase
+public class HeuristicLateContributor : ConfiguredContributorBase
 {
     private readonly HeuristicDetector _detector;
     private readonly ILogger<HeuristicLateContributor> _logger;
 
     public HeuristicLateContributor(
         ILogger<HeuristicLateContributor> logger,
-        HeuristicDetector detector)
+        HeuristicDetector detector,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
         _detector = detector;
     }
 
     public override string Name => "HeuristicLate";
-    public override int Priority => 100; // Run after AI detectors (priority ~80-90)
+    public override int Priority => Manifest?.Priority ?? 100;
 
     // Trigger once the early heuristic has produced a feature-based prediction, or when
     // inline AI has produced direct signals. The orchestrator then defers execution until
@@ -90,7 +97,7 @@ public class HeuristicLateContributor : ContributingDetectorBase
                 DetectorName = Name,
                 Category = "HeuristicLate",
                 ConfidenceDelta = reason.ConfidenceImpact,
-                Weight = 2.5, // Late heuristic is weighted heavily - it's the final say
+                Weight = GetParam("late_weight", 2.5), // Late heuristic is weighted heavily - it's the final say
                 Reason = reason.Detail.Replace("(early)", "(late)").Replace("(full)", "(late)"),
                 BotType = result.BotType?.ToString(),
                 BotName = result.BotName

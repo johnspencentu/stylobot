@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -15,22 +16,32 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///
 ///     Approval is a strong human signal (-0.4 delta) when all locked dimensions match.
 ///     Dimension mismatch is a strong bot signal (+0.3 delta) - something changed.
+///     Configuration loaded from: fingerprintapproval.detector.yaml
+///     Override via: appsettings.json → BotDetection:Detectors:FingerprintApprovalContributor:*
 /// </summary>
-public class FingerprintApprovalContributor : ContributingDetectorBase
+public class FingerprintApprovalContributor : ConfiguredContributorBase
 {
     private readonly IFingerprintApprovalStore _approvalStore;
     private readonly ILogger<FingerprintApprovalContributor> _logger;
 
     public FingerprintApprovalContributor(
         IFingerprintApprovalStore approvalStore,
-        ILogger<FingerprintApprovalContributor> logger)
+        ILogger<FingerprintApprovalContributor> logger,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _approvalStore = approvalStore;
         _logger = logger;
     }
 
     public override string Name => "FingerprintApproval";
-    public override int Priority => 24; // Before ChallengeVerification (25), after Behavioral (20)
+    public override int Priority => Manifest?.Priority ?? 24;
+
+    // Config-driven thresholds
+    private double DimensionMismatchConfidence => GetParam("dimension_mismatch_confidence", 0.3);
+    private double DimensionMismatchWeight => GetParam("dimension_mismatch_weight", 2.0);
+    private double ApprovalHumanConfidence => GetParam("unlocked_approval_confidence", -0.4);
+    private double ApprovalHumanWeight => GetParam("approval_human_weight", 2.0);
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions => [];
 
@@ -90,8 +101,8 @@ public class FingerprintApprovalContributor : ContributingDetectorBase
                     {
                         DetectorName = Name,
                         Category = "FingerprintApproval",
-                        ConfidenceDelta = 0.3, // Strong bot signal
-                        Weight = 2.0,
+                        ConfidenceDelta = DimensionMismatchConfidence,
+                        Weight = DimensionMismatchWeight,
                         Reason = $"Approved fingerprint violated locked dimensions: {mismatchList}"
                     });
 
@@ -118,8 +129,8 @@ public class FingerprintApprovalContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "FingerprintApproval",
-                ConfidenceDelta = -0.4, // Strong human signal
-                Weight = 2.0,
+                ConfidenceDelta = ApprovalHumanConfidence,
+                Weight = ApprovalHumanWeight,
                 Reason = $"Fingerprint manually approved: {approval.Justification}"
             });
 

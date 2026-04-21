@@ -43,3 +43,7 @@ defaults:
     unlocked_approval_confidence: -0.4
     # Dimension mismatch confidence boost (positive = bot-indicating)
     dimension_mismatch_confidence: 0.3
+    # Weight for dimension mismatch signal
+    dimension_mismatch_weight: 2.0
+    # Weight for approval human signal
+    approval_human_weight: 2.0

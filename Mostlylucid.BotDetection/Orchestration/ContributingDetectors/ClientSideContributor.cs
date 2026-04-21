@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Detectors;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -8,22 +9,26 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// <summary>
 ///     Client-side fingerprint analysis contributor - uses browser fingerprint data.
 ///     Runs in Wave 0 (no dependencies) when client-side detection is enabled.
+///     Configuration loaded from: clientside.detector.yaml
+///     Override via: appsettings.json -> BotDetection:Detectors:ClientSideContributor:*
 /// </summary>
-public class ClientSideContributor : ContributingDetectorBase
+public class ClientSideContributor : ConfiguredContributorBase
 {
     private readonly ClientSideDetector _detector;
     private readonly ILogger<ClientSideContributor> _logger;
 
     public ClientSideContributor(
         ILogger<ClientSideContributor> logger,
-        ClientSideDetector detector)
+        ClientSideDetector detector,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
         _detector = detector;
     }
 
     public override string Name => "ClientSide";
-    public override int Priority => 18; // Run early
+    public override int Priority => Manifest?.Priority ?? 18;
 
     // No triggers - runs in first wave to check for fingerprint data
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
@@ -57,7 +62,7 @@ public class ClientSideContributor : ContributingDetectorBase
                     DetectorName = Name,
                     Category = reason.Category,
                     ConfidenceDelta = reason.ConfidenceImpact,
-                    Weight = 1.8, // Client-side fingerprint is a very strong signal
+                    Weight = GetParam("fingerprint_weight", 1.8), // Client-side fingerprint is a very strong signal
                     Reason = reason.Detail,
                     BotType = result.BotType?.ToString(),
                     BotName = result.BotName

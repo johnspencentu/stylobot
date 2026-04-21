@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -14,24 +15,23 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     - Geographic correlation (IP geolocation vs language headers)
 ///     - Temporal correlation (timing patterns across layers)
 ///     This runs in a later wave after all fingerprinting contributors have completed.
-///     Raises signals for final waveform analysis:
-///     - correlation.os_mismatch
-///     - correlation.browser_mismatch
-///     - correlation.geo_mismatch
-///     - correlation.consistency_score
-///     - correlation.anomaly_layers
+///     Configuration loaded from: multilayercorrelation.detector.yaml
+///     Override via: appsettings.json -> BotDetection:Detectors:MultiLayerCorrelationContributor:*
 /// </summary>
-public class MultiLayerCorrelationContributor : ContributingDetectorBase
+public class MultiLayerCorrelationContributor : ConfiguredContributorBase
 {
     private readonly ILogger<MultiLayerCorrelationContributor> _logger;
 
-    public MultiLayerCorrelationContributor(ILogger<MultiLayerCorrelationContributor> logger)
+    public MultiLayerCorrelationContributor(
+        ILogger<MultiLayerCorrelationContributor> logger,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
     }
 
     public override string Name => "MultiLayerCorrelation";
-    public override int Priority => 4; // Run late, after fingerprinting
+    public override int Priority => Manifest?.Priority ?? 4;
 
     // Requires UA signal plus at least one fingerprint layer.
     // In environments without a reverse proxy that injects TLS/TCP/HTTP2 headers,
@@ -80,9 +80,9 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
                 anomalyLayers.Add("OS");
 
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Correlation", 0.65,
+                    Name, "Correlation", GetParam("os_mismatch_confidence", 0.65),
                     $"OS mismatch detected: TCP indicates {tcpOsHint ?? tcpWindowOsHint}, UA claims {userAgentOs}",
-                    weight: 1.7,
+                    weight: GetParam("os_mismatch_weight", 1.7),
                     botType: BotType.Scraper.ToString()));
             }
 
@@ -94,9 +94,9 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
                 anomalyLayers.Add("Browser");
 
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Correlation", 0.7,
+                    Name, "Correlation", GetParam("browser_mismatch_confidence", 0.7),
                     $"Browser mismatch: HTTP/2 indicates {h2ClientType}, UA claims {userAgentBrowser}",
-                    weight: 1.8,
+                    weight: GetParam("browser_mismatch_weight", 1.8),
                     botType: BotType.Scraper.ToString()));
             }
 
@@ -111,8 +111,8 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "Correlation",
-                    ConfidenceDelta = 0.4,
-                    Weight = 1.4,
+                    ConfidenceDelta = GetParam("tls_mismatch_confidence", 0.4),
+                    Weight = GetParam("tls_mismatch_weight", 1.4),
                     Reason = $"Encryption version does not match what {userAgentBrowser} would normally use"
                 });
             }
@@ -128,8 +128,8 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "Correlation",
-                    ConfidenceDelta = 0.3,
-                    Weight = 1.2,
+                    ConfidenceDelta = GetParam("geo_mismatch_confidence", 0.3),
+                    Weight = GetParam("geo_mismatch_weight", 1.2),
                     Reason = "IP address location does not match the language preference claimed by the browser"
                 });
             }
@@ -150,9 +150,9 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
                 anomalyLayers.Add("IP-Browser");
 
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Correlation", 0.75,
+                    Name, "Correlation", GetParam("datacenter_browser_confidence", 0.75),
                     $"Datacenter IP with browser User-Agent: {userAgentBrowser}",
-                    weight: 1.9,
+                    weight: GetParam("datacenter_browser_weight", 1.9),
                     botType: BotType.MaliciousBot.ToString()));
             }
 
@@ -166,17 +166,17 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
             ]);
 
             // High anomaly count = very suspicious
-            if (anomalyCount >= 3)
+            if (anomalyCount >= GetParam("triple_anomaly_count", 3))
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Correlation", 0.85,
+                    Name, "Correlation", GetParam("triple_anomaly_confidence", 0.85),
                     $"Multiple layer mismatches detected ({anomalyCount}/{totalLayers}): {string.Join(", ", anomalyLayers)}",
-                    weight: 2.0,
+                    weight: GetParam("triple_anomaly_weight", 2.0),
                     botType: BotType.MaliciousBot.ToString()));
-            else if (anomalyCount >= 2)
+            else if (anomalyCount >= GetParam("double_anomaly_count", 2))
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "Correlation", 0.6,
+                    Name, "Correlation", GetParam("double_anomaly_confidence", 0.6),
                     $"Cross-layer inconsistencies: {string.Join(", ", anomalyLayers)}",
-                    weight: 1.5,
+                    weight: GetParam("double_anomaly_weight", 1.5),
                     botType: BotType.Scraper.ToString()));
 
             // 7. Perfect consistency across all layers = likely human
@@ -185,8 +185,8 @@ public class MultiLayerCorrelationContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "Correlation",
-                    ConfidenceDelta = -0.25,
-                    Weight = 1.8,
+                    ConfidenceDelta = GetParam("perfect_consistency_confidence", -0.25),
+                    Weight = GetParam("perfect_consistency_weight", 1.8),
                     Reason = "All signals consistent: operating system, browser, encryption, and location all match"
                 });
         }

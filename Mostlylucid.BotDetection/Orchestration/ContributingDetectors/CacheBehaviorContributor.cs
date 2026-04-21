@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -18,22 +19,45 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     - Never send cache validation headers
 ///     - Request same resources repeatedly without caching
 ///     - Don't respect cache-control directives
+///     Configuration loaded from: cachebehavior.detector.yaml
+///     Override via: appsettings.json → BotDetection:Detectors:CacheBehaviorContributor:*
 /// </summary>
-public class CacheBehaviorContributor : ContributingDetectorBase
+public class CacheBehaviorContributor : ConfiguredContributorBase
 {
     private readonly IMemoryCache _cache;
     private readonly ILogger<CacheBehaviorContributor> _logger;
 
     public CacheBehaviorContributor(
         ILogger<CacheBehaviorContributor> logger,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
         _cache = cache;
     }
 
     public override string Name => "CacheBehavior";
-    public override int Priority => 15; // Run early, lightweight
+    public override int Priority => Manifest?.Priority ?? 15;
+
+    // Config-driven thresholds
+    private double RepeatBaseConfidence => GetParam("repeat_base_confidence", 0.2);
+    private double RepeatIncrementConfidence => GetParam("repeat_increment_confidence", 0.1);
+    private double RepeatMaxConfidence => GetParam("repeat_max_confidence", 0.5);
+    private double RepeatWeight => GetParam("repeat_weight", 1.2);
+    private double NoCompressionConfidence => GetParam("no_compression_confidence", 0.25);
+    private double NoCompressionWeight => GetParam("no_compression_weight", 1.0);
+    private double RapidRepeatThresholdSeconds => GetParam("rapid_repeat_threshold_seconds", 5.0);
+    private double RapidRepeatFastConfidence => GetParam("rapid_repeat_fast_confidence", 0.4);
+    private double RapidRepeatSlowConfidence => GetParam("rapid_repeat_slow_confidence", 0.3);
+    private double RapidRepeatWeight => GetParam("rapid_repeat_weight", 1.3);
+    private int ProfileMinRequests => GetParam("profile_min_requests", 10);
+    private int ProfileMinStaticRequests => GetParam("profile_min_static_requests", 5);
+    private double CacheValidationRateThreshold => GetParam("cache_validation_rate_threshold", 0.3);
+    private double ProfileAnomalyConfidence => GetParam("profile_anomaly_confidence", 0.3);
+    private double ProfileAnomalyWeight => GetParam("profile_anomaly_weight", 1.5);
+    private double GoodCacheConfidence => GetParam("good_cache_confidence", -0.15);
+    private double GoodCacheWeight => GetParam("good_cache_weight", 1.0);
 
     // Triggered by TransportProtocol signal - moves to Wave 1 so we can read streaming classification
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
@@ -94,14 +118,14 @@ public class CacheBehaviorContributor : ContributingDetectorBase
         // 1. Static resources requested multiple times without cache validation
         if (isStaticResource && requestCount > 1 && !hasCacheValidation)
         {
-            var impact = Math.Min(0.2 + (requestCount - 1) * 0.1, 0.5);
+            var impact = Math.Min(RepeatBaseConfidence + (requestCount - 1) * RepeatIncrementConfidence, RepeatMaxConfidence);
             state.WriteSignals([new(SignalKeys.CacheValidationMissing, true), new("ResourceRequestCount", requestCount)]);
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
                 Category = "CacheBehavior",
                 ConfidenceDelta = impact,
-                Weight = 1.2,
+                Weight = RepeatWeight,
                 Reason = $"Static resource requested {requestCount} times without cache headers"
             });
         }
@@ -114,8 +138,8 @@ public class CacheBehaviorContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "CacheBehavior",
-                ConfidenceDelta = 0.25,
-                Weight = 1.0,
+                ConfidenceDelta = NoCompressionConfidence,
+                Weight = NoCompressionWeight,
                 Reason = "Client does not support data compression (unusual for real browsers)"
             });
         }
@@ -135,18 +159,18 @@ public class CacheBehaviorContributor : ContributingDetectorBase
         {
             var timeSinceLastRequest = (currentTime - lastRequestTime.Value).TotalSeconds;
 
-            // Same resource requested within 5 seconds (without cache validation)
+            // Same resource requested within threshold seconds (without cache validation)
             // Skip for API requests - these are inherently non-cacheable
-            if (timeSinceLastRequest < 5 && !hasCacheValidation && !isApiRequest)
+            if (timeSinceLastRequest < RapidRepeatThresholdSeconds && !hasCacheValidation && !isApiRequest)
             {
-                var impact = timeSinceLastRequest < 1 ? 0.4 : 0.3;
+                var impact = timeSinceLastRequest < 1 ? RapidRepeatFastConfidence : RapidRepeatSlowConfidence;
                 state.WriteSignal(SignalKeys.RapidRepeatedRequest, true);
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "CacheBehavior",
                     ConfidenceDelta = impact,
-                    Weight = 1.3,
+                    Weight = RapidRepeatWeight,
                     Reason = $"Same page re-requested after {timeSinceLastRequest:F1} seconds without using browser cache"
                 });
             }
@@ -161,22 +185,22 @@ public class CacheBehaviorContributor : ContributingDetectorBase
         profile.RecordRequest(isStaticResource, hasCacheValidation);
 
         // Analyze profile after sufficient requests
-        if (profile.TotalRequests >= 10)
+        if (profile.TotalRequests >= ProfileMinRequests)
         {
-            // Browser should use cache validation on at least 30% of static resource revisits
+            // Browser should use cache validation on at least threshold% of static resource revisits
             // Guard: only compute rate when there are enough static requests to be meaningful
-            if (profile.StaticResourceRequests > 5)
+            if (profile.StaticResourceRequests > ProfileMinStaticRequests)
             {
                 var cacheValidationRate = (double)profile.RequestsWithCacheValidation / profile.StaticResourceRequests;
-                if (cacheValidationRate < 0.3)
+                if (cacheValidationRate < CacheValidationRateThreshold)
                 {
                     state.WriteSignals([new(SignalKeys.CacheBehaviorAnomaly, true), new("CacheValidationRate", cacheValidationRate)]);
                     contributions.Add(new DetectionContribution
                     {
                         DetectorName = Name,
                         Category = "CacheBehavior",
-                        ConfidenceDelta = 0.3,
-                        Weight = 1.5,
+                        ConfidenceDelta = ProfileAnomalyConfidence,
+                        Weight = ProfileAnomalyWeight,
                         Reason =
                             $"Client rarely reuses cached resources ({cacheValidationRate:P0} of static files) unlike real browsers"
                     });
@@ -192,8 +216,8 @@ public class CacheBehaviorContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "CacheBehavior",
-                ConfidenceDelta = -0.15,
-                Weight = 1.0,
+                ConfidenceDelta = GoodCacheConfidence,
+                Weight = GoodCacheWeight,
                 Reason = "Normal cache behavior detected"
             });
         }

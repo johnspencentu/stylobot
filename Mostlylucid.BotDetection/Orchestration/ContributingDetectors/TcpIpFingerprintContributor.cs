@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -19,8 +20,10 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     - tcp.options_pattern
 ///     - tcp.mss (Maximum Segment Size)
 ///     - tcp.os_fingerprint
+///     Configuration loaded from: tcpip.detector.yaml
+///     Override via: appsettings.json → BotDetection:Detectors:TcpIpFingerprintContributor:*
 /// </summary>
-public class TcpIpFingerprintContributor : ContributingDetectorBase
+public class TcpIpFingerprintContributor : ConfiguredContributorBase
 {
     // Known TCP window sizes for different systems (list allows multiple OS per window size)
     // Based on p0f database and real-world observations
@@ -111,13 +114,40 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
 
     private readonly ILogger<TcpIpFingerprintContributor> _logger;
 
-    public TcpIpFingerprintContributor(ILogger<TcpIpFingerprintContributor> logger)
+    public TcpIpFingerprintContributor(
+        ILogger<TcpIpFingerprintContributor> logger,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _logger = logger;
     }
 
     public override string Name => "TcpIpFingerprint";
-    public override int Priority => 11; // Run early
+    public override int Priority => Manifest?.Priority ?? 11;
+
+    // Config-driven thresholds
+    private double WindowBotConfidence => GetParam("window_bot_confidence", 0.55);
+    private double WindowBotWeight => GetParam("window_bot_weight", 1.3);
+    private double WindowUnusualConfidence => GetParam("window_unusual_confidence", 0.25);
+    private double WindowUnusualWeight => GetParam("window_unusual_weight", 1.1);
+    private double TtlBotConfidence => GetParam("ttl_bot_confidence", 0.6);
+    private double TtlBotWeight => GetParam("ttl_bot_weight", 1.4);
+    private double TtlUnusualConfidence => GetParam("ttl_unusual_confidence", 0.3);
+    private double TtlUnusualWeight => GetParam("ttl_unusual_weight", 1.2);
+    private double TcpOptionsMissingModernConfidence => GetParam("tcp_options_missing_modern_confidence", 0.2);
+    private double TcpOptionsMissingModernWeight => GetParam("tcp_options_missing_modern_weight", 0.9);
+    private double TcpOptionsMinimalConfidence => GetParam("tcp_options_minimal_confidence", 0.25);
+    private double TcpOptionsMinimalWeight => GetParam("tcp_options_minimal_weight", 1.0);
+    private double MssOldDefaultConfidence => GetParam("mss_old_default_confidence", 0.3);
+    private double MssOldDefaultWeight => GetParam("mss_old_default_weight", 1.1);
+    private double MssUnusualConfidence => GetParam("mss_unusual_confidence", 0.15);
+    private double MssUnusualWeight => GetParam("mss_unusual_weight", 0.8);
+    private double IpNoDfConfidence => GetParam("ip_no_df_confidence", 0.15);
+    private double IpNoDfWeight => GetParam("ip_no_df_weight", 0.8);
+    private double ConnectionMissingConfidence => GetParam("connection_missing_confidence", 0.2);
+    private double ConnectionMissingWeight => GetParam("connection_missing_weight", 0.7);
+    private double ConnectionCloseConfidence => GetParam("connection_close_confidence", 0.1);
+    private double ConnectionCloseWeight => GetParam("connection_close_weight", 0.6);
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
@@ -176,8 +206,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
                     {
                         DetectorName = Name,
                         Category = "TCP/IP",
-                        ConfidenceDelta = 0.15,
-                        Weight = 0.8,
+                        ConfidenceDelta = IpNoDfConfidence,
+                        Weight = IpNoDfWeight,
                         Reason = "Network packet configuration differs from modern browsers"
                     });
             }
@@ -201,8 +231,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "TCP/IP",
-                    ConfidenceDelta = 0.2,
-                    Weight = 0.7,
+                    ConfidenceDelta = ConnectionMissingConfidence,
+                    Weight = ConnectionMissingWeight,
                     Reason = "Missing connection reuse header (unusual for real browsers)"
                 });
             else if (connectionHeader.Equals("close", StringComparison.OrdinalIgnoreCase))
@@ -211,8 +241,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "TCP/IP",
-                    ConfidenceDelta = 0.1,
-                    Weight = 0.6,
+                    ConfidenceDelta = ConnectionCloseConfidence,
+                    Weight = ConnectionCloseWeight,
                     Reason = "Client closes connection after each request (bots often avoid persistent connections)"
                 });
 
@@ -255,9 +285,9 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
 
             if (allPatterns.Any(p => p.Contains("Bot")))
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "TCP/IP", 0.55,
+                    Name, "TCP/IP", WindowBotConfidence,
                     $"Network buffer size matches a known bot fingerprint ({pattern})",
-                    weight: 1.3,
+                    weight: WindowBotWeight,
                     botType: BotType.Scraper.ToString()));
         }
         else
@@ -268,8 +298,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "TCP/IP",
-                    ConfidenceDelta = 0.25,
-                    Weight = 1.1,
+                    ConfidenceDelta = WindowUnusualConfidence,
+                    Weight = WindowUnusualWeight,
                     Reason = "Unusual network buffer configuration (does not match standard browsers or operating systems)"
                 });
         }
@@ -287,9 +317,9 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
 
             if (allTtlPatterns.Any(p => p.Contains("Bot")))
                 contributions.Add(DetectionContribution.Bot(
-                    Name, "TCP/IP", 0.6,
+                    Name, "TCP/IP", TtlBotConfidence,
                     "Network hop count matches a known bot fingerprint",
-                    weight: 1.4,
+                    weight: TtlBotWeight,
                     botType: BotType.Scraper.ToString()));
         }
         else
@@ -300,8 +330,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
                 {
                     DetectorName = Name,
                     Category = "TCP/IP",
-                    ConfidenceDelta = 0.3,
-                    Weight = 1.2,
+                    ConfidenceDelta = TtlUnusualConfidence,
+                    Weight = TtlUnusualWeight,
                     Reason = "Unusual network hop count (does not match standard browsers or operating systems)"
                 });
         }
@@ -330,8 +360,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "TCP/IP",
-                ConfidenceDelta = 0.2,
-                Weight = 0.9,
+                ConfidenceDelta = TcpOptionsMissingModernConfidence,
+                Weight = TcpOptionsMissingModernWeight,
                 Reason = "Missing modern network features that real browsers include"
             });
 
@@ -341,8 +371,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "TCP/IP",
-                ConfidenceDelta = 0.25,
-                Weight = 1.0,
+                ConfidenceDelta = TcpOptionsMinimalConfidence,
+                Weight = TcpOptionsMinimalWeight,
                 Reason = "Very few network options set (typical for automation tools, not real browsers)"
             });
     }
@@ -358,8 +388,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "TCP/IP",
-                ConfidenceDelta = 0.3,
-                Weight = 1.1,
+                ConfidenceDelta = MssOldDefaultConfidence,
+                Weight = MssOldDefaultWeight,
                 Reason = "Minimal network packet size (indicates old or custom networking, not a real browser)"
             });
         else if (mss < 536 || mss > 1460)
@@ -368,8 +398,8 @@ public class TcpIpFingerprintContributor : ContributingDetectorBase
             {
                 DetectorName = Name,
                 Category = "TCP/IP",
-                ConfidenceDelta = 0.15,
-                Weight = 0.8,
+                ConfidenceDelta = MssUnusualConfidence,
+                Weight = MssUnusualWeight,
                 Reason = "Non-standard network packet size (does not match standard browsers)"
             });
     }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Actions;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -16,22 +17,45 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///
 ///     Key insight: a visitor scoring 0.5-0.7 (edge case) who solves a PoW with
 ///     realistic browser timing gets a strong human signal, reducing false positives.
+///     Configuration loaded from: challengeverification.detector.yaml
+///     Override via: appsettings.json → BotDetection:Detectors:ChallengeVerificationContributor:*
 /// </summary>
-public class ChallengeVerificationContributor : ContributingDetectorBase
+public class ChallengeVerificationContributor : ConfiguredContributorBase
 {
     private readonly IChallengeStore _challengeStore;
     private readonly ILogger<ChallengeVerificationContributor> _logger;
 
     public ChallengeVerificationContributor(
         IChallengeStore challengeStore,
-        ILogger<ChallengeVerificationContributor> logger)
+        ILogger<ChallengeVerificationContributor> logger,
+        IDetectorConfigProvider configProvider)
+        : base(configProvider)
     {
         _challengeStore = challengeStore;
         _logger = logger;
     }
 
     public override string Name => "ChallengeVerification";
-    public override int Priority => 25; // Wave 1, after behavioral, before session vector
+    public override int Priority => Manifest?.Priority ?? 25;
+
+    // Config-driven thresholds
+    private double SuspiciousFastMsPerPuzzle => GetParam("suspicious_fast_ms_per_puzzle", 50.0);
+    private double ExpectedMinMsPerPuzzle => GetParam("expected_min_ms_per_puzzle", 200.0);
+    private double ExpectedMaxMsPerPuzzle => GetParam("expected_max_ms_per_puzzle", 5000.0);
+    private double SuspiciousLowJitter => GetParam("suspicious_low_jitter", 0.05);
+    private double NormalJitterMin => GetParam("normal_jitter_min", 0.15);
+    private int SuspiciousMaxWorkerCount => GetParam("suspicious_max_worker_count", 1);
+    private int MinPuzzlesForWorkerCheck => GetParam("min_puzzles_for_worker_check", 4);
+    private double FastSolveConfidence => GetParam("fast_solve_confidence", 0.15);
+    private double FastSolveWeight => GetParam("fast_solve_weight", 1.2);
+    private double RealisticSolveConfidence => GetParam("realistic_solve_confidence", -0.35);
+    private double RealisticSolveWeight => GetParam("realistic_solve_weight", 1.5);
+    private double LowJitterConfidence => GetParam("low_jitter_confidence", 0.10);
+    private double LowJitterWeight => GetParam("low_jitter_weight", 1.0);
+    private double NormalJitterConfidence => GetParam("normal_jitter_confidence", -0.05);
+    private double NormalJitterWeight => GetParam("normal_jitter_weight", 0.8);
+    private double LowWorkerConfidence => GetParam("low_worker_confidence", 0.08);
+    private double LowWorkerWeight => GetParam("low_worker_weight", 0.9);
 
     public override IReadOnlyList<TriggerCondition> TriggerConditions => [];
 
@@ -67,67 +91,67 @@ public class ChallengeVerificationContributor : ContributingDetectorBase
                 ? verification.TotalSolveDurationMs / verification.PuzzleCount
                 : verification.TotalSolveDurationMs;
 
-            // Too fast: powerful hardware or pre-computed (< 50ms per puzzle is suspicious)
-            if (perPuzzleMs < 50)
+            // Too fast: powerful hardware or pre-computed
+            if (perPuzzleMs < SuspiciousFastMsPerPuzzle)
             {
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "ChallengeVerification",
-                    ConfidenceDelta = 0.15,
-                    Weight = 1.2,
+                    ConfidenceDelta = FastSolveConfidence,
+                    Weight = FastSolveWeight,
                     Reason = $"PoW solved suspiciously fast ({perPuzzleMs:F0}ms/puzzle) - possible dedicated solver"
                 });
             }
-            // Expected human range: 200ms-5000ms per puzzle
-            else if (perPuzzleMs is >= 200 and <= 5000)
+            // Expected human range
+            else if (perPuzzleMs >= ExpectedMinMsPerPuzzle && perPuzzleMs <= ExpectedMaxMsPerPuzzle)
             {
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "ChallengeVerification",
-                    ConfidenceDelta = -0.35, // Strong human signal
-                    Weight = 1.5,
+                    ConfidenceDelta = RealisticSolveConfidence,
+                    Weight = RealisticSolveWeight,
                     Reason = $"PoW solved with realistic timing ({perPuzzleMs:F0}ms/puzzle)"
                 });
             }
 
             // Timing jitter analysis (performance.now() has 5ms quantization in workers)
             // Near-zero jitter with multiple puzzles = suspicious (dedicated solver, no OS scheduling noise)
-            if (verification.PuzzleCount >= 4 && verification.TimingJitter < 0.05)
+            if (verification.PuzzleCount >= MinPuzzlesForWorkerCheck && verification.TimingJitter < SuspiciousLowJitter)
             {
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "ChallengeVerification",
-                    ConfidenceDelta = 0.10,
-                    Weight = 1.0,
+                    ConfidenceDelta = LowJitterConfidence,
+                    Weight = LowJitterWeight,
                     Reason = $"PoW timing jitter unusually low ({verification.TimingJitter:F3}) - possible automation"
                 });
             }
-            else if (verification.TimingJitter >= 0.15)
+            else if (verification.TimingJitter >= NormalJitterMin)
             {
                 // High jitter = normal browser with OS scheduling noise = human-like
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "ChallengeVerification",
-                    ConfidenceDelta = -0.05,
-                    Weight = 0.8,
+                    ConfidenceDelta = NormalJitterConfidence,
+                    Weight = NormalJitterWeight,
                     Reason = "PoW timing jitter consistent with real browser"
                 });
             }
 
             // Worker count analysis
             // 0-1 workers = possible headless browser (many don't expose navigator.hardwareConcurrency)
-            if (verification.ReportedWorkerCount <= 1 && verification.PuzzleCount >= 4)
+            if (verification.ReportedWorkerCount <= SuspiciousMaxWorkerCount && verification.PuzzleCount >= MinPuzzlesForWorkerCheck)
             {
                 contributions.Add(new DetectionContribution
                 {
                     DetectorName = Name,
                     Category = "ChallengeVerification",
-                    ConfidenceDelta = 0.08,
-                    Weight = 0.9,
+                    ConfidenceDelta = LowWorkerConfidence,
+                    Weight = LowWorkerWeight,
                     Reason = $"PoW solved with {verification.ReportedWorkerCount} worker(s) - possible headless browser"
                 });
             }
