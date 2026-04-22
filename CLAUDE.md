@@ -94,6 +94,35 @@ Detection uses an ephemeral blackboard where detectors write signals:
 
 **Entity Resolution**: Merge (cosine neighbor walking), Split (velocity oscillation), Convergence (parallel behavioral vectors), L0-L5 confidence levels
 
+### Detector Benchmark Numbers
+
+Measured via YAML-driven BenchmarkDotNet harness (`Mostlylucid.BotDetection.Benchmarks/Scenarios/*.benchmark.yaml`). Run: `dotnet run --project Mostlylucid.BotDetection.Benchmarks -c Release -- --filter '*DetectorBenchmarkRunner*'`
+
+| Detector | Scenario | Mean | Allocated |
+|----------|----------|------|-----------|
+| Intent | Navigation | 2,341 ns | 5,448 B |
+| Heuristic | Bot | 4,255 ns | 2,504 B |
+| Heuristic | Human | 3,424 ns | 2,488 B |
+| Behavioral | Normal | 1,446 ns | 2,112 B |
+| Haxxor | SQL Injection | 1,306 ns | 1,608 B |
+| Header | Bot (curl) | 507 ns | 1,520 B |
+| Header | Human (Chrome) | 496 ns | 1,448 B |
+| CacheBehavior | Normal | 1,335 ns | 1,400 B |
+| Ip | Datacenter | 537 ns | 1,152 B |
+| MultiLayerCorrelation | Full signals | 330 ns | 1,088 B |
+| UserAgent | Googlebot | 829 ns | 1,072 B |
+| AiScraper | GPTBot | 572 ns | 1,016 B |
+| FastPathReputation | Cached signature | 308 ns | 928 B |
+| UserAgent | Chrome | 2,058 ns | 928 B |
+| Ip | Residential | 557 ns | 840 B |
+| TransportProtocol | Document | 145 ns | 504 B |
+| TlsFingerprint | Chrome/Bot | ~100-260 ns | 424 B |
+| Inconsistency | TLS/UA mismatch | 135 ns | 376 B |
+| CookieBehavior | With cookies | 33 ns | 184 B |
+| Http2Fingerprint | Chrome | 120 ns | 152 B |
+| HeaderCorrelation | Full headers | 50 ns | 104 B |
+| Haxxor | Clean request | 204 ns | **0 B** |
+
 ### Session Vector Architecture
 
 Sessions are the primary behavioral unit. Per-request Markov chain transitions are compressed into a fixed-dimension vector per session, enabling similarity search and inter-session anomaly detection.
