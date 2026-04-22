@@ -22,7 +22,11 @@
       "Mostlylucid.BotDetection.Llm.LlamaSharp\\Mostlylucid.BotDetection.Llm.LlamaSharp.csproj",
       "Mostlylucid.BotDetection.Llm.Cloud\\Mostlylucid.BotDetection.Llm.Cloud.csproj",
       "Mostlylucid.BotDetection.BdfGenerator\\Mostlylucid.BotDetection.BdfGenerator.csproj",
-      "Mostlylucid.BotDetection.ApiHolodeck\\Mostlylucid.BotDetection.ApiHolodeck.csproj"
+      "Mostlylucid.BotDetection.ApiHolodeck\\Mostlylucid.BotDetection.ApiHolodeck.csproj",
+      "Mostlylucid.BotDetection.Api\\Mostlylucid.BotDetection.Api.csproj",
+      "Mostlylucid.BotDetection.Api.Tests\\Mostlylucid.BotDetection.Api.Tests.csproj",
+      "Mostlylucid.BotDetection.Llm\\Mostlylucid.BotDetection.Llm.csproj",
+      "Mostlylucid.BotDetection.SignatureStore\\Mostlylucid.BotDetection.SignatureStore.csproj"
     ]
   }
 }

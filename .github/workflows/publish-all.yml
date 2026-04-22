@@ -256,6 +256,87 @@ jobs:
         NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
       run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
+  publish-botdetection-api:
+    needs: validate-version
+    if: needs.validate-version.outputs.components == 'all'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      with:
+        dotnet-version: '10.0.x'
+    - name: Restore, Build, Pack
+      run: |
+        dotnet restore ci.slnf
+        dotnet build Mostlylucid.BotDetection.Api/Mostlylucid.BotDetection.Api.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.Api/Mostlylucid.BotDetection.Api.csproj -c Release --no-build -o ./artifacts
+    - uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544
+      id: nuget_login
+      with:
+        user: 'mostlylucid'
+    - name: Push to NuGet
+      env:
+        NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  publish-botdetection-llm:
+    needs: validate-version
+    if: needs.validate-version.outputs.components == 'all'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      with:
+        dotnet-version: '10.0.x'
+    - name: Restore, Build, Pack Llm packages
+      run: |
+        dotnet restore ci.slnf
+        dotnet build Mostlylucid.BotDetection.Llm/Mostlylucid.BotDetection.Llm.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.Llm/Mostlylucid.BotDetection.Llm.csproj -c Release --no-build -o ./artifacts
+        dotnet build Mostlylucid.BotDetection.Llm.Ollama/Mostlylucid.BotDetection.Llm.Ollama.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.Llm.Ollama/Mostlylucid.BotDetection.Llm.Ollama.csproj -c Release --no-build -o ./artifacts
+        dotnet build Mostlylucid.BotDetection.Llm.Cloud/Mostlylucid.BotDetection.Llm.Cloud.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.Llm.Cloud/Mostlylucid.BotDetection.Llm.Cloud.csproj -c Release --no-build -o ./artifacts
+        dotnet build Mostlylucid.BotDetection.Llm.LlamaSharp/Mostlylucid.BotDetection.Llm.LlamaSharp.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.Llm.LlamaSharp/Mostlylucid.BotDetection.Llm.LlamaSharp.csproj -c Release --no-build -o ./artifacts
+    - uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544
+      id: nuget_login
+      with:
+        user: 'mostlylucid'
+    - name: Push to NuGet
+      env:
+        NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  publish-botdetection-holodeck:
+    needs: validate-version
+    if: needs.validate-version.outputs.components == 'all'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      with:
+        dotnet-version: '10.0.x'
+    - name: Restore, Build, Pack
+      run: |
+        dotnet restore ci.slnf
+        dotnet build Mostlylucid.BotDetection.ApiHolodeck/Mostlylucid.BotDetection.ApiHolodeck.csproj -c Release --no-restore
+        dotnet pack Mostlylucid.BotDetection.ApiHolodeck/Mostlylucid.BotDetection.ApiHolodeck.csproj -c Release --no-build -o ./artifacts
+    - uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544
+      id: nuget_login
+      with:
+        user: 'mostlylucid'
+    - name: Push to NuGet
+      env:
+        NUGET_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key "$NUGET_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
   # Publish Stylobot.Gateway Docker image
   publish-gateway:
     needs: validate-version
