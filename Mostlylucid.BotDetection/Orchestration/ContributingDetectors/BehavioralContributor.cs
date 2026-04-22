@@ -41,7 +41,7 @@ public class BehavioralContributor : ConfiguredContributorBase
         BlackboardState state,
         CancellationToken cancellationToken = default)
     {
-        var contributions = new List<DetectionContribution>();
+        var contributions = new List<DetectionContribution>(1);
 
         try
         {
@@ -58,8 +58,15 @@ public class BehavioralContributor : ConfiguredContributorBase
             else
             {
                 // Write signals once, then convert each reason to a contribution
-                var hasRate = result.Reasons.Any(r =>
-                    r.Detail.Contains("rate", StringComparison.OrdinalIgnoreCase));
+                var hasRate = false;
+                foreach (var r in result.Reasons)
+                {
+                    if (r.Detail.Contains("rate", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasRate = true;
+                        break;
+                    }
+                }
                 state.WriteSignals([
                     new(SignalKeys.BehavioralAnomalyDetected, true),
                     new(SignalKeys.BehavioralRateExceeded, hasRate)

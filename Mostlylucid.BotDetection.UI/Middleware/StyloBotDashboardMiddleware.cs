@@ -384,6 +384,10 @@ public class StyloBotDashboardMiddleware
                 await ServeLoadPresetAsync(context);
                 break;
 
+            case var p when p.StartsWith("help/", StringComparison.OrdinalIgnoreCase):
+                await ServeHelpAsync(context, relativePath["help/".Length..]);
+                break;
+
             case var p when p.StartsWith("signature/", StringComparison.OrdinalIgnoreCase):
                 // Use original relativePath (not lowercased) to preserve signature case
                 await ServeSignatureDetailAsync(context, relativePath.Substring("signature/".Length));
@@ -573,7 +577,11 @@ public class StyloBotDashboardMiddleware
                 : null,
             // Only run investigation queries when the operator is on the Investigate tab.
             Investigation = investigationVm,
-            IsCommercial = IsCommercialMode(context)
+            IsCommercial = IsCommercialMode(context),
+            StatusStrip = BuildStatusStripModel(context),
+            Compliance = tab.Equals("compliance", StringComparison.OrdinalIgnoreCase)
+                ? BuildComplianceTabModel(context)
+                : null
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -734,7 +742,8 @@ public class StyloBotDashboardMiddleware
             Confidence = Math.Clamp(payload.Confidence ?? 1.0, 0.0, 1.0),
             LabeledBy = ResolveLabeler(context),
             LabeledAt = DateTime.UtcNow,
-            Note = string.IsNullOrWhiteSpace(payload.Note) ? null : payload.Note.Trim()
+            Note = string.IsNullOrWhiteSpace(payload.Note) ? null : payload.Note.Trim(),
+            DisplayName = string.IsNullOrWhiteSpace(payload.DisplayName) ? null : payload.DisplayName.Trim()
         };
 
         var saved = await labelStore.UpsertAsync(label, context.RequestAborted);
@@ -994,7 +1003,7 @@ public class StyloBotDashboardMiddleware
         }
     }
 
-    private sealed record LabelPayload(string? Kind, double? Confidence, string? Note);
+    private sealed record LabelPayload(string? Kind, double? Confidence, string? Note, string? DisplayName);
 
     private async Task ServeDetectionsApiAsync(HttpContext context)
     {
@@ -2044,6 +2053,128 @@ public class StyloBotDashboardMiddleware
     private LicenseCardModel BuildLicenseCardModel(HttpContext context) =>
         LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
 
+    private async Task ServeHelpAsync(HttpContext context, string sectionId)
+    {
+        var helpService = context.RequestServices.GetService<DashboardHelpService>();
+        if (helpService is null)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        var entry = helpService.GetHelp(sectionId, IsCommercialMode(context));
+        if (entry is null)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/StyloBot/Dashboard/_HelpPanel.cshtml", entry, context);
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(html);
+    }
+
+    private ComplianceTabModel? BuildComplianceTabModel(HttpContext context)
+    {
+        try
+        {
+            var packProvider = context.RequestServices.GetService<Mostlylucid.BotDetection.Compliance.ICompliancePackProvider>();
+            if (packProvider is null)
+                return new ComplianceTabModel
+                {
+                    ActivePackId = "default", ActivePackName = "Default (no compliance module)",
+                    BasePath = _options.BasePath.TrimEnd('/'), IsCommercial = IsCommercialMode(context)
+                };
+
+            var pack = packProvider.ActivePack;
+            return new ComplianceTabModel
+            {
+                ActivePackId = pack.Id,
+                ActivePackName = pack.Name,
+                ActivePackExplain = pack.Explain,
+                LegalReferences = pack.LegalReferences,
+                Jurisdiction = pack.Jurisdiction,
+                Position = pack.Position,
+                IsCommercial = IsCommercialMode(context),
+                BasePath = _options.BasePath.TrimEnd('/'),
+                AvailablePacks = packProvider.AvailablePacks
+                    .Select(p => new CompliancePackSummary(p.Id, p.Name, p.Jurisdiction))
+                    .ToList()
+            };
+        }
+        catch
+        {
+            return new ComplianceTabModel
+            {
+                ActivePackId = "default", ActivePackName = "Default",
+                BasePath = _options.BasePath.TrimEnd('/'), IsCommercial = false
+            };
+        }
+    }
+
+    private StatusStripModel BuildStatusStripModel(HttpContext context)
+    {
+        try { return BuildStatusStripModelInternal(context); }
+        catch { return new StatusStripModel { ActivePackName = "Default", Services = [], DetectionActive = true }; }
+    }
+
+    private StatusStripModel BuildStatusStripModelInternal(HttpContext context)
+    {
+        var isCommercial = IsCommercialMode(context);
+
+        // Detect available services
+        var services = new List<ServiceStatus>();
+
+        // Check if PostgreSQL is available (via IDashboardEventStore type)
+        var storeType = _eventStore.GetType().Name;
+        if (storeType.Contains("Postgre", StringComparison.OrdinalIgnoreCase))
+            services.Add(new ServiceStatus("PostgreSQL", true));
+        else if (storeType.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            services.Add(new ServiceStatus("SQLite", true));
+        else
+            services.Add(new ServiceStatus("In-Memory", true));
+
+        // Check if Redis is available
+        var redis = context.RequestServices.GetService(
+            Type.GetType("Stylobot.Commercial.Cache.Redis.IRedisCacheProvider, Stylobot.Commercial.Cache.Redis"));
+        if (redis is not null)
+            services.Add(new ServiceStatus("Redis", true));
+
+        // Check compliance pack
+        var packProvider = context.RequestServices.GetService<Mostlylucid.BotDetection.Compliance.ICompliancePackProvider>();
+        var packName = packProvider?.ActivePack.Name ?? "Default";
+
+        // Check LLM
+        var llm = context.RequestServices.GetService(
+            Type.GetType("Mostlylucid.BotDetection.Services.ILlmClassificationService, Mostlylucid.BotDetection"));
+        var llmConnected = llm is not null && llm.GetType().Name != "NullLlmClassificationService";
+        var llmProvider = llmConnected ? llm!.GetType().Name.Replace("LlmClassificationService", "").Replace("Classification", "") : null;
+
+        // Check guardians (commercial only)
+        var guardianCount = 0;
+        var guardianAlerts = 0;
+        if (isCommercial)
+        {
+            var guardians = context.RequestServices.GetServices(
+                Type.GetType("Stylobot.Commercial.Compliance.Guardians.IComplianceGuardian, Stylobot.Commercial.Compliance") ?? typeof(object));
+            guardianCount = guardians.Count();
+        }
+
+        return new StatusStripModel
+        {
+            ActivePackName = packName,
+            DetectionActive = true,
+            Services = services,
+            GuardiansEnabled = guardianCount > 0,
+            GuardianCount = guardianCount,
+            GuardianAlerts = guardianAlerts,
+            LlmConnected = llmConnected,
+            LlmProvider = llmProvider,
+            IsCommercial = isCommercial
+        };
+    }
+
     /// <summary>Render the Configuration tab partial. Lazy-loads Monaco from CDN once it boots.</summary>
     private async Task ServeConfigurationPartialAsync(HttpContext context)
     {
@@ -2870,6 +3001,7 @@ public class StyloBotDashboardMiddleware
     }
 
     private async Task<string> RenderPartialAsync<T>(HttpContext context, string viewPath, T model)
+        where T : notnull
         => await _razorViewRenderer.RenderViewToStringAsync(viewPath, model, context);
 
     private async Task<string> RenderVisitorPartialAsync(HttpContext context)

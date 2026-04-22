@@ -21,14 +21,6 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// </summary>
 public class IpContributor : ConfiguredContributorBase
 {
-    // Local/private IP ranges (includes "localhost" as a string)
-    private static readonly string[] LocalPrefixes =
-    [
-        "127.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.",
-        "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.",
-        "172.29.", "172.30.", "172.31.", "192.168.", "::1", "fe80:", "localhost"
-    ];
-
     // Hardcoded datacenter prefix hints - used as fast fallback when dynamic CIDR ranges
     // don't cover a provider (e.g., Hetzner, OVH, Vultr don't publish machine-readable lists).
     // More specific prefixes are preferred over broad ones to avoid misidentification.
@@ -326,44 +318,7 @@ public class IpContributor : ConfiguredContributorBase
         return connectionIp;
     }
 
-    private static bool IsLocalIp(string ip)
-    {
-        // Prefix check for common IPv4 ranges (fast path)
-        foreach (var prefix in LocalPrefixes)
-            if (ip.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-        // Full IPAddress parsing for accurate IPv4/IPv6 checks
-        if (IPAddress.TryParse(ip, out var addr))
-        {
-            if (IPAddress.IsLoopback(addr))
-                return true;
-
-            // IPv6 link-local (fe80::/10)
-            if (addr.IsIPv6LinkLocal)
-                return true;
-
-            // IPv6 site-local (fec0::/10 - deprecated but still used)
-            if (addr.IsIPv6SiteLocal)
-                return true;
-
-            // IPv6 unique local address (fc00::/7 - ULA, equivalent to RFC 1918)
-            if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-            {
-                var bytes = addr.GetAddressBytes();
-                if ((bytes[0] & 0xFE) == 0xFC) return true;
-            }
-
-            // IPv4-mapped IPv6 (::ffff:10.x.x.x etc.)
-            if (addr.IsIPv4MappedToIPv6)
-            {
-                var mapped = addr.MapToIPv4();
-                return IsLocalIp(mapped.ToString());
-            }
-        }
-
-        return false;
-    }
+    private static bool IsLocalIp(string ip) => NetworkHelper.IsLocalIp(ip);
 
     private static (bool isDatacenter, string? name) CheckDatacenterPrefix(string ip)
     {
@@ -377,17 +332,5 @@ public class IpContributor : ConfiguredContributorBase
         return (false, null);
     }
 
-    private static string MaskIp(string ip)
-    {
-        // Mask last octet for privacy in logs
-        var parts = ip.Split('.');
-        if (parts.Length == 4)
-            return $"{parts[0]}.{parts[1]}.{parts[2]}.xxx";
-
-        // For IPv6, truncate
-        if (ip.Length > 10)
-            return ip[..10] + "...";
-
-        return ip;
-    }
+    private static string MaskIp(string ip) => PrivacyHelper.MaskIp(ip);
 }

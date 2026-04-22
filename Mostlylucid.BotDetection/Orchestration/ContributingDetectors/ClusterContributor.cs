@@ -68,7 +68,7 @@ public class ClusterContributor : ConfiguredContributorBase
         try
         {
             // 1. Check cluster membership
-            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature);
             var inCluster = false;
 
             if (!string.IsNullOrEmpty(signature))

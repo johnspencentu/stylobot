@@ -10,6 +10,7 @@ using Mostlylucid.BotDetection.Attributes;
 using Mostlylucid.BotDetection.Filters;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
+using Mostlylucid.BotDetection.Orchestration.Audit;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Dashboard;
 using Mostlylucid.BotDetection.Services;
@@ -97,7 +98,8 @@ public class BotDetectionMiddleware(
         IPolicyRegistry policyRegistry,
         IActionPolicyRegistry actionPolicyRegistry,
         ResponseCoordinator responseCoordinator,
-        BotDetection.Telemetry.BotDetectionInstrumentation? telemetryInstrumentation = null)
+        BotDetection.Telemetry.BotDetectionInstrumentation? telemetryInstrumentation = null,
+        AuditProcessorDispatcher? auditProcessorDispatcher = null)
     {
         // Check if bot detection is globally enabled
         if (!_options.Enabled)
@@ -230,6 +232,8 @@ public class BotDetectionMiddleware(
                 context.Response.OnCompleted(async () =>
                 {
                     await RecordResponseAsync(context, upstreamEvidence, responseCoordinator, upstreamStartTime);
+                    if (auditProcessorDispatcher?.HasProcessors == true)
+                        await auditProcessorDispatcher.DispatchAsync(context, upstreamEvidence);
                 });
             }
 
@@ -253,7 +257,8 @@ public class BotDetectionMiddleware(
             var customUa = context.Request.Headers["ml-bot-test-ua"].FirstOrDefault();
             if (!string.IsNullOrEmpty(customUa))
             {
-                await HandleCustomUaDetection(context, customUa, orchestrator, policyRegistry, actionPolicyRegistry, responseCoordinator);
+                await HandleCustomUaDetection(context, customUa, orchestrator, policyRegistry, actionPolicyRegistry,
+                    responseCoordinator, auditProcessorDispatcher);
                 return;
             }
 
@@ -262,7 +267,7 @@ public class BotDetectionMiddleware(
             if (!string.IsNullOrEmpty(testMode))
             {
                 await HandleTestModeWithRealDetection(context, testMode, orchestrator, policyRegistry,
-                    actionPolicyRegistry, responseCoordinator);
+                    actionPolicyRegistry, responseCoordinator, auditProcessorDispatcher);
                 return;
             }
         }
@@ -296,6 +301,8 @@ public class BotDetectionMiddleware(
             // Read final evidence from context (may have been boosted by ApplyResponseStatusBoost)
             var finalEvidence = context.Items[AggregatedEvidenceKey] as AggregatedEvidence ?? aggregatedResult;
             await RecordResponseAsync(context, finalEvidence, responseCoordinator, requestStartTime);
+            if (auditProcessorDispatcher?.HasProcessors == true)
+                await auditProcessorDispatcher.DispatchAsync(context, finalEvidence);
         });
 
         // Log detection result
@@ -1022,6 +1029,36 @@ public class BotDetectionMiddleware(
         BotPolicyAttribute? policyAttr,
         BotBlockAction action)
     {
+        // --- Holodeck engagement check ---
+        // If path was tagged as honeypot (pre-detection) or attack signals fired,
+        // try holodeck action policy instead of hard block.
+        var isHoneypotPath = context.Items.TryGetValue("Holodeck.IsHoneypotPath", out var hpVal) && hpVal is true;
+        var hasAttackSignal = aggregated.Signals.ContainsKey(SignalKeys.AttackDetected);
+
+        if (isHoneypotPath || hasAttackSignal)
+        {
+            // Set fingerprint for downstream action policies (SimulationPackResponder uses this)
+            if (aggregated.Signals.TryGetValue(SignalKeys.PrimarySignature, out var sigVal2))
+            {
+                var fp = sigVal2?.ToString();
+                if (fp != null) context.Items["Holodeck.Fingerprint"] = fp;
+            }
+
+            var holodeckRegistry = context.RequestServices.GetService<IActionPolicyRegistry>();
+            var holodeckPolicy = holodeckRegistry?.GetPolicy("holodeck");
+            if (holodeckPolicy != null)
+            {
+                _logger.LogInformation(
+                    "[HOLODECK] Engaging for {Path} (honeypot={IsHoneypot}, attack={HasAttack})",
+                    context.Request.Path, isHoneypotPath, hasAttackSignal);
+
+                var holoResult = await holodeckPolicy.ExecuteAsync(context, aggregated, context.RequestAborted);
+                if (!holoResult.Continue) return;
+                // If holodeck returned Continue (e.g., coordinator busy), fall through to normal block
+            }
+        }
+        // --- End holodeck check ---
+
         var riskScore = aggregated.BotProbability;
 
         _logger.LogWarning(
@@ -1136,7 +1173,8 @@ public class BotDetectionMiddleware(
         BlackboardOrchestrator orchestrator,
         IPolicyRegistry policyRegistry,
         IActionPolicyRegistry actionPolicyRegistry,
-        ResponseCoordinator responseCoordinator)
+        ResponseCoordinator responseCoordinator,
+        AuditProcessorDispatcher? auditProcessorDispatcher)
     {
         _logger.LogInformation("Test mode: Running real detection with simulated UA for '{Mode}'", testMode);
 
@@ -1162,6 +1200,7 @@ public class BotDetectionMiddleware(
             policyRegistry,
             actionPolicyRegistry,
             responseCoordinator,
+            auditProcessorDispatcher,
             testModeHeader: "true",
             uaHeader: ("X-Test-Simulated-UA", simulatedUserAgent ?? "none"),
             logPrefix: "Test mode");
@@ -1177,7 +1216,8 @@ public class BotDetectionMiddleware(
         BlackboardOrchestrator orchestrator,
         IPolicyRegistry policyRegistry,
         IActionPolicyRegistry actionPolicyRegistry,
-        ResponseCoordinator responseCoordinator)
+        ResponseCoordinator responseCoordinator,
+        AuditProcessorDispatcher? auditProcessorDispatcher)
     {
         _logger.LogInformation("Custom UA test: Running real detection with '{UA}'", customUa);
 
@@ -1188,6 +1228,7 @@ public class BotDetectionMiddleware(
             policyRegistry,
             actionPolicyRegistry,
             responseCoordinator,
+            auditProcessorDispatcher,
             testModeHeader: "custom-ua",
             uaHeader: ("X-Test-Custom-UA", customUa),
             logPrefix: "Custom UA test");
@@ -1204,6 +1245,7 @@ public class BotDetectionMiddleware(
         IPolicyRegistry policyRegistry,
         IActionPolicyRegistry actionPolicyRegistry,
         ResponseCoordinator responseCoordinator,
+        AuditProcessorDispatcher? auditProcessorDispatcher,
         string testModeHeader,
         (string Name, string Value) uaHeader,
         string logPrefix)
@@ -1247,7 +1289,10 @@ public class BotDetectionMiddleware(
             var testStartTime = DateTime.UtcNow;
             context.Response.OnCompleted(async () =>
             {
-                await RecordResponseAsync(context, aggregatedResult, responseCoordinator, testStartTime);
+                var finalEvidence = context.Items[AggregatedEvidenceKey] as AggregatedEvidence ?? aggregatedResult;
+                await RecordResponseAsync(context, finalEvidence, responseCoordinator, testStartTime);
+                if (auditProcessorDispatcher?.HasProcessors == true)
+                    await auditProcessorDispatcher.DispatchAsync(context, finalEvidence);
             });
         }
 

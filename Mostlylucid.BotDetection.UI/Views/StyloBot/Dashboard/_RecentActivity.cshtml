@@ -1,4 +1,5 @@
 @using Mostlylucid.BotDetection.UI.Models
+@using Mostlylucid.BotDetection.UI.Helpers
 @model VisitorListModel
 @{
     var bp = Model.BasePath;
@@ -33,6 +34,7 @@
         <div class="flex items-center justify-between mb-1">
             <div class="flex items-center gap-2">
                 <h3 class="text-sm font-bold text-base-content">Recent Activity</h3>
+                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "recent-activity")
                 <span class="text-[9px] px-1 py-0.5 rounded status-badge-danger font-medium">LIVE</span>
             </div>
             <div class="flex items-center gap-1">
@@ -90,21 +92,8 @@
                                 "Medium" or "Elevated" => "text-warning",
                                 _ => "text-success"
                             };
-                            var actionClass = v.Action switch {
-                                "Block" or "block" or "block-hard" => "text-error",
-                                "Throttle" or "throttle" or "throttle-stealth" => "text-warning",
-                                "Challenge" or "challenge" => "text-info",
-                                "TarPit" or "simulation-pack" => "text-error",
-                                _ => "text-base-content/50"
-                            };
-                            var friendlyAction = v.Action switch {
-                                "throttle-stealth" => "Silent Throttle",
-                                "block-hard" => "Hard Block",
-                                "logonly" => "Monitor Only",
-                                "redirect-honeypot" => "Honeypot",
-                                "simulation-pack" => "Honeypot",
-                                _ => v.Action
-                            };
+                            var actionClass = ActionDisplayHelper.GetCssClass(v.Action);
+                            var friendlyAction = ActionDisplayHelper.GetFriendlyName(v.Action);
                             <tr class="hover:bg-base-300/50 cursor-pointer transition-colors">
                                 <td class="py-1 text-base-content/50 whitespace-nowrap text-[10px]">
                                     <a href="@bp/signature/@Uri.EscapeDataString(v.PrimarySignature)">@v.TimeAgo</a>
@@ -127,7 +116,7 @@
                                     }
                                 </td>
                                 <td class="py-1 text-right font-bold text-xs @riskClass">@(probPct)%</td>
-                                <td class="py-1 text-[10px] @actionClass font-medium">@(friendlyAction ?? "Allow")</td>
+                                <td class="py-1 text-[10px] @actionClass font-medium">@friendlyAction</td>
                             </tr>
                         }
                     </tbody>

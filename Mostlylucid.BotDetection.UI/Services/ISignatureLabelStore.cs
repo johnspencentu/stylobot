@@ -7,9 +7,8 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     state so offline weight-tuning can compute per-detector precision/recall against
 ///     real ground truth.
 ///
-///     FOSS ships <see cref="InMemorySignatureLabelStore"/> (lost on restart - fine for
-///     small manual labeling sessions). Production wires a SQLite or PostgreSQL implementation
-///     so labels accumulate across deploys.
+///     FOSS ships a SQLite implementation. Commercial wires PostgreSQL so labels
+///     accumulate across deploys.
 /// </summary>
 public interface ISignatureLabelStore
 {
@@ -46,8 +45,11 @@ public sealed record SignatureLabel
 
     public DateTime LabeledAt { get; init; } = DateTime.UtcNow;
 
-    /// <summary>Short free-text justification - e.g., "Classic cred-stuffing pattern on /login".</summary>
+    /// <summary>Short free-text justification -- e.g., "Classic cred-stuffing pattern on /login".</summary>
     public string? Note { get; init; }
+
+    /// <summary>Human-readable display name -- e.g., "Partner Crawler - Acme Corp", "Internal Monitoring Bot".</summary>
+    public string? DisplayName { get; init; }
 }
 
 /// <summary>Operator's judgement about a signature. Keep the set small and unambiguous.</summary>

@@ -133,9 +133,15 @@ public sealed class BoundedCache<TKey, TValue> where TKey : notnull
             // Phase 2: If still over limit, evict LRU (oldest accessed)
             if (_entries.Count > _maxSize)
             {
-                var toEvict = _entries
+                // Avoid LINQ's ICollection.CopyTo fast path over ConcurrentDictionary:
+                // under heavy mutation it can observe a stale count and throw.
+                var snapshot = new List<KeyValuePair<TKey, CacheEntry>>(_entries.Count);
+                foreach (var entry in _entries)
+                    snapshot.Add(entry);
+
+                var toEvict = snapshot
                     .OrderBy(kv => kv.Value.LastAccessed)
-                    .Take(_entries.Count - (_maxSize * 3 / 4)) // Evict down to 75% capacity
+                    .Take(Math.Max(0, snapshot.Count - (_maxSize * 3 / 4))) // Evict down to 75% capacity
                     .Select(kv => kv.Key)
                     .ToList();
 

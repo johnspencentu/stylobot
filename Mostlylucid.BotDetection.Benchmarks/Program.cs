@@ -7,7 +7,7 @@ public class Program
 {
     public static int Main(string[] args)
     {
-        if (args.Contains("--list"))
+        if (args.Contains("--list-scenarios"))
         {
             var scenarios = BenchmarkScenarioLoader.LoadAll(FindScenariosDir());
             Console.WriteLine($"Found {scenarios.Count} benchmark scenarios:\n");

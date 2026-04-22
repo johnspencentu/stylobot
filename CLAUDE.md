@@ -51,21 +51,27 @@ dotnet pack Mostlylucid.BotDetection -c Release
 
 ## Solution Structure
 
-**Main Solution**: `mostlylucid.stylobot.sln` (20 projects)
+**Main Solution**: `mostlylucid.stylobot.sln`
 
 | Project | Purpose |
 |---------|---------|
 | `Mostlylucid.BotDetection` | Core detection library (NuGet package) |
-| `Mostlylucid.BotDetection.MinimalDemo` | Minimal demo - zero dependencies, shows all protection approaches |
+| `Mostlylucid.BotDetection.Api` | Public REST API for detection & dashboard data |
+| `Mostlylucid.BotDetection.ApiHolodeck` | Honeypot responses, beacon tracking, holodeck coordinator |
 | `Mostlylucid.BotDetection.UI` | Dashboard, TagHelpers, SignalR hub |
 | `Mostlylucid.BotDetection.UI.PostgreSQL` | PostgreSQL persistence layer |
-| `Mostlylucid.BotDetection.Demo` | Interactive demo with all 30 detectors |
+| `Mostlylucid.BotDetection.Llm` | LLM abstraction (`ILlmProvider`, prompts, parsing) |
+| `Mostlylucid.BotDetection.Llm.Ollama` | Ollama HTTP LLM provider |
+| `Mostlylucid.BotDetection.Llm.LlamaSharp` | LlamaSharp in-process LLM provider |
+| `Mostlylucid.BotDetection.Llm.Cloud` | Anthropic, OpenAI, Gemini LLM providers |
+| `Mostlylucid.BotDetection.Llm.Holodeck` | LLM-powered dynamic honeypot response generation |
+| `Mostlylucid.BotDetection.Demo` | Interactive demo with all detectors |
 | `Mostlylucid.BotDetection.Console` | Standalone gateway/proxy console |
+| `Mostlylucid.BotDetection.Benchmarks` | YAML-driven BenchmarkDotNet harness |
 | `Stylobot.Gateway` | Docker-first YARP reverse proxy |
 | `Mostlylucid.GeoDetection` | Geographic routing (MaxMind, ip-api) |
 | `Mostlylucid.GeoDetection.Contributor` | Geo enrichment for bot detection |
 | `Mostlylucid.Common` | Shared utilities (caching, telemetry) |
-| `Mostlylucid.BotDetection.Api` | Public REST API for detection & dashboard data |
 
 **Test Projects**: `*.Test`, `*.Tests` - xUnit + Moq
 
@@ -93,6 +99,35 @@ Detection uses an ephemeral blackboard where detectors write signals:
 **Session Analysis**: SessionVector (Markov chain → 129-dim vector, partial chain archetypes at 3-5 requests, inter-session velocity), Periodicity (rotation cadence, temporal patterns via autocorrelation)
 
 **Entity Resolution**: Merge (cosine neighbor walking), Split (velocity oscillation), Convergence (parallel behavioral vectors), L0-L5 confidence levels
+
+### Detector Benchmark Numbers
+
+Measured via YAML-driven BenchmarkDotNet harness (`Mostlylucid.BotDetection.Benchmarks/Scenarios/*.benchmark.yaml`). Run: `dotnet run --project Mostlylucid.BotDetection.Benchmarks -c Release -- --filter '*DetectorBenchmarkRunner*'`
+
+| Detector | Scenario | Mean | Allocated |
+|----------|----------|------|-----------|
+| Intent | Navigation | 2,341 ns | 5,448 B |
+| Heuristic | Bot | 4,255 ns | 2,504 B |
+| Heuristic | Human | 3,424 ns | 2,488 B |
+| Behavioral | Normal | 1,446 ns | 2,112 B |
+| Haxxor | SQL Injection | 1,306 ns | 1,608 B |
+| Header | Bot (curl) | 507 ns | 1,520 B |
+| Header | Human (Chrome) | 496 ns | 1,448 B |
+| CacheBehavior | Normal | 1,335 ns | 1,400 B |
+| Ip | Datacenter | 537 ns | 1,152 B |
+| MultiLayerCorrelation | Full signals | 330 ns | 1,088 B |
+| UserAgent | Googlebot | 829 ns | 1,072 B |
+| AiScraper | GPTBot | 572 ns | 1,016 B |
+| FastPathReputation | Cached signature | 308 ns | 928 B |
+| UserAgent | Chrome | 2,058 ns | 928 B |
+| Ip | Residential | 557 ns | 840 B |
+| TransportProtocol | Document | 145 ns | 504 B |
+| TlsFingerprint | Chrome/Bot | ~100-260 ns | 424 B |
+| Inconsistency | TLS/UA mismatch | 135 ns | 376 B |
+| CookieBehavior | With cookies | 33 ns | 184 B |
+| Http2Fingerprint | Chrome | 120 ns | 152 B |
+| HeaderCorrelation | Full headers | 50 ns | 104 B |
+| Haxxor | Clean request | 204 ns | **0 B** |
 
 ### Session Vector Architecture
 
@@ -317,6 +352,30 @@ cd sdk/node && npm install && npm run build --workspaces
 # Test
 cd sdk/node/packages/core && node --experimental-strip-types --test src/__tests__/*.test.ts
 cd sdk/node/packages/node && node --experimental-strip-types --loader ../../ts-loader.mjs --test src/__tests__/*.test.ts
+```
+
+### Holodeck (Honeypot Response System)
+
+Three-layer architecture for serving fake responses to bots hitting honeypot paths:
+
+1. **`HoneypotPathTagger`** (pre-detection middleware) - tags honeypot paths on `HttpContext.Items` before detection runs. Solves the early-exit bypass: `FastPathReputation` can no longer kill the holodeck.
+2. **`HolodeckCoordinator`** - one engagement slot per fingerprint, global cap of 10. Overflow gets normal 403.
+3. **`SimulationPackResponder`** - serves fake responses from simulation packs. Dynamic templates use `IHolodeckResponder` (LLM generation); static templates use `{{nonce}}` canary placeholders.
+
+**Beacon tracking:** `BeaconCanaryGenerator` embeds HMAC canaries in fake responses. `BeaconContributor` (priority 2) scans incoming requests for canary replay. Match links rotated fingerprints via `beacon.original_fingerprint` signal.
+
+**Capability-aware:** `AddLlmHolodeck()` registers `IHolodeckResponder`. Nodes without it serve static templates. No hard dependency on LLM being available.
+
+Core interfaces in `Mostlylucid.BotDetection/SimulationPacks/`: `IHolodeckResponder`, `ICanaryGenerator`, `IBeaconStore`.
+
+### Benchmark Harness
+
+YAML-driven BenchmarkDotNet harness in `Mostlylucid.BotDetection.Benchmarks/Scenarios/*.benchmark.yaml`.
+
+```bash
+dotnet run --project Mostlylucid.BotDetection.Benchmarks -c Release -- --filter '*DetectorBenchmarkRunner*'
+dotnet run --project Mostlylucid.BotDetection.Benchmarks -c Release -- --list-scenarios
+dotnet run --project Mostlylucid.BotDetection.Benchmarks -c Release -- --regression  # CI mode
 ```
 
 ## Production Architecture

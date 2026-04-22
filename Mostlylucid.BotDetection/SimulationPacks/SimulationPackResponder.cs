@@ -15,13 +15,22 @@ public class SimulationPackResponder : IActionPolicy
 {
     private readonly ISimulationPackRegistry _registry;
     private readonly ILogger<SimulationPackResponder> _logger;
+    private readonly IHolodeckResponder? _holodeckResponder;
+    private readonly ICanaryGenerator? _canaryGenerator;
+    private readonly IBeaconStore? _beaconStore;
 
     public SimulationPackResponder(
         ISimulationPackRegistry registry,
-        ILogger<SimulationPackResponder> logger)
+        ILogger<SimulationPackResponder> logger,
+        IHolodeckResponder? holodeckResponder = null,
+        ICanaryGenerator? canaryGenerator = null,
+        IBeaconStore? beaconStore = null)
     {
         _registry = registry;
         _logger = logger;
+        _holodeckResponder = holodeckResponder;
+        _canaryGenerator = canaryGenerator;
+        _beaconStore = beaconStore;
     }
 
     /// <inheritdoc />
@@ -82,9 +91,53 @@ public class SimulationPackResponder : IActionPolicy
         context.Response.Headers.TryAdd("X-StyloBot-Pack", matchedPack.Id);
         context.Response.Headers.TryAdd("X-StyloBot-Honeypot", "true");
 
-        if (!string.IsNullOrEmpty(template.Body))
+        // Compute canary from fingerprint if available
+        var fingerprint = context.Items.TryGetValue("Holodeck.Fingerprint", out var fpVal) ? fpVal as string : null;
+        if (fingerprint == null && evidence.Signals.TryGetValue("identity.primary_signature", out var sigVal))
+            fingerprint = sigVal?.ToString();
+        var canary = (fingerprint != null && _canaryGenerator != null)
+            ? _canaryGenerator.Generate(fingerprint, path) : null;
+
+        // Serve response -- dynamic (LLM) or static
+        if (template.Dynamic && _holodeckResponder?.IsAvailable == true)
         {
-            await context.Response.WriteAsync(template.Body, cancellationToken);
+            var requestCtx = new HolodeckRequestContext
+            {
+                Method = context.Request.Method,
+                Path = path,
+                QueryString = context.Request.QueryString.Value,
+                ContentType = context.Request.ContentType,
+                Fingerprint = fingerprint,
+                PackId = matchedPack.Id,
+                PackFramework = matchedPack.Framework,
+                PackVersion = matchedPack.Version,
+                PackPersonality = matchedPack.PromptPersonality
+            };
+
+            var holoResponse = await _holodeckResponder.GenerateAsync(template, requestCtx, canary, cancellationToken);
+            await context.Response.WriteAsync(holoResponse.Content, cancellationToken);
+
+            _logger.LogInformation(
+                "SimulationPack dynamic response: pack={PackId}, path={Path}, generated={WasGenerated}",
+                matchedPack.Id, path, holoResponse.WasGenerated);
+        }
+        else if (!string.IsNullOrEmpty(template.Body))
+        {
+            // Static fallback -- embed canary via placeholder replacement
+            var body = template.Body;
+            if (canary != null)
+            {
+                body = body.Replace("{{nonce}}", canary)
+                           .Replace("{{api_key}}", canary)
+                           .Replace("{{token}}", canary);
+            }
+            await context.Response.WriteAsync(body, cancellationToken);
+        }
+
+        // Store beacon for canary tracking on subsequent requests
+        if (canary != null && fingerprint != null && _beaconStore != null)
+        {
+            await _beaconStore.StoreAsync(canary, fingerprint, path, matchedPack.Id, TimeSpan.FromHours(24));
         }
 
         _logger.LogInformation(

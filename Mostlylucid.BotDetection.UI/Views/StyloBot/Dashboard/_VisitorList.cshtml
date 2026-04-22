@@ -51,6 +51,7 @@
                     class="btn btn-xs btn-ghost">Risk @SortIcon("risk")</button>
             <button hx-get="@SortUrl("name")" hx-target="#visitor-list" hx-swap="outerHTML transition:true"
                     class="btn btn-xs btn-ghost">Name @SortIcon("name")</button>
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "visitors")
         </div>
     </div>
 

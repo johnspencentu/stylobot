@@ -208,38 +208,6 @@ public class BotDetectionOptions
     // ==========================================
     // Legacy Ollama Settings (use AiDetection section instead)
     // ==========================================
-    // These are kept for backwards compatibility.
-    // New deployments should use AiDetection section.
-
-    /// <summary>
-    ///     [OBSOLETE] Use AiDetection.Ollama.Endpoint instead.
-    ///     This property will be removed in a future version.
-    /// </summary>
-    [Obsolete("Use AiDetection.Ollama.Endpoint instead. This property will be removed in v1.0.")]
-    public string? OllamaEndpoint { get; set; } = "http://localhost:11434";
-
-    /// <summary>
-    ///     [OBSOLETE] Use AiDetection.Ollama.Model instead.
-    ///     This property will be removed in a future version.
-    /// </summary>
-    [Obsolete("Use AiDetection.Ollama.Model instead. This property will be removed in v1.0.")]
-    public string? OllamaModel { get; set; } = LlmDefaults.DefaultModel;
-
-    /// <summary>
-    ///     [OBSOLETE] Use AiDetection.TimeoutMs instead.
-    ///     This property will be removed in a future version.
-    /// </summary>
-    [Obsolete("Use AiDetection.TimeoutMs instead. This property will be removed in v1.0.")]
-    public int LlmTimeoutMs { get; set; } = 15000;
-
-    /// <summary>
-    ///     [OBSOLETE] Use AiDetection.MaxConcurrentRequests instead.
-    ///     This property will be removed in a future version.
-    /// </summary>
-    [Obsolete("Use AiDetection.MaxConcurrentRequests instead. This property will be removed in v1.0.")]
-    public int MaxConcurrentLlmRequests { get; set; } = 5;
-
-    // ==========================================
     // Behavioral Analysis Settings
     // ==========================================
 
@@ -300,24 +268,6 @@ public class BotDetectionOptions
     ///     When disabled, lists are only loaded once at startup.
     /// </summary>
     public bool EnableBackgroundUpdates { get; set; } = true;
-
-    /// <summary>
-    ///     DEPRECATED: Use UpdateSchedule instead.
-    ///     Interval between bot list update checks in hours (default: 24)
-    ///     Valid range: 1 to 168 (1 week)
-    ///     Lists are only downloaded if they're older than this.
-    /// </summary>
-    [Obsolete("Use UpdateSchedule with cron expression instead. This will be removed in v2.0.")]
-    public int UpdateIntervalHours { get; set; } = 24;
-
-    /// <summary>
-    ///     DEPRECATED: Use UpdateSchedule instead.
-    ///     Interval between update check polls in minutes (default: 60)
-    ///     The service checks if an update is needed at this interval.
-    ///     Valid range: 5 to 1440 (24 hours)
-    /// </summary>
-    [Obsolete("Use UpdateSchedule with cron expression instead. This will be removed in v2.0.")]
-    public int UpdateCheckIntervalMinutes { get; set; } = 60;
 
     /// <summary>
     ///     Schedule configuration for bot list updates using cron expressions.
@@ -3360,15 +3310,6 @@ public class BotDetectionOptionsValidator : IValidateOptions<BotDetectionOptions
         if (options.ResponsePiiMasking.AutoApplyConfidenceThreshold is < 0.0 or > 1.0)
             errors.Add(
                 $"ResponsePiiMasking.AutoApplyConfidenceThreshold must be between 0.0 and 1.0, got {options.ResponsePiiMasking.AutoApplyConfidenceThreshold}");
-
-#pragma warning disable CS0618 // Type or member is obsolete
-        if (options.UpdateIntervalHours < 1 || options.UpdateIntervalHours > 168)
-            errors.Add($"UpdateIntervalHours must be between 1 and 168, got {options.UpdateIntervalHours}");
-
-        if (options.UpdateCheckIntervalMinutes < 5 || options.UpdateCheckIntervalMinutes > 1440)
-            errors.Add(
-                $"UpdateCheckIntervalMinutes must be between 5 and 1440, got {options.UpdateCheckIntervalMinutes}");
-#pragma warning restore CS0618 // Type or member is obsolete
 
         // Validate Ollama settings only when using Ollama provider
         if (options.EnableLlmDetection && options.AiDetection.Provider == AiProvider.Ollama)

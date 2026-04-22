@@ -454,14 +454,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
         _refreshTimer?.Dispose();
     }
 
-    /// <summary>
-    ///     Mask an IP for logging (zero-PII). Shows first octet only for IPv4.
-    /// </summary>
-    private static string MaskIp(string ip)
-    {
-        var dotIndex = ip.IndexOf('.');
-        return dotIndex > 0 ? $"{ip[..dotIndex]}.*.*.*" : "***";
-    }
+    private static string MaskIp(string ip) => Helpers.PrivacyHelper.MaskIp(ip);
 
     private sealed record BotDefinition(
         string Name,

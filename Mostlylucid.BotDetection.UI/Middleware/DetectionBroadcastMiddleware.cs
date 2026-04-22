@@ -196,7 +196,7 @@ public partial class DetectionBroadcastMiddleware
         {
             SignatureId = Guid.NewGuid().ToString("N")[..12],
             Timestamp = DateTime.UtcNow,
-            PrimarySignature = detection.PrimarySignature,
+            PrimarySignature = detection.PrimarySignature ?? detection.RequestId,
             IpSignature = factors.IpSig,
             UaSignature = factors.UaSig,
             ClientSideSignature = factors.ClientSig,
@@ -560,43 +560,7 @@ public partial class DetectionBroadcastMiddleware
 
     // ─── Static utilities ────────────────────────────────────────────────
 
-    /// <summary>
-    ///     Check if an IP address is a local/private network address.
-    ///     Supports both IPv4 and IPv6.
-    /// </summary>
-    internal static bool IsLocalIp(IPAddress? ip)
-    {
-        if (ip == null) return false;
-        if (IPAddress.IsLoopback(ip)) return true;
-
-        if (ip.IsIPv6LinkLocal) return true;
-        if (ip.IsIPv6SiteLocal) return true;
-
-        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-        {
-            var bytes = ip.GetAddressBytes();
-            if ((bytes[0] & 0xFE) == 0xFC) return true;
-        }
-
-        if (ip.IsIPv4MappedToIPv6)
-            ip = ip.MapToIPv4();
-
-        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            var bytes = ip.GetAddressBytes();
-            return bytes[0] switch
-            {
-                10 => true,                                    // 10.0.0.0/8
-                172 => bytes[1] >= 16 && bytes[1] <= 31,       // 172.16.0.0/12
-                192 => bytes[1] == 168,                        // 192.168.0.0/16
-                169 => bytes[1] == 254,                        // 169.254.0.0/16 (link-local)
-                127 => true,                                   // 127.0.0.0/8
-                _ => false
-            };
-        }
-
-        return false;
-    }
+    internal static bool IsLocalIp(IPAddress? ip) => Mostlylucid.BotDetection.Helpers.NetworkHelper.IsLocalIp(ip);
 
     private static string? ResolveCountryFromHeaders(HttpContext context)
     {
@@ -701,38 +665,13 @@ public partial class DetectionBroadcastMiddleware
 
     private static (string? Browser, string? Version) ParseBrowserFromUa(string ua)
     {
-        ReadOnlySpan<char> uaSpan = ua.AsSpan();
-
-        if (ua.Contains("Edg/", StringComparison.Ordinal))
-            return ("Edge", ExtractVersion(uaSpan, "Edg/"));
-        if (ua.Contains("OPR/", StringComparison.Ordinal))
-            return ("Opera", ExtractVersion(uaSpan, "OPR/"));
-        if (ua.Contains("Firefox/", StringComparison.Ordinal))
-            return ("Firefox", ExtractVersion(uaSpan, "Firefox/"));
-        if (ua.Contains("Chrome/", StringComparison.Ordinal) && !ua.Contains("Chromium", StringComparison.Ordinal))
-            return ("Chrome", ExtractVersion(uaSpan, "Chrome/"));
-        if (ua.Contains("Safari/", StringComparison.Ordinal) && ua.Contains("Version/", StringComparison.Ordinal))
-            return ("Safari", ExtractVersion(uaSpan, "Version/"));
-        if (ua.Contains("bot", StringComparison.OrdinalIgnoreCase) ||
-            ua.Contains("crawler", StringComparison.OrdinalIgnoreCase) ||
-            ua.Contains("spider", StringComparison.OrdinalIgnoreCase))
+        var (family, version) = Mostlylucid.BotDetection.Helpers.UserAgentParser.Parse(ua);
+        // Return null for bot/tool UAs and "Other" to preserve the original behavior
+        // where bots returned (null, null) and only browsers populated signals
+        if (family is "Other" or "curl" or "Python" or "Go" or "Java" or "Node.js" or "wget"
+            or "Googlebot" or "Bingbot" or "GPTBot" or "ClaudeBot")
             return (null, null);
-
-        return (null, null);
-    }
-
-    private static string? ExtractVersion(ReadOnlySpan<char> ua, string token)
-    {
-        var idx = ua.IndexOf(token.AsSpan(), StringComparison.Ordinal);
-        if (idx < 0) return null;
-        var start = idx + token.Length;
-        var end = start;
-        while (end < ua.Length && (char.IsDigit(ua[end]) || ua[end] == '.'))
-            end++;
-        if (end == start) return null;
-        var full = ua[start..end].ToString();
-        var dot = full.IndexOf('.');
-        return dot > 0 ? full[..dot] : full;
+        return (family, version);
     }
 
     /// <summary>

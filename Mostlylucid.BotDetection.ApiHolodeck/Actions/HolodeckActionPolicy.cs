@@ -49,6 +49,7 @@ public class HolodeckActionPolicy : IActionPolicy
 
     // Track context memory names per bot (for consistent fake worlds)
     private static readonly ConcurrentDictionary<string, string> _contextMemoryNames = new();
+    private readonly HolodeckCoordinator _coordinator;
     private readonly HttpClient _httpClient;
     private readonly ILogger<HolodeckActionPolicy> _logger;
     private readonly HolodeckOptions _options;
@@ -58,11 +59,13 @@ public class HolodeckActionPolicy : IActionPolicy
         IHttpClientFactory httpClientFactory,
         IOptions<HolodeckOptions> options,
         ILogger<HolodeckActionPolicy> logger,
+        HolodeckCoordinator coordinator,
         IShapeBuilder? shapeBuilder = null)
     {
         _httpClient = httpClientFactory.CreateClient("Holodeck");
         _options = options.Value;
         _logger = logger;
+        _coordinator = coordinator;
         _shapeBuilder = shapeBuilder;
 
         // Configure timeout
@@ -84,134 +87,146 @@ public class HolodeckActionPolicy : IActionPolicy
         // Generate context key for this bot
         var contextKey = GetContextKey(context, evidence);
 
-        // Get or create a consistent context memory name for this bot
-        var contextMemoryName = GetContextMemoryName(contextKey, evidence);
-
-        // Check if we've studied this bot enough
-        var requestCount = _requestCounts.AddOrUpdate(contextKey, 1, (_, count) => count + 1);
-
-        if (_options.MaxStudyRequests > 0 && requestCount > _options.MaxStudyRequests)
+        // Gate: one holodeck engagement per fingerprint, global capacity limit
+        if (!_coordinator.TryEngage(contextKey, out var slot))
         {
-            _logger.LogInformation(
-                "Holodeck cutoff reached for {Context}: {Count}/{Max} requests. Hard blocking.",
-                contextKey, requestCount, _options.MaxStudyRequests);
-
-            context.Response.StatusCode = 403;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "Access denied",
-                code = "RATE_LIMITED"
-            }, cancellationToken);
-
-            return ActionResult.Blocked(403, $"Holodeck cutoff: {requestCount} requests from {contextKey}");
+            _logger.LogDebug("[HOLODECK] Coordinator rejected {Context} (busy or capacity full)", contextKey);
+            return new ActionResult { Continue = true, Description = "Holodeck coordinator busy" };
         }
 
-        // Analyze request shape for intelligent API simulation
-        ShapeAnalysisResult? shapeResult = null;
-        if (_shapeBuilder != null)
+        using (slot!)
+        {
+            // Get or create a consistent context memory name for this bot
+            var contextMemoryName = GetContextMemoryName(contextKey, evidence);
+
+            // Check if we've studied this bot enough
+            var requestCount = _requestCounts.AddOrUpdate(contextKey, 1, (_, count) => count + 1);
+
+            if (_options.MaxStudyRequests > 0 && requestCount > _options.MaxStudyRequests)
+            {
+                _logger.LogInformation(
+                    "Holodeck cutoff reached for {Context}: {Count}/{Max} requests. Hard blocking.",
+                    contextKey, requestCount, _options.MaxStudyRequests);
+
+                context.Response.StatusCode = 403;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = "Access denied",
+                    code = "RATE_LIMITED"
+                }, cancellationToken);
+
+                return ActionResult.Blocked(403, $"Holodeck cutoff: {requestCount} requests from {contextKey}");
+            }
+
+            // Analyze request shape for intelligent API simulation
+            ShapeAnalysisResult? shapeResult = null;
+            if (_shapeBuilder != null)
+                try
+                {
+                    shapeResult = await _shapeBuilder.AnalyzeAsync(context, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Shape analysis failed, using defaults");
+                }
+
+            var shape = shapeResult?.Shape ?? "generic";
+            var simulationType = shapeResult?.SimulationType ?? ApiSimulationType.RestJson;
+
+            _logger.LogInformation(
+                "Routing to holodeck: {Method} {Path} -> {MockApi} (context={Context}, memory={Memory}, shape={Shape}, type={Type}, mode={Mode}, request #{Count})",
+                context.Request.Method,
+                context.Request.Path,
+                _options.MockApiBaseUrl,
+                contextKey,
+                contextMemoryName,
+                shape,
+                simulationType,
+                _options.Mode,
+                requestCount);
+
             try
             {
-                shapeResult = await _shapeBuilder.AnalyzeAsync(context, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Shape analysis failed, using defaults");
-            }
+                // Build the mock API URL with shape parameter
+                var mockUrl = BuildMockUrl(context, contextKey, shape);
 
-        var shape = shapeResult?.Shape ?? "generic";
-        var simulationType = shapeResult?.SimulationType ?? ApiSimulationType.RestJson;
+                // Forward the request to MockLLMApi
+                using var proxyRequest = CreateProxyRequest(context, mockUrl);
 
-        _logger.LogInformation(
-            "Routing to holodeck: {Method} {Path} -> {MockApi} (context={Context}, memory={Memory}, shape={Shape}, type={Type}, mode={Mode}, request #{Count})",
-            context.Request.Method,
-            context.Request.Path,
-            _options.MockApiBaseUrl,
-            contextKey,
-            contextMemoryName,
-            shape,
-            simulationType,
-            _options.Mode,
-            requestCount);
+                // Add holodeck-specific headers
+                proxyRequest.Headers.TryAddWithoutValidation("X-Holodeck-Context", contextKey);
+                proxyRequest.Headers.TryAddWithoutValidation("X-Holodeck-Mode", _options.Mode.ToString());
+                proxyRequest.Headers.TryAddWithoutValidation("X-Holodeck-Request-Number", requestCount.ToString());
 
-        try
-        {
-            // Build the mock API URL with shape parameter
-            var mockUrl = BuildMockUrl(context, contextKey, shape);
+                // Add MockLLMApi context memory name for consistent fake world
+                proxyRequest.Headers.TryAddWithoutValidation("X-Context-Memory", contextMemoryName);
 
-            // Forward the request to MockLLMApi
-            using var proxyRequest = CreateProxyRequest(context, mockUrl);
+                // Add shape/simulation type headers for MockLLMApi
+                proxyRequest.Headers.TryAddWithoutValidation("X-Response-Shape", shape);
+                proxyRequest.Headers.TryAddWithoutValidation("X-Simulation-Type", simulationType.ToString());
 
-            // Add holodeck-specific headers
-            proxyRequest.Headers.TryAddWithoutValidation("X-Holodeck-Context", contextKey);
-            proxyRequest.Headers.TryAddWithoutValidation("X-Holodeck-Mode", _options.Mode.ToString());
-            proxyRequest.Headers.TryAddWithoutValidation("X-Holodeck-Request-Number", requestCount.ToString());
+                // Add OpenAPI spec URL if we detected a known pattern
+                if (!string.IsNullOrEmpty(shapeResult?.OpenApiSpecUrl))
+                    proxyRequest.Headers.TryAddWithoutValidation("X-OpenApi-Spec", shapeResult.OpenApiSpecUrl);
 
-            // Add MockLLMApi context memory name for consistent fake world
-            proxyRequest.Headers.TryAddWithoutValidation("X-Context-Memory", contextMemoryName);
+                // Add mode-specific configuration
+                AddModeHeaders(proxyRequest);
 
-            // Add shape/simulation type headers for MockLLMApi
-            proxyRequest.Headers.TryAddWithoutValidation("X-Response-Shape", shape);
-            proxyRequest.Headers.TryAddWithoutValidation("X-Simulation-Type", simulationType.ToString());
+                var response = await _httpClient.SendAsync(
+                    proxyRequest,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
 
-            // Add OpenAPI spec URL if we detected a known pattern
-            if (!string.IsNullOrEmpty(shapeResult?.OpenApiSpecUrl))
-                proxyRequest.Headers.TryAddWithoutValidation("X-OpenApi-Spec", shapeResult.OpenApiSpecUrl);
+                // Copy response to client
+                context.Response.StatusCode = (int)response.StatusCode;
 
-            // Add mode-specific configuration
-            AddModeHeaders(proxyRequest);
+                // Copy headers (except transfer-encoding which ASP.NET handles)
+                foreach (var header in response.Headers)
+                    if (!header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+                        context.Response.Headers[header.Key] = header.Value.ToArray();
 
-            var response = await _httpClient.SendAsync(
-                proxyRequest,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
-
-            // Copy response to client
-            context.Response.StatusCode = (int)response.StatusCode;
-
-            // Copy headers (except transfer-encoding which ASP.NET handles)
-            foreach (var header in response.Headers)
-                if (!header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+                foreach (var header in response.Content.Headers)
                     context.Response.Headers[header.Key] = header.Value.ToArray();
 
-            foreach (var header in response.Content.Headers)
-                context.Response.Headers[header.Key] = header.Value.ToArray();
+                // Add holodeck indicator headers (for debugging)
+                context.Response.Headers["X-Holodeck"] = "true";
+                context.Response.Headers["X-Holodeck-Context"] = contextKey;
+                context.Response.Headers["X-Holodeck-Memory"] = contextMemoryName;
+                context.Response.Headers["X-Holodeck-Shape"] = shape;
+                context.Response.Headers["X-Holodeck-SimType"] = simulationType.ToString();
 
-            // Add holodeck indicator headers (for debugging)
-            context.Response.Headers["X-Holodeck"] = "true";
-            context.Response.Headers["X-Holodeck-Context"] = contextKey;
-            context.Response.Headers["X-Holodeck-Memory"] = contextMemoryName;
-            context.Response.Headers["X-Holodeck-Shape"] = shape;
-            context.Response.Headers["X-Holodeck-SimType"] = simulationType.ToString();
+                // Stream response body
+                await response.Content.CopyToAsync(context.Response.Body, cancellationToken);
 
-            // Stream response body
-            await response.Content.CopyToAsync(context.Response.Body, cancellationToken);
-
-            return new ActionResult
-            {
-                Continue = false,
-                StatusCode = (int)response.StatusCode,
-                Description = $"Holodeck response from MockLLMApi (mode={_options.Mode}, shape={shape})",
-                Metadata = new Dictionary<string, object>
+                return new ActionResult
                 {
-                    ["context"] = contextKey,
-                    ["contextMemory"] = contextMemoryName,
-                    ["shape"] = shape,
-                    ["simulationType"] = simulationType.ToString(),
-                    ["mode"] = _options.Mode.ToString(),
-                    ["requestNumber"] = requestCount,
-                    ["mockUrl"] = mockUrl
-                }
-            };
-        }
-        catch (TaskCanceledException)
-        {
-            _logger.LogWarning("Holodeck request timed out for {Context}", contextKey);
-            return await FallbackResponse(context, "Holodeck timeout", shapeResult?.ContentType, cancellationToken);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Holodeck request failed for {Context}", contextKey);
-            return await FallbackResponse(context, "Holodeck unavailable", shapeResult?.ContentType, cancellationToken);
+                    Continue = false,
+                    StatusCode = (int)response.StatusCode,
+                    Description = $"Holodeck response from MockLLMApi (mode={_options.Mode}, shape={shape})",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["context"] = contextKey,
+                        ["contextMemory"] = contextMemoryName,
+                        ["shape"] = shape,
+                        ["simulationType"] = simulationType.ToString(),
+                        ["mode"] = _options.Mode.ToString(),
+                        ["requestNumber"] = requestCount,
+                        ["mockUrl"] = mockUrl
+                    }
+                };
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogWarning("Holodeck request timed out for {Context}", contextKey);
+                return await FallbackResponse(context, "Holodeck timeout", shapeResult?.ContentType,
+                    cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Holodeck request failed for {Context}", contextKey);
+                return await FallbackResponse(context, "Holodeck unavailable", shapeResult?.ContentType,
+                    cancellationToken);
+            }
         }
     }
 

@@ -100,7 +100,7 @@ public class AccountTakeoverContributor : ConfiguredContributorBase
     {
         try
         {
-            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature);
             if (string.IsNullOrEmpty(signature))
                 return EmptyResult;
 

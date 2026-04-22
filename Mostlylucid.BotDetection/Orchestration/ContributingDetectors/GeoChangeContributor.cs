@@ -72,8 +72,8 @@ public class GeoChangeContributor : ConfiguredContributorBase
             if (string.IsNullOrEmpty(countryCode))
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
 
-            // Use waveform signature as the stable visitor identity for drift tracking
-            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
+            // Use the unified HMAC primary signature as the stable visitor identity.
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature);
 
             // Always feed country reputation tracker
             var countryName = state.GetSignal<string>("geo.country_name") ?? countryCode;

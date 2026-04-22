@@ -164,7 +164,7 @@ public class ClusterContributorTests
     }
 
     [Fact]
-    public void TriggerConditions_RequiresWaveformSignature()
+    public void TriggerConditions_RequiresPrimarySignature()
     {
         var contributor = CreateContributor();
         Assert.Single(contributor.TriggerConditions);
@@ -193,7 +193,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor();
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "orphan-sig"
+            [SignalKeys.PrimarySignature] = "orphan-sig"
         });
 
         var result = await contributor.ContributeAsync(state, CancellationToken.None);
@@ -218,7 +218,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor(countryTracker: tracker);
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "some-sig",
+            [SignalKeys.PrimarySignature] = "some-sig",
             ["geo.country_code"] = "RU"
         });
 
@@ -251,7 +251,7 @@ public class ClusterContributorTests
             });
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "some-sig",
+            [SignalKeys.PrimarySignature] = "some-sig",
             ["geo.country_code"] = "CN"
         });
 
@@ -277,7 +277,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor(countryTracker: tracker);
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "some-sig",
+            [SignalKeys.PrimarySignature] = "some-sig",
             ["geo.country_code"] = "US"
         });
 
@@ -314,7 +314,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor(countryTracker: tracker);
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "some-sig",
+            [SignalKeys.PrimarySignature] = "some-sig",
             ["geo.country_code"] = "JP"
         });
 
@@ -354,7 +354,7 @@ public class ClusterContributorTests
         // A non-clustered signature that shares ASN with the cluster
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "marginal-sig",
+            [SignalKeys.PrimarySignature] = "marginal-sig",
             ["request.ip.asn"] = "AS15169",
             ["geo.country_code"] = "DE" // Different country
         });
@@ -386,7 +386,7 @@ public class ClusterContributorTests
         // Non-matching ASN and country
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "unrelated-sig",
+            [SignalKeys.PrimarySignature] = "unrelated-sig",
             ["request.ip.asn"] = "AS9999",
             ["geo.country_code"] = "JP"
         });
@@ -456,7 +456,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor(clusterService: clusterService);
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = clusteredSig
+            [SignalKeys.PrimarySignature] = clusteredSig
         });
 
         var result = await contributor.ContributeAsync(state, CancellationToken.None);
@@ -502,7 +502,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor(clusterService: clusterService);
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = clusteredSig
+            [SignalKeys.PrimarySignature] = clusteredSig
         });
 
         var result = await contributor.ContributeAsync(state, CancellationToken.None);
@@ -535,7 +535,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor(countryTracker: tracker);
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = "neutral-sig",
+            [SignalKeys.PrimarySignature] = "neutral-sig",
             ["geo.country_code"] = "FR"
         });
 
@@ -560,7 +560,7 @@ public class ClusterContributorTests
         var contributor = CreateContributor();
         var state = CreateState(new Dictionary<string, object>
         {
-            [SignalKeys.WaveformSignature] = (object)null!
+            [SignalKeys.PrimarySignature] = (object)null!
         });
 
         // Should not throw

@@ -45,7 +45,7 @@ public class BehavioralDetector : IDetector
         var stopwatch = Stopwatch.StartNew();
         var result = new DetectorResult();
         var confidence = 0.0;
-        var reasons = new List<DetectionReason>();
+        var reasons = new List<DetectionReason>(4);
 
         var ipAddress = GetClientIp(context);
         if (string.IsNullOrEmpty(ipAddress))
@@ -195,9 +195,11 @@ public class BehavioralDetector : IDetector
         // would otherwise cause false positives.
         // Also skip for programmatic requests: API polling, SignalR keep-alive, and
         // dashboard auto-refresh legitimately have regular timing patterns.
-        var hasFetchMetadataEarly = !string.IsNullOrEmpty(context.Request.Headers["Sec-Fetch-Site"].FirstOrDefault());
-        var hasApiKeyEarly = context.Items.ContainsKey("BotDetection.ApiKeyContext");
-        var isProgrammaticEarly = hasFetchMetadataEarly || hasApiKeyEarly;
+        // Read Sec-Fetch-Site once and reuse below to avoid duplicate header lookups.
+        var secFetchSite = context.Request.Headers["Sec-Fetch-Site"].FirstOrDefault();
+        var hasFetchMetadata = !string.IsNullOrEmpty(secFetchSite);
+        var hasApiKey = context.Items.ContainsKey("BotDetection.ApiKeyContext");
+        var isProgrammaticEarly = hasFetchMetadata || hasApiKey;
 
         var timingPattern = AnalyzeRequestTiming(ipAddress);
         if (!isWarmingUp && timingPattern.IsSuspicious && !isProgrammaticEarly)
@@ -249,9 +251,7 @@ public class BehavioralDetector : IDetector
         // Programmatic request detection: any Sec-Fetch-* header means a real browser
         // (bots rarely send these correctly), and API key holders are trusted clients.
         // Both legitimately omit cookies, referer, and have regular timing patterns.
-        var secFetchSite = context.Request.Headers["Sec-Fetch-Site"].FirstOrDefault();
-        var hasFetchMetadata = !string.IsNullOrEmpty(secFetchSite);
-        var hasApiKey = context.Items.ContainsKey("BotDetection.ApiKeyContext");
+        // (hasFetchMetadata and hasApiKey already computed above)
         var isFetchRequest = hasFetchMetadata ||
                              context.Request.Headers["X-Requested-With"].FirstOrDefault() == "XMLHttpRequest" ||
                              hasApiKey;
@@ -290,7 +290,7 @@ public class BehavioralDetector : IDetector
         // Skip for HTMX/fetch sub-requests - many sites don't set cookies at all,
         // and penalizing cookie-less AJAX from real browsers is a false positive.
         if (!isWarmingUp && !isHtmxRequest && !isFetchRequest &&
-            !context.Request.Cookies.Any() && totalRequestCount > 2)
+            context.Request.Cookies.Count == 0 && totalRequestCount > 2)
         {
             confidence += 0.25;
             reasons.Add(new DetectionReason
@@ -377,9 +377,15 @@ public class BehavioralDetector : IDetector
 
             if (!profile.SeenPaths.Contains(currentPath))
             {
+                if (profile.SeenPaths.Count >= 100) // Limit size — evict one entry before adding
+                {
+                    var enumerator = profile.SeenPaths.GetEnumerator();
+                    enumerator.MoveNext();
+                    var toRemove = enumerator.Current;
+                    enumerator.Dispose();
+                    profile.SeenPaths.Remove(toRemove);
+                }
                 profile.SeenPaths.Add(currentPath);
-                if (profile.SeenPaths.Count > 100) // Limit size
-                    profile.SeenPaths.Remove(profile.SeenPaths.First());
             }
 
             // Capture state for anomaly checks outside the lock
@@ -426,9 +432,15 @@ public class BehavioralDetector : IDetector
         bool wasNew;
         lock (wrapper.SyncRoot)
         {
+            if (wrapper.Paths.Count >= 50) // Evict one entry before adding
+            {
+                var enumerator = wrapper.Paths.GetEnumerator();
+                enumerator.MoveNext();
+                var toRemove = enumerator.Current;
+                enumerator.Dispose();
+                wrapper.Paths.Remove(toRemove);
+            }
             wasNew = wrapper.Paths.Add(currentPath);
-            if (wrapper.Paths.Count > 50)
-                wrapper.Paths.Remove(wrapper.Paths.First());
         }
 
         return wasNew ? 1.0 : 0.0;
@@ -436,8 +448,16 @@ public class BehavioralDetector : IDetector
 
     private string? GetClientIp(HttpContext context)
     {
-        return context.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
-               ?? context.Connection.RemoteIpAddress?.ToString();
+        var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(forwarded))
+        {
+            // Avoid string.Split allocation - find first comma manually
+            var commaIdx = forwarded.IndexOf(',');
+            var first = commaIdx >= 0 ? forwarded.AsSpan(0, commaIdx).Trim().ToString() : forwarded.Trim();
+            if (first.Length > 0) return first;
+        }
+
+        return context.Connection.RemoteIpAddress?.ToString();
     }
 
     /// <summary>
@@ -478,10 +498,27 @@ public class BehavioralDetector : IDetector
 
         // File extension check - known asset extensions are NOT page requests
         var path = context.Request.Path.Value ?? "/";
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext is ".js" or ".css" or ".png" or ".jpg" or ".jpeg" or ".gif" or ".svg" or ".ico"
-            or ".woff" or ".woff2" or ".ttf" or ".eot" or ".map" or ".webp" or ".avif"
-            or ".mp4" or ".webm" or ".json" or ".xml")
+        var ext = Path.GetExtension(path.AsSpan());
+        if (!ext.IsEmpty && (
+            ext.Equals(".js", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".css", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".svg", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".ico", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".woff", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".woff2", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".ttf", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".eot", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".map", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".webp", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".avif", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".webm", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)))
             return false;
 
         // API path pattern
@@ -495,7 +532,7 @@ public class BehavioralDetector : IDetector
             return true;
 
         // No extension = likely page, otherwise assume asset
-        return string.IsNullOrEmpty(ext);
+        return ext.IsEmpty;
     }
 
     private DateTime? GetLastRequestTime(string ipAddress)
@@ -519,7 +556,9 @@ public class BehavioralDetector : IDetector
             return new TimingWrapper();
         })!;
 
-        List<DateTime> snapshot;
+        int count;
+        // Stack-allocated buffer for up to 10 timestamps — avoids ToList() copy
+        Span<DateTime> snapshot = stackalloc DateTime[10];
         lock (wrapper.SyncRoot)
         {
             wrapper.Timings.Add(DateTime.UtcNow);
@@ -528,22 +567,36 @@ public class BehavioralDetector : IDetector
             if (wrapper.Timings.Count > 10)
                 wrapper.Timings.RemoveRange(0, wrapper.Timings.Count - 10);
 
-            snapshot = wrapper.Timings.ToList();
+            count = wrapper.Timings.Count;
+            for (var i = 0; i < count; i++)
+                snapshot[i] = wrapper.Timings[i];
         }
 
         // Check if requests are too evenly spaced (bot-like)
         // Require 8+ requests for statistical reliability.
         // stdDev < 0.2 catches real bots (near-identical intervals) while
         // allowing normal browser JS-triggered XHR which has stdDev 0.3-0.6.
-        if (snapshot.Count >= 8)
+        if (count >= 8)
         {
-            var intervals = new List<double>();
-            for (var i = 1; i < snapshot.Count; i++) intervals.Add((snapshot[i] - snapshot[i - 1]).TotalSeconds);
+            // Compute intervals inline without allocating a List<double>
+            Span<double> intervals = stackalloc double[count - 1];
+            for (var i = 1; i < count; i++)
+                intervals[i - 1] = (snapshot[i] - snapshot[i - 1]).TotalSeconds;
 
-            // Calculate standard deviation
-            var mean = intervals.Average();
-            var variance = intervals.Average(x => Math.Pow(x - mean, 2));
-            var stdDev = Math.Sqrt(variance);
+            // Calculate mean without LINQ
+            var sum = 0.0;
+            for (var i = 0; i < intervals.Length; i++) sum += intervals[i];
+            var mean = sum / intervals.Length;
+
+            // Calculate variance without LINQ lambda
+            var varianceSum = 0.0;
+            for (var i = 0; i < intervals.Length; i++)
+            {
+                var diff = intervals[i] - mean;
+                varianceSum += diff * diff;
+            }
+
+            var stdDev = Math.Sqrt(varianceSum / intervals.Length);
 
             // Very low standard deviation means requests are too regular
             if (stdDev < 0.2 && mean < 5) return (true, $"Too regular interval: {mean:F2}s ± {stdDev:F2}s");

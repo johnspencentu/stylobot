@@ -5,7 +5,71 @@ All notable changes to StyloBot are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v5.6
+## [6.0.0-beta1] - 2026-04-22
+
+### Added
+
+#### Public API & SDK Ecosystem
+- **`Mostlylucid.BotDetection.Api`** - Canonical REST API at `/api/v1/*` for all SDK clients
+  - `POST /api/v1/detect` and `/detect/batch` - detection-as-a-service via synthetic HttpContext bridge
+  - 10 read endpoints: detections, sessions, signatures, summary, timeseries, countries, endpoints, topbots, threats, me
+  - Three auth tiers: proxy headers (zero-latency), API key (`X-SB-Api-Key`), OIDC bearer (commercial)
+  - OpenAPI spec at `/api/v1/openapi.json`
+- **`@stylobot/core`** (npm) - Zero-dep TypeScript types, `StyloBotClient`, header parser. Works in Node/Deno/Bun
+- **`@stylobot/node`** (npm) - Express middleware (`styloBotMiddleware`), Fastify plugin (`styloBotPlugin`)
+  - Two modes: `headers` (behind Gateway, zero-latency) or `api` (sidecar, calls detect endpoint)
+- **Response header injection** - `X-StyloBot-IsBot`, `X-StyloBot-Probability`, `X-StyloBot-Confidence`, etc. (11 headers)
+
+#### Holodeck Rearchitecture
+- **`HoneypotPathTagger`** - Pre-detection middleware tags honeypot paths before any detector runs; fixes holodeck bypass caused by FastPathReputation early exit
+- **`HolodeckCoordinator`** - Ephemeral keyed sequential slots: one holodeck engagement per fingerprint, global capacity cap (default 10)
+- **`BeaconCanaryGenerator`** - HMAC-SHA256 deterministic canary generation per fingerprint+path
+- **`BeaconStore`** - SQLite canary-to-fingerprint persistence for rotation tracking
+- **`BeaconContributor`** - Priority 2 detector scans requests for canary values, writes `beacon.matched` + `beacon.original_fingerprint` signals for entity resolution
+- **Signal-driven holodeck transitions** - `HoneypotTriggered`, `attack.detected`, `cve.probe.detected` signals trigger holodeck instead of score bands
+
+#### LLM Holodeck Plugin
+- **`Mostlylucid.BotDetection.Llm.Holodeck`** - In-process fake response generation using system's existing `ILlmProvider`
+  - Replaces external MockLLMApi HTTP proxy with direct `ILlmProvider.CompleteAsync()` calls
+  - `HolodeckPromptBuilder` - builds prompts from `ResponseHints` + canary embedding instructions
+  - `HolodeckResponseCache` - per-fingerprint+path cache with TTL, avoids redundant LLM calls
+  - Capability-aware: nodes without LLM serve static templates automatically
+- **Core interfaces** - `IHolodeckResponder`, `ICanaryGenerator`, `IBeaconStore` defined in core for clean dependency boundaries
+- **`SimulationPackResponder`** enhanced - dynamic LLM generation for `Dynamic = true` templates, static fallback with `{{nonce}}`/`{{api_key}}`/`{{token}}` canary placeholders
+
+#### YAML-Driven Benchmark Harness
+- **26 benchmark scenarios** in `Scenarios/*.benchmark.yaml` - define detector, request, signals, thresholds per file
+- **`DetectorBenchmarkRunner`** - generic BenchmarkDotNet class, one benchmark per YAML via `[ParamsSource]`
+- **`PipelineBenchmarkRunner`** - full orchestrator benchmarks
+- **`RegressionChecker`** - post-run threshold validation for CI (`--regression` flag)
+- CLI: `--filter`, `--list-scenarios`, `--regression`
+
+### Changed
+
+- **Detector tuning** - 3 KB/request saved across top 3 allocators:
+  - IntentContributor: 6,104B to 5,448B (-11%) - pre-sized dict, span counting, OrdinalIgnoreCase
+  - HeuristicFeatureExtractor: 3,472B to 2,488B (-28%) - eliminated ToLowerInvariant, pre-sized dict
+  - BehavioralDetector: 2,688B to 2,112B (-21%) - stackalloc timing, span IP parsing, LINQ removal
+- **`PromptPersonality`** added to `SimulationPack` model for LLM-driven pack personality
+
+### Removed
+
+- **3 dead projects** deleted: `Mostlylucid.GeoDetection.Demo` (79 days stale), `Mostlylucid.BotDetection.SignatureStore` (orphaned), `Mostlylucid.BotDetection.MinimalDemo` (documentation artifact)
+- **`InMemoryDashboardEventStore`** (~565 lines) - replaced by SQLite/PostgreSQL stores
+- **`InMemorySignatureLabelStore`** (~69 lines) - replaced by SQLite store
+- **`SignatureTransitionEvent`** model - zero references
+- **6 deprecated `BotDetectionOptions` properties** - `OllamaEndpoint`, `OllamaModel`, `LlmTimeoutMs`, `MaxConcurrentLlmRequests`, `UpdateIntervalHours`, `UpdateCheckIntervalMinutes`
+- **`WaveformSignature`** constant - all code migrated to `PrimarySignature`
+- **All `#pragma warning disable CS0618` blocks** in BotListUpdateService
+
+### Fixed
+
+- **API auth policy registration** - `RequireAuthorization("StyloBotApiKey")` was missing authorization policy, causing 500 on all `/api/v1/*` endpoints
+- **Flaky cache eviction test** - `HolodeckResponseCache` used timestamp ordering (same-millisecond entries picked arbitrarily); replaced with monotonic counter
+
+---
+
+## [6.0.0-alpha] - 2026-04-17
 
 ### Added
 

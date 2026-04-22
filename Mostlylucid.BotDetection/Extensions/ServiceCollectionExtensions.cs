@@ -19,12 +19,14 @@ using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Telemetry;
 using Mostlylucid.BotDetection.ThreatIntel;
 using Mostlylucid.BotDetection.Orchestration;
+using Mostlylucid.BotDetection.Orchestration.Audit;
 using Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.BotDetection.Persistence;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.Similarity;
+using Mostlylucid.BotDetection.Compliance;
 using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.Extensions;
@@ -321,6 +323,16 @@ public static class ServiceCollectionExtensions
         // container can render live events without being in the request path.
         services.TryAddSingleton<Orchestration.Telemetry.IDetectionEventPublisher,
             Orchestration.Telemetry.NullDetectionEventPublisher>();
+
+        // Audit processors read the same raw signal trace used by the detection pipeline
+        // and emit derived audit records to one or more sinks. Commercial packages can
+        // add processor/sink packs without replacing the FOSS defaults.
+        services.AddOptions<AuditProcessorOptions>()
+            .BindConfiguration("BotDetection:AuditProcessors");
+        services.TryAddSingleton<AuditProcessorDispatcher>();
+        services.TryAddSingleton<IAuditRecordWriter, AuditRecordWriter>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditSink, LoggerAuditSink>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditProcessor, ErrorSignalAuditProcessor>());
 
         // FOSS hot-reload: watch {ContentRoot}/stylobot-config for YAML/JSON edits and
         // invalidate the DetectorConfigProvider cache on change. Hosted service starts
@@ -735,6 +747,18 @@ public static class ServiceCollectionExtensions
 
         // Register action policy registry (holds named action policies)
         services.TryAddSingleton<IActionPolicyRegistry, ActionPolicyRegistry>();
+
+        // ==========================================
+        // Compliance packs
+        // ==========================================
+        services.TryAddSingleton<ICompliancePackProvider>(sp =>
+        {
+            var configuration = sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var compliancePackId = configuration?.GetValue<string>("BotDetection:CompliancePack") ?? "balanced-default";
+            return new InMemoryCompliancePackProvider(
+                compliancePackId,
+                sp.GetRequiredService<ILogger<InMemoryCompliancePackProvider>>());
+        });
     }
 
     /// <summary>
