@@ -17,4 +17,10 @@
         <ProjectReference Include="..\Mostlylucid.BotDetection\Mostlylucid.BotDetection.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <None Update="Scenarios\**\*.benchmark.yaml">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
 </Project>
