@@ -21,14 +21,6 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// </summary>
 public class IpContributor : ConfiguredContributorBase
 {
-    // Local/private IP ranges (includes "localhost" as a string)
-    private static readonly string[] LocalPrefixes =
-    [
-        "127.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.",
-        "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.",
-        "172.29.", "172.30.", "172.31.", "192.168.", "::1", "fe80:", "localhost"
-    ];
-
     // Hardcoded datacenter prefix hints - used as fast fallback when dynamic CIDR ranges
     // don't cover a provider (e.g., Hetzner, OVH, Vultr don't publish machine-readable lists).
     // More specific prefixes are preferred over broad ones to avoid misidentification.
