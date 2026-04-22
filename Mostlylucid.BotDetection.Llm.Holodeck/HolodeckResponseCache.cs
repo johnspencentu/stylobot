@@ -8,6 +8,7 @@ public sealed class HolodeckResponseCache
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxSize;
     private readonly TimeSpan _ttl;
+    private long _insertOrder;
 
     public HolodeckResponseCache(int maxSize, TimeSpan ttl)
     {
@@ -36,12 +37,12 @@ public sealed class HolodeckResponseCache
         var key = $"{fingerprint}:{path}";
         while (_cache.Count >= _maxSize)
         {
-            var oldest = _cache.OrderBy(kv => kv.Value.CreatedAt).FirstOrDefault();
+            var oldest = _cache.OrderBy(kv => kv.Value.Order).FirstOrDefault();
             if (oldest.Key != null) _cache.TryRemove(oldest.Key, out _);
             else break;
         }
-        _cache[key] = new CacheEntry(response, DateTime.UtcNow);
+        _cache[key] = new CacheEntry(response, DateTime.UtcNow, Interlocked.Increment(ref _insertOrder));
     }
 
-    private sealed record CacheEntry(HolodeckResponse Response, DateTime CreatedAt);
+    private sealed record CacheEntry(HolodeckResponse Response, DateTime CreatedAt, long Order);
 }
