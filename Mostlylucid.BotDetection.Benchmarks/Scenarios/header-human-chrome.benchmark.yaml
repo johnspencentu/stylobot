@@ -1,6 +1,6 @@
-name: HeaderContributor_HumanChrome
+name: Header_HumanChrome
 description: Standard Chrome browser with typical navigation headers
-detector: HeaderContributor
+detector: Header
 request:
   method: GET
   path: /products/123
