@@ -458,8 +458,6 @@ jobs:
       env:
         DIGEST: ${{ steps.demo-build.outputs.digest }}
       run: cosign sign --yes scottgal/stylobot-demo@${DIGEST}
-        build-args: |
-          BUILD_VERSION=${{ needs.validate-version.outputs.version }}
 
   # Publish Stylobot Website Docker image
   # Website publish removed - moved to stylobot-commercial repo
