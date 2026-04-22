@@ -2047,6 +2047,12 @@ public class StyloBotDashboardMiddleware
 
     private StatusStripModel BuildStatusStripModel(HttpContext context)
     {
+        try { return BuildStatusStripModelInternal(context); }
+        catch { return new StatusStripModel { ActivePackName = "Default", Services = [], DetectionActive = true }; }
+    }
+
+    private StatusStripModel BuildStatusStripModelInternal(HttpContext context)
+    {
         var isCommercial = IsCommercialMode(context);
 
         // Detect available services
