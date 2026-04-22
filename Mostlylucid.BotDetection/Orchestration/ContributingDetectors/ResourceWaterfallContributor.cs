@@ -112,7 +112,7 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
         {
             contributions.Add(BotContribution(
                 "NoAssets",
-                $"Fetched {tracker.DocumentCount} documents with zero sub-resource requests — not rendering",
+                $"Fetched {tracker.DocumentCount} documents with zero sub-resource requests - not rendering",
                 confidenceOverride: NoAssetsConfidence,
                 botType: BotType.Scraper.ToString()));
 
@@ -124,7 +124,7 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
         {
             contributions.Add(BotContribution(
                 "LowAssetRatio",
-                $"Low asset/document ratio ({assetRatio:F2}) — partial rendering or selective scraping",
+                $"Low asset/document ratio ({assetRatio:F2}) - partial rendering or selective scraping",
                 confidenceOverride: LowRatioConfidence,
                 botType: BotType.Scraper.ToString()));
         }
@@ -133,7 +133,7 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
         {
             contributions.Add(HumanContribution(
                 "HealthyAssetRatio",
-                $"Healthy asset/document ratio ({assetRatio:F2}) — normal browser rendering"));
+                $"Healthy asset/document ratio ({assetRatio:F2}) - normal browser rendering"));
         }
 
         // Weak bot signal: no fonts loaded after many documents
@@ -141,7 +141,7 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
         {
             contributions.Add(BotContribution(
                 "NoFonts",
-                $"No font requests after {tracker.DocumentCount} documents — browsers typically load web fonts",
+                $"No font requests after {tracker.DocumentCount} documents - browsers typically load web fonts",
                 confidenceOverride: NoFontsConfidence,
                 botType: BotType.Scraper.ToString()));
         }
@@ -151,7 +151,7 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
         {
             contributions.Add(HumanContribution(
                 "FaviconRequested",
-                "Favicon requested — typical browser behavior"));
+                "Favicon requested - typical browser behavior"));
         }
 
         // If no contributions beyond neutral, emit neutral

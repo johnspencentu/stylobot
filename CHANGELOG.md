@@ -148,13 +148,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Intent Classification and Threat Scoring
-- **IntentContributor** — new Wave 3 detector that classifies request intent (reconnaissance, exploitation, scraping, benign, etc.) using HNSW-backed similarity search and cosine vectorization
-- **Threat scoring orthogonal to bot probability** — a human probing `.env` files has low bot probability but high threat score; both dimensions are now independently surfaced
-- **ThreatBand enum** — `None`, `Low`, `Elevated`, `High`, `Critical` with configurable score thresholds (0.15 / 0.35 / 0.55 / 0.80)
-- **IntentClassificationCoordinator** — orchestrates intent vectorization, similarity search, and threat band assignment
-- **HnswIntentSearch** — HNSW approximate nearest-neighbor index for real-time intent matching with configurable M/efConstruction/efSearch parameters
-- **IntentVectorizer** — converts request features (path patterns, method, headers) into dense vectors for similarity search
-- **IntentLearningHandler** — feeds confirmed intent classifications back into the HNSW index for adaptive improvement
+- **IntentContributor** - new Wave 3 detector that classifies request intent (reconnaissance, exploitation, scraping, benign, etc.) using HNSW-backed similarity search and cosine vectorization
+- **Threat scoring orthogonal to bot probability** - a human probing `.env` files has low bot probability but high threat score; both dimensions are now independently surfaced
+- **ThreatBand enum** - `None`, `Low`, `Elevated`, `High`, `Critical` with configurable score thresholds (0.15 / 0.35 / 0.55 / 0.80)
+- **IntentClassificationCoordinator** - orchestrates intent vectorization, similarity search, and threat band assignment
+- **HnswIntentSearch** - HNSW approximate nearest-neighbor index for real-time intent matching with configurable M/efConstruction/efSearch parameters
+- **IntentVectorizer** - converts request features (path patterns, method, headers) into dense vectors for similarity search
+- **IntentLearningHandler** - feeds confirmed intent classifications back into the HNSW index for adaptive improvement
 - Intent signals: `intent.category`, `intent.threat_score`, `intent.threat_band`, `intent.confidence`, `intent.similarity_score`, `intent.nearest_label`
 
 #### Dashboard Threat Visualization
@@ -168,35 +168,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Threat data in SignalR real-time broadcasts
 
 #### Stream and Transport Detection
-- **StreamAbuseContributor** — new Wave 1 detector that catches attackers hiding behind streaming traffic using per-signature sliding window tracking
+- **StreamAbuseContributor** - new Wave 1 detector that catches attackers hiding behind streaming traffic using per-signature sliding window tracking
 - Stream abuse patterns: connection churn, payload flooding, protocol switching, rapid reconnection
 - `stream-abuse.detector.yaml` manifest with configurable thresholds for all abuse patterns
-- Enhanced **TransportProtocolContributor** — improved WebSocket, SSE, SignalR, gRPC, and GraphQL classification with `transport.is_streaming` signal for downstream consumption
+- Enhanced **TransportProtocolContributor** - improved WebSocket, SSE, SignalR, gRPC, and GraphQL classification with `transport.is_streaming` signal for downstream consumption
 - Five existing detectors now consume `transport.is_streaming` to suppress false positives on legitimate streaming traffic (CacheBehavior, BehavioralWaveform, AdvancedBehavioral, ResponseBehavior, MultiFactorSignature)
 - Documentation: [`stream-transport-detection.md`](Mostlylucid.BotDetection/docs/stream-transport-detection.md)
 
 #### Detection Accuracy Improvements
-- Enhanced **BehavioralWaveformContributor** — stream-aware burst thresholds, excludes streaming requests from page rate calculations
-- Enhanced **CacheBehaviorContributor** — skips cache validation for streaming requests entirely
-- Enhanced **AdvancedBehavioralContributor** — skips path entropy, navigation pattern, and burst analysis for streaming
-- Enhanced **ResponseBehaviorContributor** — new signals for response analysis
+- Enhanced **BehavioralWaveformContributor** - stream-aware burst thresholds, excludes streaming requests from page rate calculations
+- Enhanced **CacheBehaviorContributor** - skips cache validation for streaming requests entirely
+- Enhanced **AdvancedBehavioralContributor** - skips path entropy, navigation pattern, and burst analysis for streaming
+- Enhanced **ResponseBehaviorContributor** - new signals for response analysis
 - Updated response behavior, transport protocol, and stream abuse detector YAML manifests
-- **PolicyEvaluator** improvements — threat-aware policy evaluation
-- **DetectionPolicy** updates — new policy fields for threat-based responses
+- **PolicyEvaluator** improvements - threat-aware policy evaluation
+- **DetectionPolicy** updates - new policy fields for threat-based responses
 
 #### Infrastructure
 - New `HttpContext` extension methods for intent/threat access
 - `BotCluster` enrichment with `DominantIntent` and `AverageThreatScore`
 - `BotClusterService` computes cluster-level intent and threat aggregates
 - `ILearningEventBus` extensions for intent learning feedback
-- `DetectionLedgerExtensions` — threat band computation from aggregated evidence
-- `DetectionContribution` — `ThreatBand` enum and threat fields on `AggregatedEvidence`
+- `DetectionLedgerExtensions` - threat band computation from aggregated evidence
+- `DetectionContribution` - `ThreatBand` enum and threat fields on `AggregatedEvidence`
 - Updated `BotDetectionOptions` with intent detection configuration
 - Updated `ServiceCollectionExtensions` with intent detector registration
 
 ### Changed
 
-- Dashboard now shows 30 detectors (was 29) — IntentContributor added to Wave 3
+- Dashboard now shows 30 detectors (was 29) - IntentContributor added to Wave 3
 - Default `EnabledDetectorCount` increased to 30
 - Cluster visualization includes threat percentage and dominant intent
 - Bot narratives include threat qualifier prefix for elevated+ threats
@@ -211,9 +211,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- [`dashboard-threat-scoring.md`](Mostlylucid.BotDetection/docs/dashboard-threat-scoring.md) — full architecture, data flow, API endpoints, UI elements, security considerations
-- [`stream-transport-detection.md`](Mostlylucid.BotDetection/docs/stream-transport-detection.md) — stream-aware detection architecture, transport classification, abuse patterns
-- [`transport-protocol-detection.md`](Mostlylucid.BotDetection/docs/transport-protocol-detection.md) — updated with streaming classification
+- [`dashboard-threat-scoring.md`](Mostlylucid.BotDetection/docs/dashboard-threat-scoring.md) - full architecture, data flow, API endpoints, UI elements, security considerations
+- [`stream-transport-detection.md`](Mostlylucid.BotDetection/docs/stream-transport-detection.md) - stream-aware detection architecture, transport classification, abuse patterns
+- [`transport-protocol-detection.md`](Mostlylucid.BotDetection/docs/transport-protocol-detection.md) - updated with streaming classification
 - Updated `SESSION_SUMMARY.md` with v5 section
 
 ---

@@ -14,7 +14,7 @@
 
 ## File Map
 
-### .NET — `Mostlylucid.BotDetection.Api/`
+### .NET - `Mostlylucid.BotDetection.Api/`
 
 | File | Responsibility |
 |------|---------------|
@@ -32,7 +32,7 @@
 | `Middleware/ResponseHeaderInjectionMiddleware.cs` | Injects `X-StyloBot-*` headers after detection |
 | `StyloBotApiExtensions.cs` | `AddStyloBotApi()` / `MapStyloBotApi()` entry points |
 
-### .NET — Tests
+### .NET - Tests
 
 | File | Responsibility |
 |------|---------------|
@@ -44,7 +44,7 @@
 | `Mostlylucid.BotDetection.Api.Tests/Auth/ApiKeyAuthTests.cs` | Auth handler tests |
 | `Mostlylucid.BotDetection.Api.Tests/Middleware/ResponseHeaderTests.cs` | Header injection tests |
 
-### Node — `sdk/node/`
+### Node - `sdk/node/`
 
 | File | Responsibility |
 |------|---------------|
@@ -539,7 +539,7 @@ public class SyntheticHttpContextTests
 dotnet test Mostlylucid.BotDetection.Api.Tests/ --filter "SyntheticHttpContextTests" -v m
 ```
 
-Expected: FAIL — `SyntheticHttpContext` class doesn't exist.
+Expected: FAIL - `SyntheticHttpContext` class doesn't exist.
 
 - [ ] **Step 4: Implement SyntheticHttpContext**
 
@@ -738,7 +738,7 @@ public class ApiKeyAuthTests
 dotnet test Mostlylucid.BotDetection.Api.Tests/ --filter "ApiKeyAuthTests" -v m
 ```
 
-Expected: FAIL — `ApiKeyAuthenticationHandler` doesn't exist.
+Expected: FAIL - `ApiKeyAuthenticationHandler` doesn't exist.
 
 - [ ] **Step 3: Implement the auth handler**
 
@@ -1411,7 +1411,7 @@ public class ResponseHeaderTests
 dotnet test Mostlylucid.BotDetection.Api.Tests/ --filter "ResponseHeaderTests" -v m
 ```
 
-Expected: FAIL — `ResponseHeaderInjection` doesn't exist.
+Expected: FAIL - `ResponseHeaderInjection` doesn't exist.
 
 - [ ] **Step 3: Implement the middleware**
 
@@ -1450,7 +1450,7 @@ public class ResponseHeaderInjectionMiddleware
 }
 
 /// <summary>
-///     Static helper for header injection — testable without middleware pipeline.
+///     Static helper for header injection - testable without middleware pipeline.
 /// </summary>
 public static class ResponseHeaderInjection
 {
@@ -2448,7 +2448,7 @@ git commit -m "Add @stylobot/core client, header parser tests, and client tests"
 
 ---
 
-## Task 12: @stylobot/node package — Express middleware and Fastify plugin
+## Task 12: @stylobot/node package - Express middleware and Fastify plugin
 
 **Files:**
 - Create: `sdk/node/packages/node/package.json`
@@ -2963,7 +2963,7 @@ git add -A && git commit -m "Fix test issues from full verification"
 
 ---
 
-## Task 14: Final commit — update CLAUDE.md and solution docs
+## Task 14: Final commit - update CLAUDE.md and solution docs
 
 **Files:**
 - Modify: `CLAUDE.md`
@@ -2984,8 +2984,8 @@ Add after the Dashboard section:
 ## Node SDK
 
 Two npm packages in `sdk/node/`:
-- **`@stylobot/core`** — Zero-dep types, `StyloBotClient`, header parser. Works in Node/Deno/Bun.
-- **`@stylobot/node`** — Express middleware (`styloBotMiddleware`), Fastify plugin (`styloBotPlugin`).
+- **`@stylobot/core`** - Zero-dep types, `StyloBotClient`, header parser. Works in Node/Deno/Bun.
+- **`@stylobot/node`** - Express middleware (`styloBotMiddleware`), Fastify plugin (`styloBotPlugin`).
 
 Two modes: `headers` (behind Gateway, zero-latency) or `api` (sidecar, calls `POST /api/v1/detect`).
 

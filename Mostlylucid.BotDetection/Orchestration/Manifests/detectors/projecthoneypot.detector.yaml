@@ -3,7 +3,7 @@ priority: 15
 enabled: true
 description: >
   DNS-based threat intelligence lookup via Project Honeypot (httpBL).
-  Optional — requires API key configuration. Slow path (~100ms DNS lookup).
+  Optional - requires API key configuration. Slow path (~100ms DNS lookup).
 
 scope:
   sink: botdetection

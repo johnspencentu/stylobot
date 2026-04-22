@@ -17,26 +17,26 @@ StyloBot is detection-in-the-proxy today. There is no transactional "send reques
 
 ## Solution
 
-1. **Public REST API** (`Mostlylucid.BotDetection.Api`) — versioned, OpenAPI-documented, auth-gated endpoints
-2. **Proxy header injection** — Gateway injects `X-StyloBot-*` headers for zero-latency detection
-3. **Node SDK** — `@stylobot/core` (types + client) and `@stylobot/node` (Express/Fastify middleware)
-4. **OpenAPI spec** — generated from .NET, source of truth for all future SDKs
+1. **Public REST API** (`Mostlylucid.BotDetection.Api`) - versioned, OpenAPI-documented, auth-gated endpoints
+2. **Proxy header injection** - Gateway injects `X-StyloBot-*` headers for zero-latency detection
+3. **Node SDK** - `@stylobot/core` (types + client) and `@stylobot/node` (Express/Fastify middleware)
+4. **OpenAPI spec** - generated from .NET, source of truth for all future SDKs
 
 ---
 
 ## API Auth Tiers
 
-### Tier 1 — Unauthenticated (proxy headers)
+### Tier 1 - Unauthenticated (proxy headers)
 
 For apps behind StyloBot Gateway. SDK reads `X-StyloBot-*` headers from the proxied request or response. No API call, zero latency.
 
-### Tier 2 — API Key (`X-SB-Api-Key` header)
+### Tier 2 - API Key (`X-SB-Api-Key` header)
 
 For detection-as-a-service and dashboard read access. Uses the existing rich API key system (`ApiKeyConfig`). Rate limits, path restrictions, time windows, and detector policy overlays all enforced per key.
 
 **Endpoints:** `POST /api/v1/detect`, all `GET /api/v1/*` read endpoints, `GET /api/v1/me`.
 
-### Tier 3 — OIDC Bearer Token (commercial)
+### Tier 3 - OIDC Bearer Token (commercial)
 
 For management operations. Uses the customer's OIDC provider (self-hosted) or Keycloak (stylobot.net). Follows the two-domain auth model: vendor domain issues licenses, customer domain manages their own deployment.
 
@@ -76,9 +76,9 @@ For management operations. Uses the customer's OIDC provider (self-hosted) or Ke
 }
 ```
 
-- `headers` — flat string dict. SDK extracts from framework request object.
-- `tls` — optional. Node apps rarely terminate TLS; included for proxy/gateway callers.
-- `remoteIp` — SDK handles `X-Forwarded-For` resolution before sending.
+- `headers` - flat string dict. SDK extracts from framework request object.
+- `tls` - optional. Node apps rarely terminate TLS; included for proxy/gateway callers.
+- `remoteIp` - SDK handles `X-Forwarded-For` resolution before sending.
 
 **Response:**
 
@@ -427,20 +427,20 @@ type ThreatBand = 'None' | 'Low' | 'Elevated' | 'High' | 'Critical';
 
 ## What Does Not Change
 
-- **`Mostlylucid.BotDetection`** (core library) — untouched
-- **`Mostlylucid.BotDetection.UI`** — keeps internal `/_stylobot/api/*` for dashboard
-- **Existing middleware pipeline** — public API is additive
-- **Detection logic** — no detector changes
-- **Auth model** — API keys and OIDC are existing systems, the API just gates on them
+- **`Mostlylucid.BotDetection`** (core library) - untouched
+- **`Mostlylucid.BotDetection.UI`** - keeps internal `/_stylobot/api/*` for dashboard
+- **Existing middleware pipeline** - public API is additive
+- **Detection logic** - no detector changes
+- **Auth model** - API keys and OIDC are existing systems, the API just gates on them
 
 ---
 
 ## Future SDKs
 
 The OpenAPI spec at `/api/v1/openapi.json` enables:
-- **C# SDK** — `Stylobot.Client` NuGet package, generated or hand-written
-- **Python SDK** — `stylobot` PyPI package
-- **Go SDK** — `github.com/stylobot/stylobot-go`
-- **Ruby SDK** — `stylobot` gem
+- **C# SDK** - `Stylobot.Client` NuGet package, generated or hand-written
+- **Python SDK** - `stylobot` PyPI package
+- **Go SDK** - `github.com/stylobot/stylobot-go`
+- **Ruby SDK** - `stylobot` gem
 
 Each follows the same pattern: types from OpenAPI, thin client wrapping HTTP, optional framework middleware.

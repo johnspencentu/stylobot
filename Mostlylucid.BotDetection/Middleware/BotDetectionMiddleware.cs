@@ -278,7 +278,7 @@ public class BotDetectionMiddleware(
         // Compute multi-vector signatures for dashboard and bot identity tracking
         ComputeAndStoreSignature(context);
 
-        // Signatures are unified — PrimarySignature is used by both dashboard and session store.
+        // Signatures are unified - PrimarySignature is used by both dashboard and session store.
         // No mapping needed (SignatureMapper was removed as part of signature unification).
 
         // Record OTel telemetry (spans, metrics, score journey) if instrumentation is registered

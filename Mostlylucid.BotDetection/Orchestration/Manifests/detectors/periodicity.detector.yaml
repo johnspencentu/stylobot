@@ -1,11 +1,11 @@
-# Periodicity Detector — temporal pattern analysis for identity resolution
+# Periodicity Detector - temporal pattern analysis for identity resolution
 name: PeriodicityContributor
 priority: 25
 enabled: true
 description: >
   Detects periodic patterns in request timing: fixed-interval polling,
   cron-like schedules, rotation cadence. Periodicity is orthogonal to
-  fingerprinting — it survives identity rotation because the rotation
+  fingerprinting - it survives identity rotation because the rotation
   pattern itself is a detectable signal.
 
 scope:

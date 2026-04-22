@@ -1,11 +1,11 @@
 # StyloBot
 
-**Open source bot defense and anonymous entity resolution.** 46 detectors, sub-millisecond inference, progressive identity that learns who keeps coming back — even when they rotate everything. One binary. No cloud dependency.
+**Open source bot defense and anonymous entity resolution.** 46 detectors, sub-millisecond inference, progressive identity that learns who keeps coming back - even when they rotate everything. One binary. No cloud dependency.
 
 [![NuGet](https://img.shields.io/nuget/v/mostlylucid.botdetection)](https://www.nuget.org/packages/mostlylucid.botdetection)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
 
-> **This repo is the FOSS product.** It contains the full detection engine, dashboard, entity resolution, and simulation packs. The [commercial product](https://stylobot.net) uses the same engine with additional enterprise features — see [FOSS vs Commercial](#foss-vs-commercial) below.
+> **This repo is the FOSS product.** It contains the full detection engine, dashboard, entity resolution, and simulation packs. The [commercial product](https://stylobot.net) uses the same engine with additional enterprise features - see [FOSS vs Commercial](#foss-vs-commercial) below.
 
 ## Install
 
@@ -38,7 +38,7 @@ stylobot status && stylobot logs
 Or embed as middleware:
 
 ```csharp
-// Two lines — detection + dashboard, correct middleware ordering guaranteed
+// Two lines - detection + dashboard, correct middleware ordering guaranteed
 builder.Services.AddStyloBot(dashboard => {
     dashboard.AllowUnauthenticatedAccess = true; // dev only
 });
@@ -66,9 +66,9 @@ The 129-dimensional session vector is projected into interpretable axes for simi
 
 ![Vector Search Projection](docs/images/vector-search-projection.png)
 
-*Left: 129 raw dimensions aggregated into 16 consolidated axes. Right: bot archetype profiles in radar space — scrapers show sharp spiky profiles, headless browsers show broad spread, humans show low uniform values. Bottom: temporal evolution as the fingerprint crystallizes over time.*
+*Left: 129 raw dimensions aggregated into 16 consolidated axes. Right: bot archetype profiles in radar space - scrapers show sharp spiky profiles, headless browsers show broad spread, humans show low uniform values. Bottom: temporal evolution as the fingerprint crystallizes over time.*
 
-## Detection surface — 46 detectors
+## Detection surface - 46 detectors
 
 | Layer | Detectors | What it catches |
 |-------|-----------|-----------------|
@@ -83,20 +83,20 @@ The 129-dimensional session vector is projected into interpretable axes for simi
 
 ### Key capabilities
 
-- **Sub-millisecond fast path** — 46 detectors, ~150µs per request, ~175KB allocation
-- **Anonymous entity resolution** — progressive identity (L0→L5) with merge/split/rewind. Rotation creates a trail of near-miss fingerprints that get linked back to the same actor
-- **129-dim session vectors** — Markov chain transitions + timing + fingerprints. Partial chain archetypes detect bots at 3-5 requests before full session maturity
-- **Simulation packs** — honeypots that look like real products. WordPress 5.9 pack included with 8 CVE modules
-- **Zero PII** — HMAC-SHA256 hashed signatures. Raw UAs stored PII-stripped (emails/phones redacted). No raw IPs persisted
-- **Headless framework naming** — identifies Puppeteer, Playwright, Selenium, PhantomJS by name, not "Unknown Bot"
+- **Sub-millisecond fast path** - 46 detectors, ~150µs per request, ~175KB allocation
+- **Anonymous entity resolution** - progressive identity (L0→L5) with merge/split/rewind. Rotation creates a trail of near-miss fingerprints that get linked back to the same actor
+- **129-dim session vectors** - Markov chain transitions + timing + fingerprints. Partial chain archetypes detect bots at 3-5 requests before full session maturity
+- **Simulation packs** - honeypots that look like real products. WordPress 5.9 pack included with 8 CVE modules
+- **Zero PII** - HMAC-SHA256 hashed signatures. Raw UAs stored PII-stripped (emails/phones redacted). No raw IPs persisted
+- **Headless framework naming** - identifies Puppeteer, Playwright, Selenium, PhantomJS by name, not "Unknown Bot"
 
 ## FOSS vs Commercial
 
-Two products, same engine. The FOSS product in this repo is complete — it detects bots, resolves identities, runs the dashboard. The [commercial product](https://stylobot.net) adds enterprise operational features on top.
+Two products, same engine. The FOSS product in this repo is complete - it detects bots, resolves identities, runs the dashboard. The [commercial product](https://stylobot.net) adds enterprise operational features on top.
 
 ### What's in FOSS (this repo)
 
-- All 46 detectors — same detection pipeline as commercial
+- All 46 detectors - same detection pipeline as commercial
 - Anonymous entity resolution (merge/split/rewind, L0-L5 confidence)
 - Real-time dashboard with all tabs (Overview, Visitors, Sessions, Threats, Clusters, User Agents, Configuration)
 - Session vectors, Markov chains, behavioral radar charts
@@ -150,7 +150,7 @@ The [commercial product](https://stylobot.net) is a separate repo that plugs int
 - Identity inspector: entity graph explorer, rotation trail visualization
 - Marketing website (ASP.NET Core MVC + Vite/Tailwind)
 
-**License model:** Capability-based JWT tiers (OSS → Startup → SME → Enterprise). Tiers unlock capabilities, never counts. If a license expires, the system **reverts to FOSS mode** — detection continues, PostgreSQL falls back to SQLite, config editor goes read-only. No downtime.
+**License model:** Capability-based JWT tiers (OSS → Startup → SME → Enterprise). Tiers unlock capabilities, never counts. If a license expires, the system **reverts to FOSS mode** - detection continues, PostgreSQL falls back to SQLite, config editor goes read-only. No downtime.
 
 See [stylobot.net](https://stylobot.net) for pricing.
 
@@ -176,13 +176,13 @@ stylobot 5080 http://localhost:3000 --llm anthropic --llm-key sk-ant-...
 
 Real-time monitoring at `/stylobot`. All data persists to SQLite.
 
-- **Overview** — top threats, traffic chart, world threat map
-- **Visitors** — signature-level cards with probability badges (Bot/Suspicious/Uncertain/Human)
-- **Sessions** — Markov chain timeline with behavioral radar and session playback
-- **Threats** — CVE probe feed, honeypot engagements, severity badges
-- **Clusters** — Leiden community detection visualization
-- **User Agents** — family breakdown, version distribution, full-text search
-- **Configuration** — Monaco YAML editor (read-only in FOSS)
+- **Overview** - top threats, traffic chart, world threat map
+- **Visitors** - signature-level cards with probability badges (Bot/Suspicious/Uncertain/Human)
+- **Sessions** - Markov chain timeline with behavioral radar and session playback
+- **Threats** - CVE probe feed, honeypot engagements, severity badges
+- **Clusters** - Leiden community detection visualization
+- **User Agents** - family breakdown, version distribution, full-text search
+- **Configuration** - Monaco YAML editor (read-only in FOSS)
 
 ## Repo layout
 
@@ -213,4 +213,4 @@ docs/                               Architecture + specs
 
 ## License
 
-[The Unlicense](https://unlicense.org/) — FOSS core is public domain. Commercial features licensed separately.
+[The Unlicense](https://unlicense.org/) - FOSS core is public domain. Commercial features licensed separately.

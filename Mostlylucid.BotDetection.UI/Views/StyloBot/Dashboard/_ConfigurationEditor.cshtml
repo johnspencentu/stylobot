@@ -67,7 +67,7 @@
         <div class="flex items-center justify-between gap-2 px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-semibold text-base-content/70 uppercase tracking-wide">YAML editor</span>
-                <span id="config-active-slug" class="text-xs font-mono text-base-content/50">— select a detector —</span>
+                <span id="config-active-slug" class="text-xs font-mono text-base-content/50">- select a detector -</span>
                 <span id="config-dirty-indicator" class="text-[9px] px-1 py-0.5 rounded font-medium hidden"
                       style="background: var(--sb-signal-warn); color: #1a0e00;">UNSAVED</span>
             </div>
@@ -123,7 +123,7 @@
                 This editor saves overrides that apply to <strong>all traffic</strong>.
             </p>
             <p class="text-base-content/60 leading-snug">
-                Per-endpoint, per-user, and per-API-key overrides — plus a forms-based editor over every parameter — ship with StyloBot Startup ($100/mo per domain).
+                Per-endpoint, per-user, and per-API-key overrides - plus a forms-based editor over every parameter - ship with StyloBot Startup ($100/mo per domain).
             </p>
             <a href="https://stylobot.net/pricing#config" target="_blank" rel="noopener"
                class="inline-block text-xs sb-link mt-1">
@@ -143,7 +143,7 @@
     let monacoLoading = false;
     let editor = null;
     let activeSlug = null;
-    let activeOriginal = "";  // text the editor was last seeded with — for dirty detection
+    let activeOriginal = "";  // text the editor was last seeded with - for dirty detection
 
     // ---------- DOM refs ----------
     const list        = document.getElementById('config-detector-list');

@@ -62,7 +62,7 @@ public sealed class EntityResolutionService : BackgroundService
     private async Task AnalyzeEntitiesAsync(CancellationToken ct)
     {
         // Get entities with enough sessions for analysis
-        // For now, iterate all entities — optimize with a "needs_analysis" flag later
+        // For now, iterate all entities - optimize with a "needs_analysis" flag later
         await using var conn = new Microsoft.Data.Sqlite.SqliteConnection(
             ((SqliteSessionStore)_store).ConnectionString);
         await conn.OpenAsync(ct);
@@ -257,7 +257,7 @@ public sealed class EntityResolutionService : BackgroundService
     ///     Detect convergence: two entities with no fingerprint overlap but high
     ///     behavioral cosine similarity. Could be same actor on different devices,
     ///     or coordinated bots with identical behavior.
-    ///     Creates Converge edges (flagged, not auto-merged — operator decides).
+    ///     Creates Converge edges (flagged, not auto-merged - operator decides).
     /// </summary>
     private const float ConvergenceThreshold = 0.92f;
 
@@ -278,7 +278,7 @@ public sealed class EntityResolutionService : BackgroundService
             if (vector != null) entityVectors[entityId] = vector;
         }
 
-        // Pairwise comparison — O(n²) but limited to 100 entities max
+        // Pairwise comparison - O(n²) but limited to 100 entities max
         var comparedPairs = new HashSet<string>();
         foreach (var (idA, vecA) in entityVectors)
         {
@@ -297,7 +297,7 @@ public sealed class EntityResolutionService : BackgroundService
                         "Possible same actor across devices or coordinated bots.",
                         idA, idB, similarity);
 
-                    // Don't auto-merge — create Converge edge for operator review
+                    // Don't auto-merge - create Converge edge for operator review
                     // Check if this convergence was already flagged
                     var existingEdges = await _store.GetEntityEdgesAsync(idA, ct);
                     var alreadyFlagged = existingEdges.Any(e =>

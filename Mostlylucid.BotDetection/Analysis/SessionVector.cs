@@ -570,7 +570,7 @@ public sealed class SessionStore
     /// <summary>
     ///     Gets a live radar projection of the current in-progress session.
     ///     Returns null if no active session or too few requests.
-    ///     This is FAST — just encodes the cached request list into a vector and projects.
+    ///     This is FAST - just encodes the cached request list into a vector and projects.
     /// </summary>
     public double[]? GetLiveRadarProjection(string signature, FingerprintContext? fingerprint = null)
     {

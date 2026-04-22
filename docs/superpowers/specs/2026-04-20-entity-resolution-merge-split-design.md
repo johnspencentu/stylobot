@@ -7,7 +7,7 @@
 
 ### The Entity Graph
 
-An **Entity** is a resolved identity — our best guess at "this is one actor." Entities are NOT fingerprints. Multiple fingerprints (PrimarySignatures) can belong to one entity (merged). One fingerprint can fork into multiple entities (split).
+An **Entity** is a resolved identity - our best guess at "this is one actor." Entities are NOT fingerprints. Multiple fingerprints (PrimarySignatures) can belong to one entity (merged). One fingerprint can fork into multiple entities (split).
 
 ```
 Entity (resolved actor)
@@ -22,11 +22,11 @@ Session snapshots are immutable. Entity membership is mutable.
 
 Every session snapshot stores the full 129-dim vector, timestamps, request count, dominant state, and (new) header hashes. These NEVER change. They are the ground truth we can always rewind to.
 
-Entity assignment is a LAYER on top of snapshots. When we merge or split, we reassign session ownership — we never modify the sessions themselves.
+Entity assignment is a LAYER on top of snapshots. When we merge or split, we reassign session ownership - we never modify the sessions themselves.
 
 ### Three Operations
 
-#### 1. MERGE — Link two fingerprints to one entity
+#### 1. MERGE - Link two fingerprints to one entity
 
 **Trigger:** New PrimarySignature V_new appears. Cosine similarity to recent entity V_existing is > 0.85 AND:
 - Timing matches rotation cadence (if entity has established cadence), OR
@@ -40,7 +40,7 @@ Entity assignment is a LAYER on top of snapshots. When we merge or split, we rea
 
 **Reversible:** Yes. The edge can be deleted, reverting to two separate entities.
 
-#### 2. SPLIT — Fork one entity into two
+#### 2. SPLIT - Fork one entity into two
 
 **Trigger:** Oscillation detected. The entity's velocity history shows alternating high-low pattern:
 
@@ -72,7 +72,7 @@ if autocorrelation(velocities, lag=2) > 0.6:
 
 **Rewind:** Since session snapshots are immutable, the split replays all sessions from the divergence point, assigning each to the correct cluster.
 
-#### 3. REWIND — Undo a bad merge
+#### 3. REWIND - Undo a bad merge
 
 **Trigger:** After a merge, subsequent sessions show the merged entity diverging from the expected pattern. The new sessions don't match the behavioral baseline established by the original entity.
 
@@ -184,12 +184,12 @@ CREATE TABLE entity_session_assignments (
 ## Confidence Level Progression
 
 ```
-L0: Infrastructure (1 factor: IP only) — first request
-L1: Browser Guess (2 factors: IP+UA) — PrimarySignature computed
-L2: Transport (4+ factors: +TLS, +HTTP/2) — after TLS/H2 detectors run
-L3: Runtime (6+ factors: +client JS, +canvas) — after client-side JS
-L4: Behavioral (8+ factors: +Markov, +timing) — after session vector
-L5: Persistent Actor (10+ factors, 3+ sessions, stable anchors) — entity resolved
+L0: Infrastructure (1 factor: IP only) - first request
+L1: Browser Guess (2 factors: IP+UA) - PrimarySignature computed
+L2: Transport (4+ factors: +TLS, +HTTP/2) - after TLS/H2 detectors run
+L3: Runtime (6+ factors: +client JS, +canvas) - after client-side JS
+L4: Behavioral (8+ factors: +Markov, +timing) - after session vector
+L5: Persistent Actor (10+ factors, 3+ sessions, stable anchors) - entity resolved
 ```
 
 ## FOSS vs Commercial

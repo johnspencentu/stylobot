@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
-- **Unified Signature System**: `WaveformSignature` deprecated (`[Obsolete]`). All detectors use `PrimarySignature` (HMAC-SHA256) via blackboard. Session store keyed by PrimarySignature. Existing session data will not match new keys — sessions re-accumulate automatically.
+- **Unified Signature System**: `WaveformSignature` deprecated (`[Obsolete]`). All detectors use `PrimarySignature` (HMAC-SHA256) via blackboard. Session store keyed by PrimarySignature. Existing session data will not match new keys - sessions re-accumulate automatically.
 - **Default LLM**: `qwen3:0.6b` → `gemma4`. All defaults consolidated in `LlmDefaults` class (single source of truth).
 - **Risk scoring**: Changed from max-single-detector to weighted average with multi-signal corroboration. Prevents single detector from producing VeryHigh risk.
 - **IP reputation**: Removed IP-range as standalone reputation key. Reputation anchors on PrimarySignature (HMAC of IP+UA), not raw IP subnet. Prevents cross-contamination (e.g., curl traffic poisoning browser traffic from same IP).
 
-### Added — Anonymous Entity Resolution
+### Added - Anonymous Entity Resolution
 
 The identity system learns who keeps coming back, even when they rotate their fingerprint.
 
@@ -27,33 +27,33 @@ The identity system learns who keeps coming back, even when they rotate their fi
 - **Rotation cadence estimation**: Detects systematic rotation via low velocity variance
 - **EntityResolutionService**: Background service (60s interval) for merge/split/rotation analysis
 
-### Added — Progressive Identity
+### Added - Progressive Identity
 
 - **HeaderHashCollector**: HMAC hashes of discriminatory HTTP headers per session (sec-ch-ua, accept-language, sec-fetch-*, header ordering pattern)
-- **StabilityAnalyzer**: PersonalStability × GlobalRarity scoring — stable-for-this-visitor AND rare-globally = strong identity anchor
+- **StabilityAnalyzer**: PersonalStability × GlobalRarity scoring - stable-for-this-visitor AND rare-globally = strong identity anchor
 - **SignatureContributor** (Priority 1): Computes PrimarySignature + header hashes, writes to blackboard before all other detectors
 - All identity data stored per session for retroactive stability analysis
 
-### Added — New Detectors (14 new, 45 total)
+### Added - New Detectors (14 new, 45 total)
 
 - **SignatureContributor**: Unified identity computation (Priority 1, Wave 0)
-- **PeriodicityContributor**: Temporal pattern analysis — fixed-interval polling, cron schedules, hour-of-day entropy, rotation cadence detection via autocorrelation
+- **PeriodicityContributor**: Temporal pattern analysis - fixed-interval polling, cron schedules, hour-of-day entropy, rotation cadence detection via autocorrelation
 - **CveProbeContributor**: CVE vulnerability probe detection via simulation packs
 - **PiiQueryStringContributor**: Detects PII patterns in query strings (email, tokens, credentials)
-- **CookieBehaviorContributor**: Tracks cookie acceptance across requests — bots using HTTP libraries ignore Set-Cookie entirely
-- **ResourceWaterfallContributor**: Document-to-asset ratio analysis — 50 HTML fetches + 0 CSS/JS = definitive bot
+- **CookieBehaviorContributor**: Tracks cookie acceptance across requests - bots using HTTP libraries ignore Set-Cookie entirely
+- **ResourceWaterfallContributor**: Document-to-asset ratio analysis - 50 HTML fetches + 0 CSS/JS = definitive bot
 - **SimulationPackResponder**: IActionPolicy that serves fake responses from simulation packs
-- **JS Execution Timing**: DOM layout timing, setTimeout drift, performance.now() resolution probes — catches Puppeteer/Playwright stealth
+- **JS Execution Timing**: DOM layout timing, setTimeout drift, performance.now() resolution probes - catches Puppeteer/Playwright stealth
 - **Headless framework identification**: Names specific automation (Puppeteer, Playwright, Selenium, PhantomJS, Nightmare) instead of "Unknown Bot"
 
-### Added — Simulation Pack Framework
+### Added - Simulation Pack Framework
 
 - **SimulationPack** models: packs, honeypot paths, response templates, CVE modules, timing profiles, LLM response hints
 - **SimulationPackLoader**: Loads YAML pack definitions from embedded resources
 - **WordPress 5.9 Pack** (FOSS): 11 honeypot paths, 7 response templates, 8 CVE modules (CVE-2024-6386 WPML RCE, CVE-2023-2982 miniOrange, etc.)
 - CVE probe signals feed threat intelligence for prioritization over time
 
-### Added — Dashboard
+### Added - Dashboard
 
 - **Threats tab**: CVE probe feed, severity badges, honeypot status indicator, real-time SignalR updates
 - **Session-first layout**: Behavioral sessions promoted as primary view, raw requests collapsed
@@ -64,16 +64,16 @@ The identity system learns who keeps coming back, even when they rotate their fi
 - **Friendly action names**: throttle-stealth → "Silent Throttle", logonly → "Monitor Only"
 - **Config editor security**: `EnableConfigEditing` + `WriteAuthorizationFilter` required. Default DENY. Monaco editor read-only when not authorized.
 
-### Added — Infrastructure
+### Added - Infrastructure
 
 - **`UseStyloBot()`**: Single method for detection + dashboard with correct middleware ordering. Broadcast wraps detection so blocked requests are always recorded.
 - **`AddStyloBot()`**: Registers both detection and dashboard services.
 - **LlmDefaults**: Single constant class for default model, endpoint, timeouts (no more duplicated "qwen3:0.6b" across 10+ files)
 - **Thinking-aware LLM**: `EnableThinking` configurable per-options and per-request. Ollama provider captures thinking content separately from classification JSON.
-- **Proxy/CDN header config**: `proxy-headers.yaml` with 10 providers (Cloudflare, AWS, Akamai, Fastly, etc.) — detection headers, real IP headers, country headers
+- **Proxy/CDN header config**: `proxy-headers.yaml` with 10 providers (Cloudflare, AWS, Akamai, Fastly, etc.) - detection headers, real IP headers, country headers
 - **Partial Markov chains**: 5 behavioral archetypes score first 3-5 requests before full session maturity
 
-### Changed — Zero Magic Numbers
+### Changed - Zero Magic Numbers
 
 - All 12 remaining detectors migrated from hardcoded weights to YAML-configurable parameters via `ConfiguredContributorBase`
 - 38 YAML manifests for 45 detectors (4 don't need YAML by design)
@@ -82,7 +82,7 @@ The identity system learns who keeps coming back, even when they rotate their fi
 
 ### Fixed
 
-- **Reputation poisoning**: IP-range reputation removed — curl traffic no longer poisons browser traffic from same IP
+- **Reputation poisoning**: IP-range reputation removed - curl traffic no longer poisons browser traffic from same IP
 - **Blocked requests invisible**: `UseStyloBot()` middleware ordering ensures broadcast wraps detection, blocked 403s recorded in dashboard
 - **Nullable ThreatScore crash**: SQLite parameter binding for nullable `double?` fields
 - **Visitor cache not populated**: `visitorListCache.Upsert()` moved before `ExcludeLocalIpFromBroadcast` check

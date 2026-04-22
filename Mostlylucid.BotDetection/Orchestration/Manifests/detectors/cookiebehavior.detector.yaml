@@ -1,4 +1,4 @@
-# Cookie Behavior Detector — tracks cookie acceptance patterns per signature
+# Cookie Behavior Detector - tracks cookie acceptance patterns per signature
 name: CookieBehaviorContributor
 priority: 20
 enabled: true
@@ -6,7 +6,7 @@ description: >
   Detects bots that ignore Set-Cookie headers. HTTP libraries (Python requests,
   Go net/http, Node axios, curl) typically discard cookies entirely. Real browsers
   always handle cookies and accumulate them over a session. Tracks cookie counts
-  per signature — never stores cookie names or values (zero-PII).
+  per signature - never stores cookie names or values (zero-PII).
 
 scope:
   sink: botdetection

@@ -530,7 +530,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     {
         await EnsureInitializedAsync(ct);
 
-        // Check for existing active edge — exact match
+        // Check for existing active edge - exact match
         var existing = await GetEntityForSignatureAsync(primarySignature, ct);
         if (existing != null) return existing.EntityId;
 
@@ -554,7 +554,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             }
         }
 
-        // No merge candidate — create new entity
+        // No merge candidate - create new entity
         var entityId = Guid.NewGuid().ToString("N")[..16];
         var now = DateTime.UtcNow.ToString("O");
 

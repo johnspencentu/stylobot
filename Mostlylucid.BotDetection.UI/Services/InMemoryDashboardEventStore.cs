@@ -460,7 +460,7 @@ public class InMemoryDashboardEventStore : IDashboardEventStore
                 var path = d.Path ?? "/";
                 var threatScore = d.ThreatScore ?? 0;
 
-                // Derive severity from the detection system's threat band — no hardcoded path matching
+                // Derive severity from the detection system's threat band - no hardcoded path matching
                 var cveSeverity = d.ThreatBand switch
                 {
                     "Critical" => "critical",

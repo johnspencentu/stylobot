@@ -1,4 +1,4 @@
-# Resource Waterfall Detector — document-to-asset ratio analysis
+# Resource Waterfall Detector - document-to-asset ratio analysis
 name: ResourceWaterfallContributor
 priority: 22
 enabled: true

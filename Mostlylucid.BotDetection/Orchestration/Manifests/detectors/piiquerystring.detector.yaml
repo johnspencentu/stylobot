@@ -3,7 +3,7 @@ priority: 8
 enabled: true
 description: >
   Detects PII patterns in query strings (email, tokens, credentials).
-  Privacy contributor — emits informational signals, not bot/human confidence.
+  Privacy contributor - emits informational signals, not bot/human confidence.
 
 scope:
   sink: botdetection

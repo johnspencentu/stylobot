@@ -6,9 +6,9 @@
  * flagged as bot traffic (missing Sec-Fetch-* header awareness).
  *
  * Three scenarios:
- *   1. dashboard_page_load  — Full browser navigation headers
- *   2. same_origin_fetch    — Browser fetch() to dashboard API (the misclassified scenario)
- *   3. signalr_negotiate    — SignalR negotiate POST with same-origin headers
+ *   1. dashboard_page_load  - Full browser navigation headers
+ *   2. same_origin_fetch    - Browser fetch() to dashboard API (the misclassified scenario)
+ *   3. signalr_negotiate    - SignalR negotiate POST with same-origin headers
  *
  * Usage:
  *   k6 run k6-dashboard-fetch.js --env BASE_URL=http://localhost:5090
@@ -97,7 +97,7 @@ function checkNotFlaggedAsBot(response, requestName) {
 }
 
 /**
- * Scenario 1: Dashboard page load — full browser navigation headers.
+ * Scenario 1: Dashboard page load - full browser navigation headers.
  * Simulates a user navigating directly to the dashboard URL.
  */
 export function dashboardPageLoad() {
@@ -125,7 +125,7 @@ export function dashboardPageLoad() {
 }
 
 /**
- * Scenario 2: Same-origin fetch — browser fetch() to dashboard API endpoints.
+ * Scenario 2: Same-origin fetch - browser fetch() to dashboard API endpoints.
  * THIS IS THE SCENARIO THAT WAS MISCLASSIFIED as bot traffic.
  *
  * When a browser makes fetch() calls from the dashboard page to its own API,
@@ -205,7 +205,7 @@ export function sameOriginFetch() {
 }
 
 /**
- * Scenario 3: SignalR negotiate — POST with same-origin headers.
+ * Scenario 3: SignalR negotiate - POST with same-origin headers.
  * SignalR's negotiate step uses a POST request with same-origin fetch metadata.
  */
 export function signalrNegotiate() {

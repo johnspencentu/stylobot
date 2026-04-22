@@ -168,7 +168,7 @@ public static class StyloBotDashboardServiceExtensions
     ///     <para>
     ///     Registers: detection middleware, broadcast middleware, dashboard UI, SignalR hub.
     ///     The broadcast middleware wraps detection so ALL detections (including blocked requests)
-    ///     are recorded in the dashboard — no middleware ordering issues.
+    ///     are recorded in the dashboard - no middleware ordering issues.
     ///     </para>
     /// </summary>
     /// <example>
@@ -185,7 +185,7 @@ public static class StyloBotDashboardServiceExtensions
 
         if (options?.Enabled == true)
         {
-            // Broadcast middleware goes FIRST — it wraps detection.
+            // Broadcast middleware goes FIRST - it wraps detection.
             // When _next returns (whether detection blocked or allowed the request),
             // the broadcast middleware ALWAYS runs and records the result.
             // This solves the "blocked requests invisible in dashboard" problem.

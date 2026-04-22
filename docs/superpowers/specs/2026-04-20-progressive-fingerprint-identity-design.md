@@ -1,7 +1,7 @@
 # Progressive Fingerprint Identity System
 
 **Date**: 2026-04-20
-**Status**: Spec — needs planning session
+**Status**: Spec - needs planning session
 
 ## Problem
 
@@ -11,7 +11,7 @@ More fundamentally: the identity should be progressive. The first request has IP
 
 ## Design Principle
 
-**Identity is a projection, not a snapshot.** Each session stores the HMAC hashes of every observable characteristic at that point. Over multiple sessions, the system retroactively discovers which characteristics are stable for this visitor — those become strong identity anchors. Volatile characteristics (timestamps, request IDs) get low weight automatically.
+**Identity is a projection, not a snapshot.** Each session stores the HMAC hashes of every observable characteristic at that point. Over multiple sessions, the system retroactively discovers which characteristics are stable for this visitor - those become strong identity anchors. Volatile characteristics (timestamps, request IDs) get low weight automatically.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ For each header hash key:
     if stability < 0.5: volatile (weight: zero, exclude from identity)
 ```
 
-Headers that are stable for THIS visitor become identity anchors. Different visitors may have different stable headers — the system discovers this automatically.
+Headers that are stable for THIS visitor become identity anchors. Different visitors may have different stable headers - the system discovers this automatically.
 
 ### Progressive Signature Resolution
 
@@ -99,15 +99,15 @@ The reputation system should:
 
 ## Key Files
 
-- `MultiFactorSignatureService.cs` — extend to compute per-header hashes
-- `SessionVector.cs` — extend `SessionSnapshot` to carry header hashes
-- `SignatureFeedbackHandler.cs` — use PrimarySignature instead of IP range (DONE)
-- `SessionPersistence.cs` — add header_hashes_json column
-- New: `FingerprintStabilityAnalyzer` — retroactive stability analysis across sessions
+- `MultiFactorSignatureService.cs` - extend to compute per-header hashes
+- `SessionVector.cs` - extend `SessionSnapshot` to carry header hashes
+- `SignatureFeedbackHandler.cs` - use PrimarySignature instead of IP range (DONE)
+- `SessionPersistence.cs` - add header_hashes_json column
+- New: `FingerprintStabilityAnalyzer` - retroactive stability analysis across sessions
 
 ## Immediate Fixes Done (this session)
 
-1. Killed IP-range reputation in `SignatureFeedbackHandler` — no more `IpRange` pattern type
+1. Killed IP-range reputation in `SignatureFeedbackHandler` - no more `IpRange` pattern type
 2. Added `PrimarySignature` to learning event metadata
 3. Added `IsLocalOrLoopback` guard in `NormalizeIpToRange`
 4. Reputation now anchors on PrimarySignature, not IP subnet

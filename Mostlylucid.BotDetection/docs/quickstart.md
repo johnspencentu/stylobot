@@ -1,6 +1,6 @@
 # Enterprise Bot Detection with Minimal Code
 
-StyloBot gives you 45-detector bot detection with anonymous entity resolution in two lines of code. No external services, no database setup, no API keys. It runs entirely self-contained with SQLite storage, in-process similarity search, and progressive identity resolution that learns who keeps coming back — even when they rotate their fingerprint.
+StyloBot gives you 45-detector bot detection with anonymous entity resolution in two lines of code. No external services, no database setup, no API keys. It runs entirely self-contained with SQLite storage, in-process similarity search, and progressive identity resolution that learns who keeps coming back - even when they rotate their fingerprint.
 
 ```
 NuGet: dotnet add package Mostlylucid.BotDetection

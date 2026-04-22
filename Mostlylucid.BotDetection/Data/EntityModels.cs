@@ -37,7 +37,7 @@ public sealed record ResolvedEntity
 /// <summary>
 ///     Links a PrimarySignature to an entity with full audit trail.
 ///     Edges are created on merge, split, rewind, or initial assignment.
-///     Reverted edges have RevertedAt set — they stay for audit but don't affect resolution.
+///     Reverted edges have RevertedAt set - they stay for audit but don't affect resolution.
 /// </summary>
 public sealed record EntityEdge
 {
@@ -59,7 +59,7 @@ public sealed record EntityEdge
 
 public enum EntityEdgeType
 {
-    /// <summary>First time this signature was seen — created a new entity.</summary>
+    /// <summary>First time this signature was seen - created a new entity.</summary>
     Initial,
 
     /// <summary>Signature merged into an existing entity (cosine neighbor + cadence match).</summary>

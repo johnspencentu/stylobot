@@ -2,7 +2,7 @@
 
 > **⚠️ DEPRECATED from v1.0.0 onwards.** PostgreSQL and TimescaleDB are no longer required for FOSS StyloBot.
 >
-> The new **temporal behavioral vector compression** technique achieves 100x+ storage reduction by compressing session histories into fixed-size behavioral vectors — without needing TimescaleDB hypertables, continuous aggregates, or any database-specific extensions. The FOSS product works with file/SQLite storage out of the box.
+> The new **temporal behavioral vector compression** technique achieves 100x+ storage reduction by compressing session histories into fixed-size behavioral vectors - without needing TimescaleDB hypertables, continuous aggregates, or any database-specific extensions. The FOSS product works with file/SQLite storage out of the box.
 >
 > PostgreSQL persistence (with pgvector for similarity search) has moved to [StyloBot Commercial](https://github.com/scottgal/stylobot-commercial) (`Stylobot.Commercial.Persistence.Postgres`) for customers who need fleet-wide reporting and long-term session history.
 >

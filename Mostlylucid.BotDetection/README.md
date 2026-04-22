@@ -12,7 +12,7 @@ learning**, auto-updated blocklists, YARP integration, and full observability.
 ## Key Features
 
 - **45 detectors in 4 waves**: User-Agent, headers, IP, behavioral, protocol fingerprinting, AI classification, intent classification, cluster detection, cookie behavior, resource waterfall, JS timing probes, periodicity, CVE probes, and more
-- **Anonymous entity resolution**: Progressive identity that learns who keeps coming back — even when they rotate IPs, UAs, or TLS fingerprints. Merge/split/rewind operations backed by immutable session snapshots. L0-L5 confidence levels.
+- **Anonymous entity resolution**: Progressive identity that learns who keeps coming back - even when they rotate IPs, UAs, or TLS fingerprints. Merge/split/rewind operations backed by immutable session snapshots. L0-L5 confidence levels.
 - **Intent classification and threat scoring**: HNSW-backed similarity search classifies request intent and assigns threat scores orthogonal to bot probability
 - **Protocol-deep fingerprinting**: JA3/JA4 TLS, p0f TCP/IP, AKAMAI HTTP/2, QUIC HTTP/3 - catch bots even when they spoof everything
 - **Simulation packs**: Honeypots that look like real products (WordPress 5.9 included). CVE probe detection feeds threat intelligence.

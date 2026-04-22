@@ -6,10 +6,10 @@
 // or set BASE_URL env var to target a different endpoint.
 //
 // API Key env vars (set to match docker-compose.demo.yml values):
-//   DASHBOARD_API_KEY     — dashboard monitor key (default: SB-DASHBOARD-MONITOR)
-//   FULL_DETECTION_KEY    — all detectors enabled, logonly (default: SB-K6-FULL-DETECTION)
-//   BYPASS_KEY            — all detectors disabled, latency baseline (default: SB-K6-BYPASS)
-//   NO_BEHAVIORAL_KEY     — behavioral detectors disabled (default: SB-K6-NO-BEHAVIORAL)
+//   DASHBOARD_API_KEY     - dashboard monitor key (default: SB-DASHBOARD-MONITOR)
+//   FULL_DETECTION_KEY    - all detectors enabled, logonly (default: SB-K6-FULL-DETECTION)
+//   BYPASS_KEY            - all detectors disabled, latency baseline (default: SB-K6-BYPASS)
+//   NO_BEHAVIORAL_KEY     - behavioral detectors disabled (default: SB-K6-NO-BEHAVIORAL)
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -90,7 +90,7 @@ export const options = {
             maxVUs: 5,
             exec: 'dashboardPolling',
         },
-        // Full detection — ALL detectors, verifies every detector fires
+        // Full detection - ALL detectors, verifies every detector fires
         full_detection_test: {
             executor: 'constant-arrival-rate',
             rate: 2,
@@ -100,7 +100,7 @@ export const options = {
             maxVUs: 10,
             exec: 'fullDetectionTest',
         },
-        // Bypass baseline — ALL detectors disabled, measures raw proxy latency
+        // Bypass baseline - ALL detectors disabled, measures raw proxy latency
         bypass_baseline: {
             executor: 'constant-arrival-rate',
             rate: 2,
@@ -110,7 +110,7 @@ export const options = {
             maxVUs: 10,
             exec: 'bypassBaseline',
         },
-        // No-behavioral — only fingerprint/header detectors, isolates detection layers
+        // No-behavioral - only fingerprint/header detectors, isolates detection layers
         no_behavioral_test: {
             executor: 'constant-arrival-rate',
             rate: 2,

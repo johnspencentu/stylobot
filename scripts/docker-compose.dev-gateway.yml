@@ -1,5 +1,5 @@
 # Minimal dev stack: Gateway (with dashboard) + TimescaleDB
-# No website needed — gateway serves the dashboard directly.
+# No website needed - gateway serves the dashboard directly.
 # Usage: docker compose -f docker-compose.dev-gateway.yml up -d
 #        Open http://localhost:8080/_stylobot
 

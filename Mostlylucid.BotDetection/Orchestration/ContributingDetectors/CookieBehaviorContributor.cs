@@ -88,14 +88,14 @@ public class CookieBehaviorContributor : ConfiguredContributorBase
         foreach (var (key, value) in signals)
             state.WriteSignal(key, value);
 
-        // Not enough requests yet — neutral
+        // Not enough requests yet - neutral
         if (tracking.RequestCount < MinRequestsForAnalysis)
         {
             contributions.Add(NeutralContribution("CookieBehavior", "Too few requests for cookie analysis"));
             return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
         }
 
-        // Server hasn't sent any Set-Cookie yet — can't judge
+        // Server hasn't sent any Set-Cookie yet - can't judge
         if (tracking.SetCookieCount == 0 && NoSetCookieNeutral)
         {
             contributions.Add(NeutralContribution("CookieBehavior", "No Set-Cookie headers observed"));
@@ -130,7 +130,7 @@ public class CookieBehaviorContributor : ConfiguredContributorBase
             return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
         }
 
-        // Neutral — cookies present but not enough data to be conclusive
+        // Neutral - cookies present but not enough data to be conclusive
         contributions.Add(NeutralContribution("CookieBehavior", "Cookie behavior inconclusive"));
         return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
     }
@@ -184,7 +184,7 @@ public class CookieBehaviorContributor : ConfiguredContributorBase
     }
 
     /// <summary>
-    ///     Per-signature tracking state. Only counts — never cookie names or values (zero-PII).
+    ///     Per-signature tracking state. Only counts - never cookie names or values (zero-PII).
     /// </summary>
     private class CookieTrackingState
     {

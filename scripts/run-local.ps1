@@ -1,4 +1,4 @@
-# run-local.ps1 — Start Gateway + Website locally (no Docker)
+# run-local.ps1 - Start Gateway + Website locally (no Docker)
 #
 # Architecture:
 #   Browser → Gateway (localhost:5010, bot detection) → Website (localhost:5062)

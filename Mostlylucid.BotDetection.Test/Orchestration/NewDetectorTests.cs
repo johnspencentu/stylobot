@@ -191,7 +191,7 @@ public class NewDetectorTests
             result = await contributor.ContributeAsync(state, CancellationToken.None);
         }
 
-        // Should be neutral — not enough data
+        // Should be neutral - not enough data
         Assert.All(result, c => Assert.True(c.ConfidenceDelta == 0,
             $"Expected neutral but got delta={c.ConfidenceDelta}: {c.Reason}"));
     }
@@ -203,7 +203,7 @@ public class NewDetectorTests
         var contributor = CreateCookieContributor(cache);
         const string sig = "test-sig-cookie-noset";
 
-        // Do NOT call RecordSetCookie — server never sent Set-Cookie
+        // Do NOT call RecordSetCookie - server never sent Set-Cookie
 
         IReadOnlyList<DetectionContribution> result = [];
         for (var i = 0; i < 5; i++)
@@ -215,7 +215,7 @@ public class NewDetectorTests
             result = await contributor.ContributeAsync(state, CancellationToken.None);
         }
 
-        // Should be neutral — can't judge without Set-Cookie
+        // Should be neutral - can't judge without Set-Cookie
         Assert.All(result, c => Assert.True(c.ConfidenceDelta == 0,
             $"Expected neutral but got delta={c.ConfidenceDelta}: {c.Reason}"));
     }
@@ -403,12 +403,12 @@ public class NewDetectorTests
         var baseTime = DateTimeOffset.UtcNow.AddMinutes(-15);
         for (var i = 0; i < 14; i++)
         {
-            // Exactly 1 second apart — very low CV
+            // Exactly 1 second apart - very low CV
             history.Add(baseTime.AddSeconds(i));
         }
         cache.Set(key, history, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromMinutes(30) });
 
-        // Fire one more request — the contributor will add UtcNow, which is ~15 min later.
+        // Fire one more request - the contributor will add UtcNow, which is ~15 min later.
         // This breaks the CV, so we add one more to the cache right before calling.
         // Actually, let's add all 15 to the cache and call once more to just read the analysis.
         history.Add(baseTime.AddSeconds(14));
@@ -485,7 +485,7 @@ public class NewDetectorTests
             -3590,  // 8s gap
             -60,    // near now (3530s gap)
             -55,    // 5s gap
-            -2      // 53s gap — close to now so UtcNow adds ~2s
+            -2      // 53s gap - close to now so UtcNow adds ~2s
         };
         foreach (var secOffset in secondsOffsets)
             history.Add(now.AddSeconds(secOffset));
@@ -608,7 +608,7 @@ public class NewDetectorTests
     [Fact]
     public void PartialChain_TooFewRequests_ZeroVector()
     {
-        // Only 2 requests — only 1 transition, produces a sparse vector
+        // Only 2 requests - only 1 transition, produces a sparse vector
         var requests = new List<SessionRequest>
         {
             new(RequestState.PageView, DateTimeOffset.UtcNow.AddSeconds(-2), "/page/1", 200),
@@ -664,7 +664,7 @@ public class NewDetectorTests
                 {
                     ctx.Request.Path = $"/page/{i}";
                     ctx.Request.Headers.Accept = "text/html";
-                    // No Sec-Fetch-Dest — fallback to Accept header for classification
+                    // No Sec-Fetch-Dest - fallback to Accept header for classification
                 });
 
             result = await contributor.ContributeAsync(state, CancellationToken.None);
@@ -675,7 +675,7 @@ public class NewDetectorTests
         var partialChainSignal = result.FirstOrDefault(r =>
             r.Reason.Contains("Partial chain", StringComparison.OrdinalIgnoreCase));
 
-        // The partial chain may or may not match depending on classification —
+        // The partial chain may or may not match depending on classification -
         // verify that some contribution was returned
         Assert.NotEmpty(result);
 

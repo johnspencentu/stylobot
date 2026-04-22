@@ -74,17 +74,17 @@ The existing User Agents tab gets enriched:
 **Current**: Shows UA family breakdown with basic counts.
 
 **New**:
-1. **Version distribution chart** — bar/pie chart of Chrome versions in use. Shows version adoption curve.
-2. **Version change timeline** — per-entity, when did the browser version change? Helps detect:
+1. **Version distribution chart** - bar/pie chart of Chrome versions in use. Shows version adoption curve.
+2. **Version change timeline** - per-entity, when did the browser version change? Helps detect:
    - Legitimate browser updates (Chrome 119→120, one jump, months apart)
    - Rotation (Chrome→Firefox→Safari→Edge in one session = bot)
-3. **UA search box** — full-text search with autocomplete
-4. **Anomaly highlighting** — impossible UAs highlighted:
+3. **UA search box** - full-text search with autocomplete
+4. **Anomaly highlighting** - impossible UAs highlighted:
    - Chrome version higher than latest released
    - Chrome UA with Firefox rendering engine
    - Mobile device with desktop screen resolution
    - Bot UA claiming to be a browser
-5. **Raw UA display** — hover/click to see full raw UA string (PII-stripped)
+5. **Raw UA display** - hover/click to see full raw UA string (PII-stripped)
 
 ### Version Plausibility Checker
 
@@ -106,7 +106,7 @@ public static class UaVersionPlausibility
 }
 ```
 
-This feeds into the `UserAgentContributor` — implausible versions get a bot signal.
+This feeds into the `UserAgentContributor` - implausible versions get a bot signal.
 
 ### UA Family Tracking Per Entity
 

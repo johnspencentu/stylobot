@@ -12,7 +12,7 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     - Temporal patterns: time-of-day consistency across sessions
 ///     - Rotation cadence: how often identity factors change
 ///
-///     Periodicity is orthogonal to fingerprinting — it survives identity rotation.
+///     Periodicity is orthogonal to fingerprinting - it survives identity rotation.
 ///     A bot rotating IPs every 5 minutes has a ROTATION PERIOD that is itself identifying.
 ///
 ///     Uses autocorrelation to detect dominant frequencies in the inter-request interval series.
@@ -77,7 +77,7 @@ public class PeriodicityContributor : ConfiguredContributorBase
         signals[SignalKeys.PeriodicityCV] = cv;
         signals[SignalKeys.PeriodicityMeanInterval] = meanInterval;
 
-        // === Analysis 2: Autocorrelation — find dominant periodic signal ===
+        // === Analysis 2: Autocorrelation - find dominant periodic signal ===
         var (dominantPeriod, peakStrength) = FindDominantPeriod(intervals);
         signals[SignalKeys.PeriodicityDominantPeriod] = dominantPeriod;
         signals[SignalKeys.PeriodicityPeakStrength] = peakStrength;
@@ -169,7 +169,7 @@ public class PeriodicityContributor : ConfiguredContributorBase
 
         // Compute autocorrelation at lag 0 (denominator)
         var denom = intervals.Sum(x => (x - mean) * (x - mean));
-        if (denom < 0.001) return (0, 0); // All intervals identical — perfect periodicity at lag 1
+        if (denom < 0.001) return (0, 0); // All intervals identical - perfect periodicity at lag 1
 
         var bestLag = 0;
         var bestCorr = 0.0;

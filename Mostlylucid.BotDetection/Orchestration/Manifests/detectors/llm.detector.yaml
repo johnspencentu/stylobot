@@ -1,6 +1,6 @@
 # LLM Detector - AI-powered bot detection for ambiguous cases
 name: LlmContributor
-priority: 55  # Runs after Intent (40) and Heuristic (50) — only for escalated cases
+priority: 55  # Runs after Intent (40) and Heuristic (50) - only for escalated cases
 enabled: true
 description: Uses LLM to analyze ambiguous bot/human patterns
 

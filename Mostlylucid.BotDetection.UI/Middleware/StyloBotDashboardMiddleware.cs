@@ -438,7 +438,7 @@ public class StyloBotDashboardMiddleware
 
     /// <summary>
     ///     Checks if the current request is authorized for WRITE operations (config save/delete).
-    ///     Write access is denied by default — requires explicit WriteAuthorizationFilter
+    ///     Write access is denied by default - requires explicit WriteAuthorizationFilter
     ///     or RequireWriteAuthorizationPolicy configuration. Viewing the dashboard does NOT grant write access.
     /// </summary>
     private async Task<bool> IsWriteAuthorizedAsync(HttpContext context)
@@ -469,7 +469,7 @@ public class StyloBotDashboardMiddleware
             return false;
         }
 
-        // Default DENY — write access is never implicitly granted
+        // Default DENY - write access is never implicitly granted
         _logger.LogWarning("Config write attempt denied: no WriteAuthorizationFilter or RequireWriteAuthorizationPolicy configured");
         return false;
     }
@@ -2040,7 +2040,7 @@ public class StyloBotDashboardMiddleware
         var model = BuildConfigurationModel(context);
         if (model is null)
         {
-            // No editor service registered — show a friendly empty state instead of a 500.
+            // No editor service registered - show a friendly empty state instead of a 500.
             context.Response.ContentType = "text/html";
             await context.Response.WriteAsync("<div class=\"text-sm text-base-content/60 p-4\">Config editor unavailable in this build.</div>");
             return;
@@ -2062,7 +2062,7 @@ public class StyloBotDashboardMiddleware
 
     /// <summary>
     ///     Build the Configuration tab model. Returns null when the editor service isn't
-    ///     registered (defensive — should always be present once <c>AddBotDetection()</c>
+    ///     registered (defensive - should always be present once <c>AddBotDetection()</c>
     ///     has run, but the dashboard may be hosted in trimmed configurations).
     /// </summary>
     private ConfigurationEditorModel? BuildConfigurationModel(HttpContext context)
@@ -2071,7 +2071,7 @@ public class StyloBotDashboardMiddleware
         if (editor is null) return null;
 
         // Reuse the shared license-status logic so the upsell rail's gating matches what
-        // the License card on Overview is showing — no risk of inconsistency.
+        // the License card on Overview is showing - no risk of inconsistency.
         var license = LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
         var commercial = license.Status is LicenseStatusKind.Active or LicenseStatusKind.Trial;
 
@@ -2094,7 +2094,7 @@ public class StyloBotDashboardMiddleware
     // atomic write). These methods only translate between HTTP and the service result enum.
     // ====================================================================================
 
-    /// <summary><c>GET /api/config/manifests</c> — list every editable detector + override status.</summary>
+    /// <summary><c>GET /api/config/manifests</c> - list every editable detector + override status.</summary>
     private async Task ServeConfigManifestsListAsync(HttpContext context)
     {
         var editor = context.RequestServices.GetService<ConfigEditorService>();
@@ -2105,12 +2105,12 @@ public class StyloBotDashboardMiddleware
             new { detectors = editor.ListManifests() }, CamelCaseJson);
     }
 
-    /// <summary><c>GET /api/config/schema</c> — JSON Schema for Monaco's YAML model binding.</summary>
+    /// <summary><c>GET /api/config/schema</c> - JSON Schema for Monaco's YAML model binding.</summary>
     private async Task ServeConfigSchemaAsync(HttpContext context)
     {
         context.Response.ContentType = "application/json";
         // Hand-written schema covering the high-traffic 80% of manifest fields. Monaco
-        // will mark unknown keys as warnings, not errors — fine for the long tail
+        // will mark unknown keys as warnings, not errors - fine for the long tail
         // (Triggers / Emits / Listens). Full schema is a follow-up.
         await context.Response.WriteAsync(DetectorManifestJsonSchema);
     }
@@ -2156,7 +2156,7 @@ public class StyloBotDashboardMiddleware
 
     private async Task ServeConfigManifestPutAsync(HttpContext context, ConfigEditorService editor, string slug)
     {
-        // Write operations require explicit write authorization — separate from dashboard read access
+        // Write operations require explicit write authorization - separate from dashboard read access
         if (!await IsWriteAuthorizedAsync(context))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -2165,7 +2165,7 @@ public class StyloBotDashboardMiddleware
             return;
         }
 
-        // Body is either text/plain YAML or JSON {"yaml":"…"} — accept both because the
+        // Body is either text/plain YAML or JSON {"yaml":"…"} - accept both because the
         // browser sends JSON via fetch() while curl users tend to send raw YAML.
         string yaml;
         try
@@ -2296,7 +2296,7 @@ public class StyloBotDashboardMiddleware
         "tags": { "type": "array", "items": { "type": "string" } },
         "defaults": {
           "type": "object",
-          "description": "All tunable values live here — no magic numbers in C#.",
+          "description": "All tunable values live here - no magic numbers in C#.",
           "properties": {
             "weights": {
               "type": "object",
@@ -2648,7 +2648,7 @@ public class StyloBotDashboardMiddleware
             html.Append($"<td class=\"py-1 text-[10px] {riskClass}\">{s.RiskBand}</td>");
             html.Append(velocity.HasValue
                 ? $"<td class=\"py-1 text-right text-[10px] font-mono {driftClass}\" title=\"Inter-session velocity: behavioral shift magnitude\">{velocity.Value:F2}</td>"
-                : "<td class=\"py-1 text-right text-[10px] text-base-content/20\">—</td>");
+                : "<td class=\"py-1 text-right text-[10px] text-base-content/20\">-</td>");
             html.Append($"<td class=\"py-1 text-right text-xs {(s.ErrorCount > 0 ? "text-error font-bold" : "text-base-content/40")}\">{s.ErrorCount}</td>");
             html.Append($"<td class=\"py-1 text-[10px] text-base-content/40 max-w-[250px] truncate\" title=\"{System.Net.WebUtility.HtmlEncode(pathPreview)}\">{System.Net.WebUtility.HtmlEncode(pathPreview)}</td>");
             html.Append("</tr>");

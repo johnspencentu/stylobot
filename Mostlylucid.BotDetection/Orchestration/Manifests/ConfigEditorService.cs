@@ -13,7 +13,7 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 ///     <list type="number">
 ///       <item><description>Listing all editable detector manifests (slug + parsed name + override-status).</description></item>
 ///       <item><description>Reading a manifest's embedded YAML and any on-disk override.</description></item>
-///       <item><description>Writing/deleting an override safely — slug regex guard, path-traversal check, YAML-parse validation, atomic temp+rename.</description></item>
+///       <item><description>Writing/deleting an override safely - slug regex guard, path-traversal check, YAML-parse validation, atomic temp+rename.</description></item>
 ///     </list>
 ///
 ///     <para>
@@ -24,7 +24,7 @@ namespace Mostlylucid.BotDetection.Orchestration.Manifests;
 ///     </para>
 ///
 ///     <para>
-///     The service deliberately does NOT push reload events itself — writes go through the
+///     The service deliberately does NOT push reload events itself - writes go through the
 ///     same FileSystemWatcher path as a manual edit, so <see cref="FileSystemConfigurationOverrideSource"/>
 ///     debounces and emits one <c>ConfigurationChangeNotification</c>. Keeping the contract
 ///     "edit a file, watcher reloads" makes the editor's behaviour identical to running
@@ -142,7 +142,7 @@ public sealed class ConfigEditorService
         var targetPath = GetOverridePath(slug);
         if (!IsInsideRoot(targetPath)) return SaveResult.Failure(SaveOutcome.PathEscape);
 
-        // Validate YAML parses cleanly. A failed parse must NOT touch the on-disk file —
+        // Validate YAML parses cleanly. A failed parse must NOT touch the on-disk file -
         // an operator with a syntax error mid-edit would otherwise nuke a previously-good
         // override and have no way to revert.
         try
@@ -164,7 +164,7 @@ public sealed class ConfigEditorService
             var dir = Path.GetDirectoryName(targetPath)!;
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-            // Atomic replace — write to .tmp sibling then File.Move with overwrite.
+            // Atomic replace - write to .tmp sibling then File.Move with overwrite.
             // The watcher fires on the rename; the embedded debounce collapses the burst.
             var tmp = targetPath + ".tmp";
             File.WriteAllText(tmp, yaml);
@@ -209,7 +209,7 @@ public sealed class ConfigEditorService
         Path.Combine(_overrideSource.RootPath, DetectorsSubDir, slug + DetectorYamlSuffix);
 
     /// <summary>
-    ///     Defence-in-depth — even after the slug regex and Path.Combine, re-resolve the
+    ///     Defence-in-depth - even after the slug regex and Path.Combine, re-resolve the
     ///     absolute path and confirm it sits underneath the override root. Catches exotic
     ///     edge cases (symlink races, NTFS reparse points) that a regex alone wouldn't.
     /// </summary>
@@ -293,7 +293,7 @@ public sealed record DetectorManifestDocument(
     bool HasOverride,
     DateTime? LastModifiedUtc);
 
-/// <summary>Outcome of a save attempt — middleware maps to HTTP status code.</summary>
+/// <summary>Outcome of a save attempt - middleware maps to HTTP status code.</summary>
 public enum SaveOutcome
 {
     Ok,

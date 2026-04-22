@@ -484,7 +484,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, TimescaleReputationContributor>();
         //
         // Wave 0 detectors (no dependencies - run first)
-        // Unified signature — computes PrimarySignature + header hashes for all downstream detectors (priority 1)
+        // Unified signature - computes PrimarySignature + header hashes for all downstream detectors (priority 1)
         services.AddSingleton<IContributingDetector, SignatureContributor>();
         // PII query string detection - privacy signals, not bot detection (priority 8)
         services.AddSingleton<IContributingDetector, PiiQueryStringContributor>();

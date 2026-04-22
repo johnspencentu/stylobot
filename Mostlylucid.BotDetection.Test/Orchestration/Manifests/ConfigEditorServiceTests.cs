@@ -122,7 +122,7 @@ public sealed class ConfigEditorServiceTests : IDisposable
         Assert.Equal(SaveOutcome.Ok, firstSave.Outcome);
         var path = firstSave.Path!;
 
-        // Try to save something that won't parse — the original file must survive.
+        // Try to save something that won't parse - the original file must survive.
         var badSave = _service.SaveOverride("header", "name: HeaderContributor\npriority: bogus\n  weird-indent");
         Assert.Equal(SaveOutcome.YamlInvalid, badSave.Outcome);
         Assert.True(File.Exists(path));
@@ -182,7 +182,7 @@ public sealed class ConfigEditorServiceTests : IDisposable
 
 internal static class DeleteOutcomeExtensions
 {
-    // The enum is bare on purpose — wrapping in a struct/record adds noise. This shim
+    // The enum is bare on purpose - wrapping in a struct/record adds noise. This shim
     // lets tests read like `result.Outcome()` for symmetry with SaveResult.
     public static DeleteOutcome Outcome(this DeleteOutcome o) => o;
 }

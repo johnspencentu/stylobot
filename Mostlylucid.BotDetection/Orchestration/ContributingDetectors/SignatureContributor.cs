@@ -13,10 +13,10 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 ///     collects header hashes for progressive identity resolution, and writes everything
 ///     to the blackboard so downstream contributors use one identity key.
 ///
-///     Priority 1 — runs before everything else in Wave 0.
+///     Priority 1 - runs before everything else in Wave 0.
 ///     No YAML config needed (no tunable parameters).
 ///     No trigger conditions (runs on every request).
-///     Returns empty contributions (informational only — no bot/human signal).
+///     Returns empty contributions (informational only - no bot/human signal).
 /// </summary>
 public class SignatureContributor : ContributingDetectorBase
 {

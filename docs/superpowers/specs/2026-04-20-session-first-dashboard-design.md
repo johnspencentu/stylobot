@@ -5,13 +5,13 @@
 
 ## Problem
 
-The signature detail view currently shows raw requests as the primary view. This isn't useful — sessions are the behavioral unit, not individual HTTP requests. Additionally, behavioral shape radar charts show as empty when no finalized sessions exist in SQLite, even though the write-through cache always has live data.
+The signature detail view currently shows raw requests as the primary view. This isn't useful - sessions are the behavioral unit, not individual HTTP requests. Additionally, behavioral shape radar charts show as empty when no finalized sessions exist in SQLite, even though the write-through cache always has live data.
 
 ## Design
 
 ### Core Principle: Sessions are the primary view, requests are drill-down
 
-When viewing a signature, you see **sessions** — including the active/live one. Each session shows its radar shape, Markov transitions, duration, request count, risk band. You drill INTO a session to see raw requests with Chrome DevTools-style filtering.
+When viewing a signature, you see **sessions** - including the active/live one. Each session shows its radar shape, Markov transitions, duration, request count, risk band. You drill INTO a session to see raw requests with Chrome DevTools-style filtering.
 
 ### Changes
 
@@ -47,7 +47,7 @@ When you click into a session, the existing `_SessionDetail.cshtml` expands to s
   - Filter by time range within session
   - Search by path
   - Sort by timestamp, status, state
-- This is the raw request view — but contextualised within a session
+- This is the raw request view - but contextualised within a session
 
 #### 4. API Changes
 
@@ -80,6 +80,6 @@ When the signature detail is open and a live session exists:
 
 ### Non-Goals
 
-- Full DevTools network panel (no request/response body inspection — zero-PII)
+- Full DevTools network panel (no request/response body inspection - zero-PII)
 - WebSocket/SSE live streaming of radar updates (SignalR invalidation + re-fetch is sufficient)
 - Request body inspection (violates zero-PII)

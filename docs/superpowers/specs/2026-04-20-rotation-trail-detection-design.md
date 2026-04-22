@@ -1,4 +1,4 @@
-# Rotation Trail Detection — Fingerprint Neighbor Merging
+# Rotation Trail Detection - Fingerprint Neighbor Merging
 
 **Date**: 2026-04-20
 **Status**: Spec
@@ -15,11 +15,11 @@ Identity rotation creates a trail of near-miss fingerprints in vector space. Eac
 
 ### Observation
 
-The inter-session velocity (already computed) measures `||V_n - V_{n-1}||` — the L2 magnitude of the behavioral delta between sessions. This IS the rotation signal.
+The inter-session velocity (already computed) measures `||V_n - V_{n-1}||` - the L2 magnitude of the behavioral delta between sessions. This IS the rotation signal.
 
 **Human patterns:**
 - Long stretches of velocity ≈ 0 (same browser, same behavior)
-- Occasional large jump (browser update, device change) — velocity spike
+- Occasional large jump (browser update, device change) - velocity spike
 - **Variance of velocity: HIGH** (stable → spike → stable)
 
 **Bot rotation patterns:**
@@ -56,18 +56,18 @@ When a NEW fingerprint appears (no history for this PrimarySignature):
 The 129-dim vector has different rotation characteristics:
 
 **Typically rotated by bots (dims that change):**
-- [118] TLS version — rotated between 1.2/1.3
-- [119] HTTP protocol — rotated between h1/h2
-- [120] Protocol client type — different HTTP libraries
-- [126-128] Timing features — varies with load/proxy
+- [118] TLS version - rotated between 1.2/1.3
+- [119] HTTP protocol - rotated between h1/h2
+- [120] Protocol client type - different HTTP libraries
+- [126-128] Timing features - varies with load/proxy
 
 **Typically stable even during rotation (dims that DON'T change):**
-- [0-99] Markov transitions — behavior pattern is the goal, hard to fake
-- [110] Timing regularity — bot rhythm is persistent
-- [114] Request rate — throughput is consistent
-- [116] Path diversity — target set doesn't change
+- [0-99] Markov transitions - behavior pattern is the goal, hard to fake
+- [110] Timing regularity - bot rhythm is persistent
+- [114] Request rate - throughput is consistent
+- [116] Path diversity - target set doesn't change
 
-**The key dimensions for merging are the STABLE ones** — if Markov transitions are similar but fingerprint dims changed, it's the same actor rotating their transport layer.
+**The key dimensions for merging are the STABLE ones** - if Markov transitions are similar but fingerprint dims changed, it's the same actor rotating their transport layer.
 
 ### Integration with Entity Resolution
 
@@ -103,10 +103,10 @@ Two entities with:
 
 ## Implementation
 
-1. **Extend `SessionVectorContributor`** — compute velocity variance across last N sessions
+1. **Extend `SessionVectorContributor`** - compute velocity variance across last N sessions
 2. **New signal:** `session.rotation_detected`, `session.rotation_cadence`, `session.velocity_variance`
-3. **Extend `ClusterContributor`** — use cosine neighbor walking for entity merging
-4. **New contributor: `RotationDetectionContributor`** — fires when velocity variance is suspiciously low
+3. **Extend `ClusterContributor`** - use cosine neighbor walking for entity merging
+4. **New contributor: `RotationDetectionContributor`** - fires when velocity variance is suspiciously low
 5. **Dashboard:** show rotation trail visualization (connected dots in vector space)
 
 ## Already Have

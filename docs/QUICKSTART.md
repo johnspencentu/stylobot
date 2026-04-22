@@ -148,5 +148,5 @@ docker compose -f docker-compose.demo.yml up -d
 - `README.md`
 - `DOCKER_SETUP.md`
 - `docs/README.md`
-- `Mostlylucid.BotDetection/docs/quickstart.md` — Full integration guide (NuGet, attributes, action policies, dashboard setup)
+- `Mostlylucid.BotDetection/docs/quickstart.md` - Full integration guide (NuGet, attributes, action policies, dashboard setup)
 - `Mostlylucid.BotDetection/docs/api-reference.md`

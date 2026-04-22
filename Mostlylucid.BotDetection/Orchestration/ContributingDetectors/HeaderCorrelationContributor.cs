@@ -10,7 +10,7 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// <summary>
 ///     Detects UA rotation by correlating requests that have different PrimarySignatures
 ///     but identical non-UA header profiles. When a bot rotates User-Agent strings,
-///     everything ELSE stays the same — Accept-Encoding, Accept-Language, connection
+///     everything ELSE stays the same - Accept-Encoding, Accept-Language, connection
 ///     behavior, Sec-CH-UA ordering. This detector catches that pattern.
 ///
 ///     Works by hashing the "header fingerprint" (all headers EXCEPT User-Agent) and
@@ -96,7 +96,7 @@ public class HeaderCorrelationContributor : ConfiguredContributorBase
         }
         else if (distinctSignatures == 2)
         {
-            // Two signatures — suspicious but not conclusive (could be browser update)
+            // Two signatures - suspicious but not conclusive (could be browser update)
             contributions.Add(NeutralContribution(
                 "HeaderCorrelation",
                 $"2 signatures with similar headers from same IP (monitoring)"));
@@ -139,7 +139,7 @@ public class HeaderCorrelationContributor : ConfiguredContributorBase
         discriminators.Sort(StringComparer.Ordinal);
         var combined = string.Join("|", discriminators);
 
-        // Simple hash — we don't need crypto here, just deduplication
+        // Simple hash - we don't need crypto here, just deduplication
         return combined.GetHashCode().ToString("X8");
     }
 }

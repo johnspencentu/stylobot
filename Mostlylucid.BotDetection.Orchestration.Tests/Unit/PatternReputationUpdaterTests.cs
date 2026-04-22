@@ -343,7 +343,7 @@ public class PatternReputationUpdaterTests
     {
         // ConfirmedBad patterns use the longer tau pair (12h / 24h) introduced in commit
         // d241863 to prevent oscillation. After 3h the decay is much gentler than the
-        // 3h/6h base tau would predict — that's the whole point.
+        // 3h/6h base tau would predict - that's the whole point.
         // ScoreDecayTauHours          = 3   (used by Neutral / Suspect)
         // ConfirmedBadScoreDecayTauHours = 12
         // SupportDecayTauHours        = 6
@@ -375,7 +375,7 @@ public class PatternReputationUpdaterTests
     {
         // After 12h on a ConfirmedBad pattern: score has done one ConfirmedBad-tau worth
         // of decay (12/12 = 1τ → ~63% of the way to prior), support half a tau (12/24 →
-        // drops ~39%). Still nowhere near "near prior" — the test name predates the
+        // drops ~39%). Still nowhere near "near prior" - the test name predates the
         // ConfirmedBad-tau split and is kept for git history continuity even though the
         // assertion is now "decayed but still suspicious".
         var current = new PatternReputation

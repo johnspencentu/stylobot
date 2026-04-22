@@ -294,7 +294,7 @@ Session-centric dashboard at `/_stylobot` with:
 
 ## Public API & SDKs
 
-**Canonical REST API** (`Mostlylucid.BotDetection.Api`) at `/api/v1/*` — the foundation for all SDK clients.
+**Canonical REST API** (`Mostlylucid.BotDetection.Api`) at `/api/v1/*` - the foundation for all SDK clients.
 
 **Auth tiers:** Tier 1 (proxy headers, zero-latency), Tier 2 (`X-SB-Api-Key` for detection + read), Tier 3 (OIDC bearer for management, commercial).
 
@@ -305,8 +305,8 @@ Session-centric dashboard at `/_stylobot` with:
 ### Node SDK
 
 Two npm packages in `sdk/node/`:
-- **`@stylobot/core`** — Zero-dep types, `StyloBotClient`, header parser. Works in Node/Deno/Bun.
-- **`@stylobot/node`** — Express middleware (`styloBotMiddleware`), Fastify plugin (`styloBotPlugin`).
+- **`@stylobot/core`** - Zero-dep types, `StyloBotClient`, header parser. Works in Node/Deno/Bun.
+- **`@stylobot/node`** - Express middleware (`styloBotMiddleware`), Fastify plugin (`styloBotPlugin`).
 
 Two modes: `headers` (behind Gateway, zero-latency) or `api` (sidecar, calls `POST /api/v1/detect`).
 

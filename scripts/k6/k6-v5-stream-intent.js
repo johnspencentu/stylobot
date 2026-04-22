@@ -328,13 +328,13 @@ export function signalrAbuse() {
     trackGeneral(res);
     const { isBot, detectors } = parseDetectionHeaders(res);
 
-    // Abuse should be detected — StreamAbuse or TransportProtocol signals
+    // Abuse should be detected - StreamAbuse or TransportProtocol signals
     const hasStreamDetection = detectors.toLowerCase().includes('stream') ||
                                detectors.toLowerCase().includes('transport') ||
                                isBot;
     streamAbuseDetected.add(hasStreamDetection ? 1 : 0);
 
-    // No sleep — rapid-fire is the point
+    // No sleep - rapid-fire is the point
 }
 
 // --- WebSocket Legitimate ---
@@ -390,7 +390,7 @@ export function websocketAbuse() {
                                isBot;
     streamAbuseDetected.add(hasStreamDetection ? 1 : 0);
 
-    // No sleep — rapid handshake storm
+    // No sleep - rapid handshake storm
 }
 
 // --- SSE Legitimate ---
@@ -749,7 +749,7 @@ const EDGE_CASE_PROFILES = [
             'User-Agent': CHROME_UA,
             'Connection': 'close',
             'Accept': '*/*',
-            // Browser UA but Connection: close and no cookies — competing features
+            // Browser UA but Connection: close and no cookies - competing features
         },
         path: '/docs',
     },

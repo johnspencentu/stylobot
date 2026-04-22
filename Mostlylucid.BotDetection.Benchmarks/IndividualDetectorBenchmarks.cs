@@ -110,7 +110,7 @@ public class IndividualDetectorBenchmarks
     }
 
     // =========================================
-    // Benchmark methods — one per detector × scenario
+    // Benchmark methods - one per detector × scenario
     // =========================================
 
     // --- Core detectors ---

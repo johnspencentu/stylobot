@@ -1,5 +1,5 @@
 #!/usr/bin/env npx playwright test
-// UX audit script — screenshots each dashboard tab + tests signature links
+// UX audit script - screenshots each dashboard tab + tests signature links
 // Usage: node scripts/dashboard-audit.mjs [base_url]
 
 import { chromium } from 'playwright';
@@ -37,7 +37,7 @@ for (const tab of tabs) {
   } catch (e) { console.log(`  ${tab} FAILED: ${e.message}`); }
 }
 
-// Test signature links — go back to overview
+// Test signature links - go back to overview
 try {
   await page.getByRole('tab', { name: 'Overview' }).or(page.locator(`button:has-text("Overview")`)).first().click();
   await page.waitForTimeout(1000);
@@ -55,7 +55,7 @@ for (let i = 0; i < Math.min(8, count); i++) {
     const notFound = await page.locator('text=Not Found').first().isVisible().catch(() => false);
     if (notFound) { broken++; console.log(`  BROKEN: ${href}`); }
     else { ok++; if (ok === 1) await page.screenshot({ path: `${out}-sig-ok.png`, fullPage: true }); }
-  } catch (e) { broken++; console.log(`  ERROR: ${href} — ${e.message}`); }
+  } catch (e) { broken++; console.log(`  ERROR: ${href} - ${e.message}`); }
 }
 console.log(`\nResults: ${ok} OK, ${broken} broken out of ${Math.min(8, count)}`);
 if (consoleErrors.length > 0) {

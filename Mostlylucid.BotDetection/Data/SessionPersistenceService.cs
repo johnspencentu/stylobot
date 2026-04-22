@@ -123,7 +123,7 @@ public sealed class SessionPersistenceService : BackgroundService
 
         await _store.UpsertSignatureAsync(sig, ct);
 
-        // Resolve entity — creates one if new, returns existing if known.
+        // Resolve entity - creates one if new, returns existing if known.
         // This is async/background so it doesn't block the request pipeline.
         try
         {

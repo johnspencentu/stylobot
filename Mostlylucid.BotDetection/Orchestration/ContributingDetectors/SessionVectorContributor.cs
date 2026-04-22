@@ -284,7 +284,7 @@ public class SessionVectorContributor : ConfiguredContributorBase
         }
         else
         {
-            // Zero vector — no transitions to analyze
+            // Zero vector - no transitions to analyze
             return;
         }
 

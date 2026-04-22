@@ -5,7 +5,7 @@ namespace Mostlylucid.BotDetection.Identity;
 
 /// <summary>
 ///     Collects HMAC hashes of discriminatory HTTP headers per request.
-///     Only headers with identity-discriminating value are hashed — junk headers
+///     Only headers with identity-discriminating value are hashed - junk headers
 ///     (Date, Content-Length, Host) are ignored.
 ///     The hashes are stored per session for retroactive stability analysis:
 ///     which headers are stable for THIS visitor across sessions?
@@ -16,12 +16,12 @@ public sealed class HeaderHashCollector
 
     /// <summary>
     ///     Headers worth hashing for identity resolution.
-    ///     Selected for discriminatory value — each has a reasonable chance of being
+    ///     Selected for discriminatory value - each has a reasonable chance of being
     ///     stable for one visitor but different across visitors.
     /// </summary>
     private static readonly FrozenSet<string> CandidateHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        // Client hints — highly discriminating, browser-specific
+        // Client hints - highly discriminating, browser-specific
         "sec-ch-ua",
         "sec-ch-ua-platform",
         "sec-ch-ua-mobile",
@@ -30,17 +30,17 @@ public sealed class HeaderHashCollector
         "sec-ch-ua-bitness",
         "sec-ch-ua-model",
 
-        // Fetch metadata — reveals navigation context
+        // Fetch metadata - reveals navigation context
         "sec-fetch-site",
         "sec-fetch-mode",
         "sec-fetch-dest",
 
-        // Content negotiation — stable per browser/locale
+        // Content negotiation - stable per browser/locale
         "accept",
         "accept-language",
         "accept-encoding",
 
-        // Privacy signals — stable per user choice
+        // Privacy signals - stable per user choice
         "dnt",
         "sec-gpc",
 
@@ -49,12 +49,12 @@ public sealed class HeaderHashCollector
         "upgrade-insecure-requests",
         "priority",
 
-        // Ordering patterns — the ORDER of headers is itself discriminating
+        // Ordering patterns - the ORDER of headers is itself discriminating
         // (captured separately via header ordering hash)
     }.ToFrozenSet();
 
     /// <summary>
-    ///     Headers that are common junk — high entropy, low identity value.
+    ///     Headers that are common junk - high entropy, low identity value.
     ///     Excluded even if they match candidate list.
     /// </summary>
     private static readonly FrozenSet<string> ExcludedHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -74,7 +74,7 @@ public sealed class HeaderHashCollector
     /// <summary>
     ///     Collect HMAC hashes of discriminatory headers from the current request.
     ///     Returns a dictionary of header name → HMAC hash of value.
-    ///     Also includes a special "header_order" key — the hash of the header name ordering,
+    ///     Also includes a special "header_order" key - the hash of the header name ordering,
     ///     which is itself a strong fingerprint signal (different HTTP stacks send headers
     ///     in different orders).
     /// </summary>
@@ -95,7 +95,7 @@ public sealed class HeaderHashCollector
             hashes[name] = _hasher.ComputeSignature(value);
         }
 
-        // Header ordering hash — the sequence of header names is a fingerprint
+        // Header ordering hash - the sequence of header names is a fingerprint
         // Different HTTP clients/browsers send headers in characteristic orders
         var headerNames = request.Headers.Keys
             .Where(k => !ExcludedHeaders.Contains(k))

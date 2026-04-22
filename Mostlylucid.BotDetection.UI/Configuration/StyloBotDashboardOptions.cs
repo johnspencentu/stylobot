@@ -77,7 +77,7 @@ public sealed class StyloBotDashboardOptions
 
     /// <summary>
     ///     Authorization filter for write operations (config save/delete, policy changes).
-    ///     Separate from read access — viewing the dashboard does NOT grant write permission.
+    ///     Separate from read access - viewing the dashboard does NOT grant write permission.
     ///     If null and RequireWriteAuthorizationPolicy is also null, write operations are DENIED by default.
     /// </summary>
     public Func<HttpContext, Task<bool>>? WriteAuthorizationFilter { get; set; }

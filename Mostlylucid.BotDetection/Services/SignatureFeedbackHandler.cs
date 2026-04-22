@@ -200,7 +200,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
         var signatures = new List<(string, string)>();
 
         // PRIMARY: Use the multi-factor PrimarySignature as the reputation anchor.
-        // This is HMAC(IP+UA) — it distinguishes visitors behind the same IP.
+        // This is HMAC(IP+UA) - it distinguishes visitors behind the same IP.
         // Different browsers/tools from the same IP get different reputations.
         if (evt.Metadata?.TryGetValue("primarySignature", out var primaryObj) == true &&
             primaryObj is string primary && !string.IsNullOrEmpty(primary))
@@ -208,7 +208,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
             signatures.Add((SignatureTypes.CombinedSignature, primary));
         }
 
-        // UA pattern signature — still useful for UA-family reputation (all Chrome users)
+        // UA pattern signature - still useful for UA-family reputation (all Chrome users)
         if (evt.Metadata?.TryGetValue("userAgent", out var uaObj) == true &&
             uaObj is string userAgent && !string.IsNullOrEmpty(userAgent))
         {
@@ -218,7 +218,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
 
         // NO IP range reputation. IP-alone reputation poisons all visitors from the same
         // network (e.g., localhost curl traffic poisons localhost Chrome).
-        // The PrimarySignature already incorporates IP — that's sufficient.
+        // The PrimarySignature already incorporates IP - that's sufficient.
 
         // Path pattern signature
         if (evt.Metadata?.TryGetValue("path", out var pathObj) == true &&
@@ -284,7 +284,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
     internal static string NormalizeIpToRange(string ip)
     {
         // Local/loopback IPs must never get subnet-level reputation.
-        // They're not network identities — every developer runs from ::1/127.0.0.1.
+        // They're not network identities - every developer runs from ::1/127.0.0.1.
         // Building reputation on localhost would poison detection for all local traffic.
         if (IsLocalOrLoopback(ip)) return string.Empty;
 

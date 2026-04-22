@@ -90,7 +90,7 @@ public partial class DetectionBroadcastMiddleware
 
                 var options = optionsAccessor.Value;
                 if (options.ExcludeLocalIpFromBroadcast && IsLocalIp(context.Connection.RemoteIpAddress))
-                    return; // Skip SignalR broadcast only — DB and caches are already updated
+                    return; // Skip SignalR broadcast only - DB and caches are already updated
 
                 // Beacon-only: signal which widgets need refreshing, never send full payloads
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
@@ -138,7 +138,7 @@ public partial class DetectionBroadcastMiddleware
                 // Filter out local/private IP detections from SignalR broadcast if configured
                 var options = optionsAccessor.Value;
                 if (options.ExcludeLocalIpFromBroadcast && IsLocalIp(context.Connection.RemoteIpAddress))
-                    return; // Skip broadcast only — DB and caches are already updated
+                    return; // Skip broadcast only - DB and caches are already updated
                 await hubContext.Clients.All.BroadcastInvalidation("signature");
                 await hubContext.Clients.All.BroadcastInvalidation("summary");
 

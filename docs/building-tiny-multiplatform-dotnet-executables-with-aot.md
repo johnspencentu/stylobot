@@ -1,6 +1,6 @@
 # Building Tiny Multi-Platform .NET Executables with Native AOT
 
-If you've ever wanted to ship a .NET application as a single, native executable that starts instantly and runs anywhere—without requiring users to install .NET—then Native AOT (Ahead-of-Time compilation) is your answer. In this comprehensive guide, I'll walk you through building multi-platform native executables that are genuinely tiny (10-30MB), run on Windows, Linux (including ARM64 Raspberry Pi), and macOS, and deploy automatically via GitHub Actions.
+If you've ever wanted to ship a .NET application as a single, native executable that starts instantly and runs anywhere-without requiring users to install .NET-then Native AOT (Ahead-of-Time compilation) is your answer. In this comprehensive guide, I'll walk you through building multi-platform native executables that are genuinely tiny (10-30MB), run on Windows, Linux (including ARM64 Raspberry Pi), and macOS, and deploy automatically via GitHub Actions.
 
 ## Table of Contents
 
@@ -55,7 +55,7 @@ The AOT compiler aggressively trims unused code. If you use reflection, JSON ser
 
 ### 3. Longer Build Times
 
-Native compilation takes longer than normal .NET builds—expect 2-5 minutes instead of seconds.
+Native compilation takes longer than normal .NET builds-expect 2-5 minutes instead of seconds.
 
 ### 4. Platform-Specific Builds
 
@@ -128,13 +128,13 @@ Removes culture-specific data (saves ~5-10MB). Only use if you don't need locali
 Removes debug symbols from the final binary (saves MB).
 
 #### `PublishSingleFile=true`
-Bundles everything into one executable (except native dependencies like SQLite—more on that below).
+Bundles everything into one executable (except native dependencies like SQLite-more on that below).
 
 #### `OptimizationPreference=Speed`
 Tells the AOT compiler to optimize for performance over size. Use `Size` if you need the smallest possible binary.
 
 #### `RuntimeIdentifiers`
-Declares which platforms you support. This doesn't build them all—it just tells tooling they're valid targets.
+Declares which platforms you support. This doesn't build them all-it just tells tooling they're valid targets.
 
 <a name="sqlite-problem"></a>
 ## The SQLite Problem (and Solution)
@@ -517,7 +517,7 @@ DllNotFoundException: Unable to load DLL 'mylibrary'
 ```
 
 **Common causes**:
-- SQLite (covered above—use the bundle)
+- SQLite (covered above-use the bundle)
 - Other native libraries (OpenSSL, libcurl, etc.)
 
 **Solution**: Ensure native dependencies are either:
@@ -596,11 +596,11 @@ Idle memory (gateway running, no traffic):
 
 ## Conclusion
 
-Native AOT opens up new possibilities for .NET applications—tiny binaries, instant startup, zero runtime dependencies. The setup requires careful attention to reflection, JSON serialization, and native dependencies (especially SQLite), but the payoff is substantial.
+Native AOT opens up new possibilities for .NET applications-tiny binaries, instant startup, zero runtime dependencies. The setup requires careful attention to reflection, JSON serialization, and native dependencies (especially SQLite), but the payoff is substantial.
 
 For CLI tools, gateways, containers, and edge devices, AOT is the clear winner. For applications heavy on reflection, EF Core, or dynamic features, stick with traditional .NET deployments or be prepared for significant testing and attribute annotations.
 
-The GitHub Actions workflow provided here builds all major platforms automatically—just tag a release and you're done. Welcome to the world of truly portable .NET applications.
+The GitHub Actions workflow provided here builds all major platforms automatically-just tag a release and you're done. Welcome to the world of truly portable .NET applications.
 
 ## Resources
 
