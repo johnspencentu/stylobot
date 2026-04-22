@@ -95,7 +95,9 @@ public static class HeuristicFeatureExtractor
     private static void ExtractRequestMetadata(HttpContext context, Dictionary<string, float> features)
     {
         var headers = context.Request.Headers;
-        var userAgent = headers.UserAgent.ToString();
+        // Avoid ToString() — read directly from StringValues to skip string allocation for length check
+        var userAgentSv = headers.UserAgent;
+        var userAgent = userAgentSv.Count > 0 ? userAgentSv.ToString() : string.Empty;
 
         // Request basics
         features["req:ua_length"] = Math.Min(userAgent.Length / 200f, 1f);
@@ -113,14 +115,11 @@ public static class HeuristicFeatureExtractor
         features["hdr:accept"] = headers.ContainsKey("Accept") ? 1f : 0f;
         features["hdr:referer"] = hasReferer ? 1f : 0f;
         features["hdr:origin"] = headers.ContainsKey("Origin") ? 1f : 0f;
-        features["hdr:x-requested-with"] = headers["X-Requested-With"].ToString()
-            .Equals("XMLHttpRequest", StringComparison.OrdinalIgnoreCase)
-            ? 1f
-            : 0f;
-        features["hdr:connection-close"] = headers.Connection.ToString()
-            .Equals("close", StringComparison.OrdinalIgnoreCase)
-            ? 1f
-            : 0f;
+        // Avoid ToString() — compare directly via FirstOrDefault to skip string allocation
+        features["hdr:x-requested-with"] = headers["X-Requested-With"].FirstOrDefault()
+            ?.Equals("XMLHttpRequest", StringComparison.OrdinalIgnoreCase) == true ? 1f : 0f;
+        features["hdr:connection-close"] = headers.Connection.FirstOrDefault()
+            ?.Equals("close", StringComparison.OrdinalIgnoreCase) == true ? 1f : 0f;
 
         // Sec-Fetch-* headers (Fetch Metadata Request Headers, W3C spec)
         // Modern browsers send these on ALL requests to attest origin/mode/destination.
@@ -136,26 +135,25 @@ public static class HeuristicFeatureExtractor
         if (!hasAcceptLanguage && !isSameOriginFetch) features["hdr:missing_accept_language"] = 1f;
         if (!hasReferer) features["hdr:missing_referer"] = 1f;
 
-        // User-Agent pattern features (dynamic based on content)
-        var uaLower = userAgent.ToLowerInvariant();
-        if (uaLower.Contains("bot")) features["ua:contains_bot"] = 1f;
-        if (uaLower.Contains("spider")) features["ua:contains_spider"] = 1f;
-        if (uaLower.Contains("crawler")) features["ua:contains_crawler"] = 1f;
-        if (uaLower.Contains("scraper")) features["ua:contains_scraper"] = 1f;
-        if (uaLower.Contains("headless")) features["ua:headless"] = 1f;
-        if (uaLower.Contains("phantomjs")) features["ua:phantomjs"] = 1f;
-        if (uaLower.Contains("selenium")) features["ua:selenium"] = 1f;
-        if (uaLower.Contains("chrome")) features["ua:chrome"] = 1f;
-        if (uaLower.Contains("firefox")) features["ua:firefox"] = 1f;
-        if (uaLower.Contains("safari")) features["ua:safari"] = 1f;
-        if (uaLower.Contains("edge")) features["ua:edge"] = 1f;
-        if (uaLower.Contains("curl")) features["ua:curl"] = 1f;
-        if (uaLower.Contains("wget")) features["ua:wget"] = 1f;
-        if (uaLower.Contains("python")) features["ua:python"] = 1f;
-        if (uaLower.Contains("scrapy")) features["ua:scrapy"] = 1f;
-        if (uaLower.Contains("requests")) features["ua:requests"] = 1f;
-        if (uaLower.Contains("httpx")) features["ua:httpx"] = 1f;
-        if (uaLower.Contains("aiohttp")) features["ua:aiohttp"] = 1f;
+        // User-Agent pattern features — OrdinalIgnoreCase avoids ToLowerInvariant() allocation
+        if (userAgent.Contains("bot", StringComparison.OrdinalIgnoreCase)) features["ua:contains_bot"] = 1f;
+        if (userAgent.Contains("spider", StringComparison.OrdinalIgnoreCase)) features["ua:contains_spider"] = 1f;
+        if (userAgent.Contains("crawler", StringComparison.OrdinalIgnoreCase)) features["ua:contains_crawler"] = 1f;
+        if (userAgent.Contains("scraper", StringComparison.OrdinalIgnoreCase)) features["ua:contains_scraper"] = 1f;
+        if (userAgent.Contains("headless", StringComparison.OrdinalIgnoreCase)) features["ua:headless"] = 1f;
+        if (userAgent.Contains("phantomjs", StringComparison.OrdinalIgnoreCase)) features["ua:phantomjs"] = 1f;
+        if (userAgent.Contains("selenium", StringComparison.OrdinalIgnoreCase)) features["ua:selenium"] = 1f;
+        if (userAgent.Contains("chrome", StringComparison.OrdinalIgnoreCase)) features["ua:chrome"] = 1f;
+        if (userAgent.Contains("firefox", StringComparison.OrdinalIgnoreCase)) features["ua:firefox"] = 1f;
+        if (userAgent.Contains("safari", StringComparison.OrdinalIgnoreCase)) features["ua:safari"] = 1f;
+        if (userAgent.Contains("edge", StringComparison.OrdinalIgnoreCase)) features["ua:edge"] = 1f;
+        if (userAgent.Contains("curl", StringComparison.OrdinalIgnoreCase)) features["ua:curl"] = 1f;
+        if (userAgent.Contains("wget", StringComparison.OrdinalIgnoreCase)) features["ua:wget"] = 1f;
+        if (userAgent.Contains("python", StringComparison.OrdinalIgnoreCase)) features["ua:python"] = 1f;
+        if (userAgent.Contains("scrapy", StringComparison.OrdinalIgnoreCase)) features["ua:scrapy"] = 1f;
+        if (userAgent.Contains("requests", StringComparison.OrdinalIgnoreCase)) features["ua:requests"] = 1f;
+        if (userAgent.Contains("httpx", StringComparison.OrdinalIgnoreCase)) features["ua:httpx"] = 1f;
+        if (userAgent.Contains("aiohttp", StringComparison.OrdinalIgnoreCase)) features["ua:aiohttp"] = 1f;
 
         // Empty/missing User-Agent - no real browser omits the UA header
         if (userAgent.Length == 0) features["ua:empty"] = 1f;
@@ -163,9 +161,12 @@ public static class HeuristicFeatureExtractor
         // Very short User-Agent (< 15 chars) is suspicious - real browsers have long UAs
         if (userAgent.Length > 0 && userAgent.Length < 15) features["ua:very_short"] = 1f;
 
-        // Detect browser-like UA (Chrome/Firefox/Safari/Edge in the string)
-        var isBrowserUa = uaLower.Contains("chrome") || uaLower.Contains("firefox") ||
-                          uaLower.Contains("safari") || uaLower.Contains("edge");
+        // Detect browser-like UA (Chrome/Firefox/Safari/Edge in the string) — reuse OrdinalIgnoreCase,
+        // no extra allocation needed since the individual checks above already computed these
+        var isBrowserUa = userAgent.Contains("chrome", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("firefox", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("safari", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("edge", StringComparison.OrdinalIgnoreCase);
 
         // Composite: browser UA without typical browser headers = spoofed UA
         // Suppress for same-origin fetch: browser fetch() legitimately omits Accept-Language
@@ -177,23 +178,30 @@ public static class HeuristicFeatureExtractor
             features["req:method_head"] = 1f;
 
         // Path analysis - detect config/env file probing
-        var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
-        if (path.Contains("/.env")) features["path:env_file"] = 1f;
-        if (path.StartsWith("/.") && path.Length > 2) features["path:dotfile"] = 1f;
-        if (path.Contains("wp-") || path.Contains("wordpress") || path.Contains("wp-admin") ||
-            path.Contains("wp-login"))
+        // Avoid ToLowerInvariant() — use OrdinalIgnoreCase on raw path value
+        var path = context.Request.Path.Value ?? "";
+        if (path.Contains("/.env", StringComparison.OrdinalIgnoreCase)) features["path:env_file"] = 1f;
+        if (path.StartsWith("/.", StringComparison.OrdinalIgnoreCase) && path.Length > 2) features["path:dotfile"] = 1f;
+        if (path.Contains("wp-", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("wordpress", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("wp-admin", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("wp-login", StringComparison.OrdinalIgnoreCase))
             features["path:wordpress_probe"] = 1f;
-        if (path.Contains(".git") || path.Contains(".svn") || path.Contains(".hg"))
+        if (path.Contains(".git", StringComparison.OrdinalIgnoreCase)
+            || path.Contains(".svn", StringComparison.OrdinalIgnoreCase)
+            || path.Contains(".hg", StringComparison.OrdinalIgnoreCase))
             features["path:vcs_probe"] = 1f;
-        if (path.Contains("config") || path.Contains("backup") || path.Contains("admin") ||
-            path.Contains("phpmyadmin"))
+        if (path.Contains("config", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("backup", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("admin", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("phpmyadmin", StringComparison.OrdinalIgnoreCase))
             features["path:config_probe"] = 1f;
 
-        // Accept header analysis
-        var accept = headers.Accept.ToString();
-        if (accept == "*/*") features["accept:wildcard"] = 1f;
-        if (accept.Contains("text/html")) features["accept:html"] = 1f;
-        if (accept.Contains("application/json")) features["accept:json"] = 1f;
+        // Accept header analysis — use FirstOrDefault to avoid ToString() allocation when possible
+        var acceptFirst = headers.Accept.FirstOrDefault() ?? "";
+        if (acceptFirst == "*/*") features["accept:wildcard"] = 1f;
+        if (acceptFirst.Contains("text/html", StringComparison.OrdinalIgnoreCase)) features["accept:html"] = 1f;
+        if (acceptFirst.Contains("application/json", StringComparison.OrdinalIgnoreCase)) features["accept:json"] = 1f;
     }
 
     /// <summary>
