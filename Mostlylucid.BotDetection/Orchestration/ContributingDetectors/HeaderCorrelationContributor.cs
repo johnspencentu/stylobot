@@ -42,7 +42,8 @@ public class HeaderCorrelationContributor : ConfiguredContributorBase
     }
 
     public override string Name => "HeaderCorrelation";
-    public override int Priority => 21; // After headers (10), before behavioral (20)
+    protected override string ManifestName => Name; // YAML name is "HeaderCorrelation", not "HeaderCorrelationContributor"
+    public override int Priority => 21;
     public override IReadOnlyList<TriggerCondition> TriggerConditions => [];
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(

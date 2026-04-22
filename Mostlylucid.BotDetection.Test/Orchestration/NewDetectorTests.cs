@@ -4,10 +4,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Mostlylucid.BotDetection.Analysis;
+using Mostlylucid.BotDetection.Dashboard;
+using Mostlylucid.BotDetection.Identity;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
+using Mostlylucid.BotDetection.Privacy;
+using Mostlylucid.BotDetection.SimulationPacks;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Test.Orchestration;
@@ -763,6 +767,320 @@ public class NewDetectorTests
         }
         var denom = MathF.Sqrt(normA) * MathF.Sqrt(normB);
         return denom > 0 ? dot / denom : 0f;
+    }
+
+    #endregion
+
+    #region UaPiiStripper Tests
+
+    [Fact]
+    public void UaPiiStripper_StripEmail_Redacts()
+    {
+        var result = UaPiiStripper.Strip("MyBot/1.0 (admin@company.com)");
+        Assert.Contains("[email]", result);
+        Assert.DoesNotContain("admin@company.com", result);
+    }
+
+    [Fact]
+    public void UaPiiStripper_NormalUA_Unchanged()
+    {
+        const string ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        var result = UaPiiStripper.Strip(ua);
+        Assert.Equal(ua, result);
+    }
+
+    [Fact]
+    public void UaPiiStripper_NullInput_ReturnsEmpty()
+    {
+        Assert.Equal(string.Empty, UaPiiStripper.Strip(null));
+        Assert.Equal(string.Empty, UaPiiStripper.Strip(""));
+        Assert.Equal(string.Empty, UaPiiStripper.Strip("   "));
+    }
+
+    #endregion
+
+    #region HeaderHashCollector Tests
+
+    private static HeaderHashCollector CreateHeaderHashCollector()
+    {
+        var hasher = new PiiHasher(new byte[32]);
+        return new HeaderHashCollector(hasher);
+    }
+
+    [Fact]
+    public void HeaderHashCollector_CollectsDiscriminatoryHeaders()
+    {
+        var collector = CreateHeaderHashCollector();
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Accept-Language"] = "en-US,en;q=0.9";
+        ctx.Request.Headers["Accept-Encoding"] = "gzip, deflate, br";
+        ctx.Request.Headers["Sec-CH-UA"] = "\"Chromium\";v=\"120\"";
+
+        var hashes = collector.CollectHashes(ctx.Request);
+
+        Assert.True(hashes.ContainsKey("accept-language"));
+        Assert.True(hashes.ContainsKey("accept-encoding"));
+        Assert.True(hashes.ContainsKey("sec-ch-ua"));
+        Assert.True(hashes.ContainsKey("_header_order"));
+    }
+
+    [Fact]
+    public void HeaderHashCollector_ExcludesJunkHeaders()
+    {
+        var collector = CreateHeaderHashCollector();
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Host"] = "example.com";
+        ctx.Request.Headers["Cookie"] = "session=abc";
+        ctx.Request.Headers["Authorization"] = "Bearer token";
+        // Add a discriminatory header so we actually get results
+        ctx.Request.Headers["Accept-Language"] = "en-US";
+
+        var hashes = collector.CollectHashes(ctx.Request);
+
+        Assert.False(hashes.ContainsKey("host"));
+        Assert.False(hashes.ContainsKey("cookie"));
+        Assert.False(hashes.ContainsKey("authorization"));
+    }
+
+    #endregion
+
+    #region StabilityAnalyzer Tests
+
+    [Fact]
+    public void StabilityAnalyzer_StableHeader_HighAnchorStrength()
+    {
+        // Same hash for "accept-language" across 5 sessions
+        var sessions = Enumerable.Range(0, 5)
+            .Select(_ => new Dictionary<string, string> { ["accept-language"] = "hash-stable" })
+            .ToList();
+
+        var anchors = StabilityAnalyzer.ComputeAnchors(sessions);
+
+        Assert.True(anchors.ContainsKey("accept-language"));
+        var score = anchors["accept-language"];
+        Assert.True(score.PersonalStability >= 0.99,
+            $"Expected PersonalStability near 1.0 but got {score.PersonalStability}");
+        Assert.Equal(1, score.UniqueValues);
+    }
+
+    [Fact]
+    public void StabilityAnalyzer_VolatileHeader_LowAnchorStrength()
+    {
+        // Different hash for "accept-language" in each of 5 sessions
+        var sessions = Enumerable.Range(0, 5)
+            .Select(i => new Dictionary<string, string> { ["accept-language"] = $"hash-{i}" })
+            .ToList();
+
+        var anchors = StabilityAnalyzer.ComputeAnchors(sessions);
+
+        Assert.True(anchors.ContainsKey("accept-language"));
+        var score = anchors["accept-language"];
+        Assert.True(score.PersonalStability <= 0.21,
+            $"Expected PersonalStability near 0.2 but got {score.PersonalStability}");
+        Assert.Equal(5, score.UniqueValues);
+    }
+
+    #endregion
+
+    #region HeaderCorrelationContributor Tests
+
+    private static HeaderCorrelationContributor CreateHeaderCorrelationContributor(
+        IMemoryCache? cache = null,
+        Dictionary<string, object>? configParams = null)
+    {
+        cache ??= CreateCache();
+        return new HeaderCorrelationContributor(
+            NullLogger<HeaderCorrelationContributor>.Instance,
+            new StubConfigProvider(configParams),
+            cache);
+    }
+
+    [Fact]
+    public async Task HeaderCorrelation_ThreeDistinctUAs_SameHeaders_BotSignal()
+    {
+        var cache = CreateCache();
+        var contributor = CreateHeaderCorrelationContributor(cache);
+
+        // 3 requests with different PrimarySignatures (simulating different UAs)
+        // but identical non-UA headers from the same IP
+        IReadOnlyList<DetectionContribution> result = [];
+        for (var i = 0; i < 3; i++)
+        {
+            var state = CreateState(
+                new Dictionary<string, object>
+                {
+                    [SignalKeys.PrimarySignature] = $"sig-{i}",
+                    [SignalKeys.ClientIp] = "192.168.1.100"
+                },
+                ctx =>
+                {
+                    // Same discriminatory headers across all requests
+                    ctx.Request.Headers["Accept-Language"] = "en-US,en;q=0.9";
+                    ctx.Request.Headers["Accept-Encoding"] = "gzip, deflate, br";
+                    ctx.Request.Headers["Accept"] = "text/html,application/xhtml+xml";
+                });
+
+            result = await contributor.ContributeAsync(state, CancellationToken.None);
+        }
+
+        // After 3 distinct signatures with identical header profiles, should detect UA rotation
+        var botContribs = result.Where(r => r.ConfidenceDelta > 0).ToList();
+        Assert.NotEmpty(botContribs);
+        Assert.Contains(botContribs, c => c.Reason.Contains("rotation", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task HeaderCorrelation_SingleUA_NeutralSignal()
+    {
+        var cache = CreateCache();
+        var contributor = CreateHeaderCorrelationContributor(cache);
+
+        var state = CreateState(
+            new Dictionary<string, object>
+            {
+                [SignalKeys.PrimarySignature] = "sig-only-one",
+                [SignalKeys.ClientIp] = "192.168.1.100"
+            },
+            ctx =>
+            {
+                ctx.Request.Headers["Accept-Language"] = "en-US,en;q=0.9";
+                ctx.Request.Headers["Accept-Encoding"] = "gzip, deflate, br";
+                ctx.Request.Headers["Accept"] = "text/html";
+            });
+
+        var result = await contributor.ContributeAsync(state, CancellationToken.None);
+
+        // Single signature - should be neutral
+        Assert.All(result, c => Assert.True(c.ConfidenceDelta == 0,
+            $"Expected neutral but got delta={c.ConfidenceDelta}: {c.Reason}"));
+    }
+
+    #endregion
+
+    #region CveProbeContributor Tests
+
+    [Fact]
+    public async Task CveProbe_WordPressPath_BotSignal()
+    {
+        // Use the real SimulationPackLoader which loads from embedded resources
+        var registry = new SimulationPackLoader(
+            NullLogger<SimulationPackLoader>.Instance);
+
+        var contributor = new CveProbeContributor(
+            registry,
+            NullLogger<CveProbeContributor>.Instance);
+
+        var state = CreateState(
+            configureHttp: ctx =>
+            {
+                ctx.Request.Path = "/wp-login.php";
+            });
+
+        var result = await contributor.ContributeAsync(state, CancellationToken.None);
+
+        // /wp-login.php should match a WordPress simulation pack honeypot path
+        var botContribs = result.Where(r => r.ConfidenceDelta > 0).ToList();
+        Assert.NotEmpty(botContribs);
+    }
+
+    [Fact]
+    public async Task CveProbe_NormalPath_NeutralSignal()
+    {
+        var registry = new SimulationPackLoader(
+            NullLogger<SimulationPackLoader>.Instance);
+
+        var contributor = new CveProbeContributor(
+            registry,
+            NullLogger<CveProbeContributor>.Instance);
+
+        var state = CreateState(
+            configureHttp: ctx =>
+            {
+                ctx.Request.Path = "/";
+            });
+
+        var result = await contributor.ContributeAsync(state, CancellationToken.None);
+
+        // Normal path should produce no contributions
+        Assert.Empty(result);
+    }
+
+    #endregion
+
+    #region PiiQueryStringContributor Tests
+
+    [Fact]
+    public async Task PiiQueryString_EmailInQuery_DetectsPii()
+    {
+        var contributor = new PiiQueryStringContributor(
+            NullLogger<PiiQueryStringContributor>.Instance);
+
+        var state = CreateState(
+            configureHttp: ctx =>
+            {
+                ctx.Request.QueryString = new QueryString("?email=user@test.com");
+            });
+
+        var result = await contributor.ContributeAsync(state, CancellationToken.None);
+
+        // Should detect PII and emit privacy signals
+        Assert.NotEmpty(result);
+        Assert.True(state.Signals.ContainsKey(SignalKeys.PrivacyQueryPiiDetected),
+            "Expected privacy.query_pii_detected signal to be written");
+    }
+
+    [Fact]
+    public async Task PiiQueryString_CleanQuery_NoPii()
+    {
+        var contributor = new PiiQueryStringContributor(
+            NullLogger<PiiQueryStringContributor>.Instance);
+
+        var state = CreateState(
+            configureHttp: ctx =>
+            {
+                ctx.Request.QueryString = new QueryString("?page=1&sort=name");
+            });
+
+        var result = await contributor.ContributeAsync(state, CancellationToken.None);
+
+        // Should produce no contributions for clean query
+        Assert.Empty(result);
+        Assert.False(state.Signals.ContainsKey(SignalKeys.PrivacyQueryPiiDetected),
+            "Should not write PII signal for clean query string");
+    }
+
+    #endregion
+
+    #region SignatureContributor Tests
+
+    [Fact]
+    public async Task Signature_WritesPrimarySignature()
+    {
+        var hasher = new PiiHasher(new byte[32]);
+        var signatureService = new MultiFactorSignatureService(
+            hasher,
+            NullLogger<MultiFactorSignatureService>.Instance);
+        var headerHashCollector = new HeaderHashCollector(hasher);
+
+        var contributor = new SignatureContributor(
+            NullLogger<SignatureContributor>.Instance,
+            signatureService,
+            headerHashCollector);
+
+        var state = CreateState(
+            configureHttp: ctx =>
+            {
+                ctx.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.1.1");
+                ctx.Request.Headers.UserAgent = "Mozilla/5.0 TestBrowser";
+            });
+
+        await contributor.ContributeAsync(state, CancellationToken.None);
+
+        // Verify the contributor writes PrimarySignature to the blackboard
+        Assert.True(state.Signals.ContainsKey(SignalKeys.PrimarySignature),
+            "SignatureContributor should write PrimarySignature to the blackboard");
+        var sig = state.GetSignal<string>(SignalKeys.PrimarySignature);
+        Assert.False(string.IsNullOrEmpty(sig), "PrimarySignature should not be empty");
     }
 
     #endregion
