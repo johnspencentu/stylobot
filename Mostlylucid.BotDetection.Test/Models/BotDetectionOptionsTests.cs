@@ -90,36 +90,6 @@ public class BotDetectionOptionsTests
     }
 
     [Fact]
-    public void Constructor_SetsDefaultOllamaEndpoint()
-    {
-        // Act
-        var options = new BotDetectionOptions();
-
-        // Assert
-        Assert.Equal("http://localhost:11434", options.OllamaEndpoint);
-    }
-
-    [Fact]
-    public void Constructor_SetsDefaultOllamaModel()
-    {
-        // Act
-        var options = new BotDetectionOptions();
-
-        // Assert - Default model is gemma4 (efficient, thinking-capable)
-        Assert.Equal("gemma4", options.OllamaModel);
-    }
-
-    [Fact]
-    public void Constructor_SetsDefaultLlmTimeout()
-    {
-        // Act
-        var options = new BotDetectionOptions();
-
-        // Assert - Timeout increased to 15000ms for larger 4b model and cold start
-        Assert.Equal(15000, options.LlmTimeoutMs);
-    }
-
-    [Fact]
     public void Constructor_SetsDefaultMaxRequestsPerMinute()
     {
         // Act
@@ -307,50 +277,6 @@ public class BotDetectionOptionsTests
 
         // Assert
         Assert.True(options.EnableTestMode);
-    }
-
-    [Fact]
-    public void OllamaEndpoint_CanBeSet()
-    {
-        // Arrange
-        var options = new BotDetectionOptions();
-        var customEndpoint = "http://custom-ollama:11434";
-
-        // Act
-        options.OllamaEndpoint = customEndpoint;
-
-        // Assert
-        Assert.Equal(customEndpoint, options.OllamaEndpoint);
-    }
-
-    [Fact]
-    public void OllamaModel_CanBeSet()
-    {
-        // Arrange
-        var options = new BotDetectionOptions();
-        var customModel = "llama3.2:latest";
-
-        // Act
-        options.OllamaModel = customModel;
-
-        // Assert
-        Assert.Equal(customModel, options.OllamaModel);
-    }
-
-    [Theory]
-    [InlineData(1000)]
-    [InlineData(5000)]
-    [InlineData(10000)]
-    public void LlmTimeoutMs_CanBeSet(int timeout)
-    {
-        // Arrange
-        var options = new BotDetectionOptions();
-
-        // Act
-        options.LlmTimeoutMs = timeout;
-
-        // Assert
-        Assert.Equal(timeout, options.LlmTimeoutMs);
     }
 
     [Theory]

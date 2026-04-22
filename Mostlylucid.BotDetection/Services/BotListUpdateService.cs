@@ -45,12 +45,9 @@ public class BotListUpdateService : BackgroundService
             return;
         }
 
-#pragma warning disable CS0618 // Type or member is obsolete
         _logger.LogInformation(
-            "Bot list update service started. Update interval: {Hours}h, Check interval: {Minutes}m",
-            _options.UpdateIntervalHours,
-            _options.UpdateCheckIntervalMinutes);
-#pragma warning restore CS0618 // Type or member is obsolete
+            "Bot list update service started. Schedule: {Schedule}",
+            _options.UpdateSchedule?.Description ?? "default (daily at 2 AM UTC)");
 
         // Delay startup to avoid slowing down application startup
         if (_options.StartupDelaySeconds > 0)
@@ -132,11 +129,9 @@ public class BotListUpdateService : BackgroundService
     {
         try
         {
-#pragma warning disable CS0618 // Type or member is obsolete
             // Check if update is needed
             var lastUpdate = await _database.GetLastUpdateTimeAsync("bot_patterns", cancellationToken);
-            var updateInterval = TimeSpan.FromHours(_options.UpdateIntervalHours);
-#pragma warning restore CS0618 // Type or member is obsolete
+            var updateInterval = TimeSpan.FromHours(24); // Default: 24 hours (use UpdateSchedule cron for custom intervals)
 
             if (lastUpdate == null)
             {
@@ -256,17 +251,17 @@ public class BotListUpdateService : BackgroundService
 
     private TimeSpan CalculateNextCheckDelay()
     {
-#pragma warning disable CS0618 // Type or member is obsolete
-        var baseDelay = TimeSpan.FromMinutes(_options.UpdateCheckIntervalMinutes);
+        const int checkIntervalMinutes = 60; // Default: 60 minutes (use UpdateSchedule cron for custom intervals)
+        const int updateIntervalHours = 24; // Default: 24 hours
+        var baseDelay = TimeSpan.FromMinutes(checkIntervalMinutes);
 
         // If we've had consecutive failures, use exponential backoff
         if (_consecutiveFailures > 0)
         {
             var backoffMinutes = Math.Min(
-                _options.UpdateCheckIntervalMinutes * Math.Pow(1.5, _consecutiveFailures),
-                _options.UpdateIntervalHours * 60 // Cap at update interval
+                checkIntervalMinutes * Math.Pow(1.5, _consecutiveFailures),
+                updateIntervalHours * 60 // Cap at update interval
             );
-#pragma warning restore CS0618 // Type or member is obsolete
 
             var backoffDelay = TimeSpan.FromMinutes(backoffMinutes);
             _logger.LogDebug(
@@ -285,15 +280,13 @@ public class BotListUpdateService : BackgroundService
     /// </summary>
     public BotListUpdateStatus GetStatus()
     {
-#pragma warning disable CS0618 // Type or member is obsolete
         return new BotListUpdateStatus
         {
             IsEnabled = _options.EnableBackgroundUpdates,
             LastSuccessfulUpdate = _lastSuccessfulUpdate,
             ConsecutiveFailures = _consecutiveFailures,
-            UpdateIntervalHours = _options.UpdateIntervalHours,
-            CheckIntervalMinutes = _options.UpdateCheckIntervalMinutes
-#pragma warning restore CS0618 // Type or member is obsolete
+            UpdateIntervalHours = 24,
+            CheckIntervalMinutes = 60
         };
     }
 }
