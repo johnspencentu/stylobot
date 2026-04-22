@@ -1,9 +1,11 @@
 # StyloBot
 
-**Self-hosted bot defense and anonymous entity resolution.** 46 detectors, sub-millisecond inference, progressive identity that learns who keeps coming back — even when they rotate everything. One binary. No cloud dependency. Your traffic never leaves your perimeter.
+**Open source bot defense and anonymous entity resolution.** 46 detectors, sub-millisecond inference, progressive identity that learns who keeps coming back — even when they rotate everything. One binary. No cloud dependency.
 
 [![NuGet](https://img.shields.io/nuget/v/mostlylucid.botdetection)](https://www.nuget.org/packages/mostlylucid.botdetection)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
+
+> **This repo is the FOSS product.** It contains the full detection engine, dashboard, entity resolution, and simulation packs. The [commercial product](https://stylobot.net) uses the same engine with additional enterprise features — see [FOSS vs Commercial](#foss-vs-commercial) below.
 
 ## Install
 
@@ -88,24 +90,69 @@ The 129-dimensional session vector is projected into interpretable axes for simi
 - **Zero PII** — HMAC-SHA256 hashed signatures. Raw UAs stored PII-stripped (emails/phones redacted). No raw IPs persisted
 - **Headless framework naming** — identifies Puppeteer, Playwright, Selenium, PhantomJS by name, not "Unknown Bot"
 
-## Pricing
+## FOSS vs Commercial
 
-**FOSS is the full product.** Commercial adds persistence, fleet management, and live config editing.
+Two products, same engine. The FOSS product in this repo is complete — it detects bots, resolves identities, runs the dashboard. The [commercial product](https://stylobot.net) adds enterprise operational features on top.
 
-| | **FOSS** | **Commercial** |
-|---|---|---|
-| **Price** | Free forever | $100/mo per domain |
-| **Detectors** | All 46 | All 46 |
-| **Entity resolution** | Full | Full |
-| **Dashboard** | Full (read-only config) | Live config editor |
-| **Persistence** | SQLite (zero-dependency) | PostgreSQL + pgvector |
-| **UA search** | Full-text (SQLite LIKE) | Full-text (PostgreSQL) |
-| **Simulation packs** | WordPress (FOSS) | All frameworks |
-| **Identity inspector** | — | Entity graph explorer |
-| **Fleet management** | — | Redis backplane, multi-node |
-| **SSO** | — | OIDC/SAML |
+### What's in FOSS (this repo)
 
-After a commercial trial ends, the system reverts to FOSS mode. Detection never stops — only commercial persistence and UI features deactivate.
+- All 46 detectors — same detection pipeline as commercial
+- Anonymous entity resolution (merge/split/rewind, L0-L5 confidence)
+- Real-time dashboard with all tabs (Overview, Visitors, Sessions, Threats, Clusters, User Agents, Configuration)
+- Session vectors, Markov chains, behavioral radar charts
+- Simulation packs (WordPress 5.9 with 8 CVE modules)
+- SQLite persistence (zero external dependencies)
+- Full-text UA search
+- BDF replay testing
+- CLI binary (6 platforms)
+- Docker gateway (YARP reverse proxy)
+- Optional LLM enrichment (any provider)
+- Configuration via YAML manifests (read-only in dashboard)
+- Public REST API
+- Node.js SDK
+
+### What commercial adds
+
+The [commercial product](https://stylobot.net) is a separate repo that plugs into the FOSS engine via DI. Gateways run unmodified FOSS detection; commercial features are injected at startup.
+
+**Persistence & scale:**
+- PostgreSQL + pgvector (replaces SQLite)
+- Redis cross-gateway reputation cache, pub/sub config reload, cluster coordination
+- Control plane API for fleet management, config, and telemetry aggregation
+
+**Fleet management:**
+- Multi-gateway coordination via Redis backplane
+- Fleet dashboard with aggregate stats and gateway health
+- Leader election for cluster-wide background tasks
+- Kubernetes Helm chart (control plane, PostgreSQL HA, Redis Sentinel, HPA gateways)
+
+**Live configuration:**
+- Forms-based detector config editor in dashboard, hot-reload via Redis pub/sub
+- Per-endpoint policy overrides with live UI
+- Config audit trail with rollback
+
+**LLM providers:**
+- Managed OpenAI, Anthropic, Azure OpenAI implementations
+- Per-use-case routing, cost caps, fallback chains
+
+**Identity & access:**
+- Keycloak integration with Ed25519 JWT license validation
+- OIDC/SAML SSO for dashboard and API
+- Protected identity policies (per-user detection overrides)
+
+**Reporting:**
+- Scheduled detection reports and threat intelligence digests
+- Webhook alerting on threat events
+- Data retention controls
+
+**Additional content:**
+- Simulation packs: Django, Rails, Laravel, Spring Boot, Strapi, Shopify
+- Identity inspector: entity graph explorer, rotation trail visualization
+- Marketing website (ASP.NET Core MVC + Vite/Tailwind)
+
+**License model:** Capability-based JWT tiers (OSS → Startup → SME → Enterprise). Tiers unlock capabilities, never counts. If a license expires, the system **reverts to FOSS mode** — detection continues, PostgreSQL falls back to SQLite, config editor goes read-only. No downtime.
+
+See [stylobot.net](https://stylobot.net) for pricing.
 
 ## LLM providers
 
