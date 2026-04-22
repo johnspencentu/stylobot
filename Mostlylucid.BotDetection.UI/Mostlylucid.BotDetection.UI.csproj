@@ -65,4 +65,17 @@
         <None Include="Examples\**\*.cs"/>
     </ItemGroup>
 
+    <!-- Tailwind CSS build: compile on dotnet build if node_modules exists -->
+    <Target Name="BuildTailwindCSS" BeforeTargets="Build"
+            Condition="Exists('node_modules')">
+        <Exec Command="npx @tailwindcss/cli -i ./wwwroot/css/tailwind-input.css -o ./wwwroot/vendor/css/tailwind.min.css --minify"
+              WorkingDirectory="$(MSBuildProjectDirectory)" />
+    </Target>
+
+    <!-- Exclude node_modules and package-lock from packaging -->
+    <ItemGroup>
+        <Content Remove="node_modules\**" />
+        <None Remove="node_modules\**" />
+    </ItemGroup>
+
 </Project>

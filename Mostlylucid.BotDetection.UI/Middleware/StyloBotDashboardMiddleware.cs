@@ -492,10 +492,10 @@ public class StyloBotDashboardMiddleware
             "base-uri 'self'",
             "frame-ancestors 'self'",
             "object-src 'none'",
-            "img-src 'self' data: https:",
-            "font-src 'self' data: https://fonts.gstatic.com https://unpkg.com",
-            $"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
-            $"script-src 'self' 'nonce-{cspNonce}' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com",
+            "img-src 'self' data:",
+            "font-src 'self' data:",
+            $"style-src 'self' 'unsafe-inline'",
+            $"script-src 'self' 'nonce-{cspNonce}'",
             // worker-src for Monaco's language-service web workers (loaded from CDN as
             // blob: URLs after the AMD loader rewrites them). Safe to allow on the
             // dashboard origin since Monaco is the only consumer.
