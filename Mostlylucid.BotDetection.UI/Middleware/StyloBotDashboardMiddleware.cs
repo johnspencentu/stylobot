@@ -573,7 +573,8 @@ public class StyloBotDashboardMiddleware
                 : null,
             // Only run investigation queries when the operator is on the Investigate tab.
             Investigation = investigationVm,
-            IsCommercial = IsCommercialMode(context)
+            IsCommercial = IsCommercialMode(context),
+            StatusStrip = BuildStatusStripModel(context)
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -2043,6 +2044,62 @@ public class StyloBotDashboardMiddleware
     /// </summary>
     private LicenseCardModel BuildLicenseCardModel(HttpContext context) =>
         LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
+
+    private StatusStripModel BuildStatusStripModel(HttpContext context)
+    {
+        var isCommercial = IsCommercialMode(context);
+
+        // Detect available services
+        var services = new List<ServiceStatus>();
+
+        // Check if PostgreSQL is available (via IDashboardEventStore type)
+        var storeType = _eventStore.GetType().Name;
+        if (storeType.Contains("Postgre", StringComparison.OrdinalIgnoreCase))
+            services.Add(new ServiceStatus("PostgreSQL", true));
+        else if (storeType.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            services.Add(new ServiceStatus("SQLite", true));
+        else
+            services.Add(new ServiceStatus("In-Memory", true));
+
+        // Check if Redis is available
+        var redis = context.RequestServices.GetService(
+            Type.GetType("Stylobot.Commercial.Cache.Redis.IRedisCacheProvider, Stylobot.Commercial.Cache.Redis"));
+        if (redis is not null)
+            services.Add(new ServiceStatus("Redis", true));
+
+        // Check compliance pack
+        var packProvider = context.RequestServices.GetService<Mostlylucid.BotDetection.Compliance.ICompliancePackProvider>();
+        var packName = packProvider?.ActivePack.Name ?? "Default";
+
+        // Check LLM
+        var llm = context.RequestServices.GetService(
+            Type.GetType("Mostlylucid.BotDetection.Services.ILlmClassificationService, Mostlylucid.BotDetection"));
+        var llmConnected = llm is not null && llm.GetType().Name != "NullLlmClassificationService";
+        var llmProvider = llmConnected ? llm!.GetType().Name.Replace("LlmClassificationService", "").Replace("Classification", "") : null;
+
+        // Check guardians (commercial only)
+        var guardianCount = 0;
+        var guardianAlerts = 0;
+        if (isCommercial)
+        {
+            var guardians = context.RequestServices.GetServices(
+                Type.GetType("Stylobot.Commercial.Compliance.Guardians.IComplianceGuardian, Stylobot.Commercial.Compliance") ?? typeof(object));
+            guardianCount = guardians.Count();
+        }
+
+        return new StatusStripModel
+        {
+            ActivePackName = packName,
+            DetectionActive = true,
+            Services = services,
+            GuardiansEnabled = guardianCount > 0,
+            GuardianCount = guardianCount,
+            GuardianAlerts = guardianAlerts,
+            LlmConnected = llmConnected,
+            LlmProvider = llmProvider,
+            IsCommercial = isCommercial
+        };
+    }
 
     /// <summary>Render the Configuration tab partial. Lazy-loads Monaco from CDN once it boots.</summary>
     private async Task ServeConfigurationPartialAsync(HttpContext context)

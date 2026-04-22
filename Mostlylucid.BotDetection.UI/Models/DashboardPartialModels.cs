@@ -339,6 +339,9 @@ public sealed class DashboardShellModel
 
     /// <summary>Whether commercial features (config editor, IP search, fingerprints) are enabled for this request.</summary>
     public bool IsCommercial { get; init; }
+
+    /// <summary>System status strip model (overview tab header).</summary>
+    public StatusStripModel? StatusStrip { get; init; }
 }
 
 /// <summary>

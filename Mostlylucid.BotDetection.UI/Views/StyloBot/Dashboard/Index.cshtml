@@ -176,6 +176,11 @@
             }
         </div>
 
+        @if (Model.StatusStrip is not null)
+        {
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_StatusStrip.cshtml", Model.StatusStrip)
+        }
+
         @if (tab == "overview")
         {
             <!-- LIVE FIRST: Recent Activity (prominent) + Traffic Chart -->
