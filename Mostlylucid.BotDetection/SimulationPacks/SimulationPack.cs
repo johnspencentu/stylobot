@@ -12,6 +12,10 @@ public sealed record SimulationPack
     public required string Framework { get; init; }
     public required string Version { get; init; }
     public string? Description { get; init; }
+
+    /// <summary>System prompt additions giving the LLM domain vocabulary and API style for this pack.</summary>
+    public string? PromptPersonality { get; init; }
+
     public List<PackHoneypotPath> HoneypotPaths { get; init; } = [];
     public List<PackResponseTemplate> ResponseTemplates { get; init; } = [];
     public List<PackCveModule> CveModules { get; init; } = [];
