@@ -1194,6 +1194,105 @@ public class PostgreSQLDashboardEventStore : IDashboardEventStore
         }
     }
 
+    public async Task<InvestigationResult> GetInvestigationAsync(InvestigationFilter filter, CancellationToken ct = default)
+    {
+        if (IsCircuitOpen) return new InvestigationResult { Summary = new InvestigationSummary(), TotalCount = 0 };
+
+        var whereClause = filter.EntityType switch
+        {
+            "signature" => "primary_signature = @Value",
+            "country"   => "country_code = @Value",
+            "path"      => "path ILIKE @Value",
+            "ua_family" => "user_agent_raw ILIKE @Value || '%'",
+            _           => "1=0"
+        };
+
+        var timeFilter = "";
+        if (filter.Start.HasValue) timeFilter += " AND timestamp >= @Start";
+        if (filter.End.HasValue)   timeFilter += " AND timestamp <= @End";
+
+        var paramValue = filter.EntityType == "path" ? $"%{filter.EntityValue}%" : filter.EntityValue;
+
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+
+            // Summary
+            var summarySql = $"""
+                SELECT COUNT(*) AS total,
+                       MIN(timestamp) AS first_seen, MAX(timestamp) AS last_seen,
+                       SUM(CASE WHEN risk_band = 'High' THEN 1 ELSE 0 END) AS high_risk,
+                       SUM(CASE WHEN risk_band = 'Medium' THEN 1 ELSE 0 END) AS med_risk,
+                       SUM(CASE WHEN risk_band = 'Low' THEN 1 ELSE 0 END) AS low_risk
+                FROM dashboard_detections WHERE {whereClause}{timeFilter}
+                """;
+            var summaryRow = await connection.QueryFirstOrDefaultAsync(summarySql,
+                new { Value = paramValue, Start = filter.Start, End = filter.End },
+                commandTimeout: _options.CommandTimeoutSeconds);
+
+            var summary = summaryRow != null ? new InvestigationSummary
+            {
+                TotalDetections = (long)(summaryRow.total ?? 0L),
+                FirstSeen = (DateTime?)summaryRow.first_seen,
+                LastSeen = (DateTime?)summaryRow.last_seen,
+                HighRisk = (int)(summaryRow.high_risk ?? 0),
+                MediumRisk = (int)(summaryRow.med_risk ?? 0),
+                LowRisk = (int)(summaryRow.low_risk ?? 0)
+            } : new InvestigationSummary();
+
+            // Detections
+            var detSql = $"""
+                SELECT primary_signature AS signature, timestamp, method, path,
+                       is_bot, bot_probability, confidence, risk_band,
+                       bot_name, bot_type, action, country_code,
+                       processing_time_ms, status_code, user_agent_raw,
+                       COALESCE((important_signals->>'threat.score')::double precision, 0) AS threat_score,
+                       important_signals->>'threat.band' AS threat_band
+                FROM dashboard_detections WHERE {whereClause}{timeFilter}
+                ORDER BY timestamp DESC LIMIT @Limit OFFSET @Offset
+                """;
+            var rows = await connection.QueryAsync(detSql,
+                new { Value = paramValue, Start = filter.Start, End = filter.End,
+                      Limit = filter.Limit, Offset = filter.Offset },
+                commandTimeout: _options.CommandTimeoutSeconds);
+
+            var detections = rows.Select(r => new DashboardDetectionEvent
+            {
+                RequestId = "pg",
+                Timestamp = (DateTime)r.timestamp,
+                PrimarySignature = (string?)r.signature ?? "",
+                Method = (string?)r.method ?? "GET",
+                Path = (string?)r.path ?? "/",
+                IsBot = (bool?)r.is_bot ?? false,
+                BotProbability = (double?)r.bot_probability ?? 0,
+                Confidence = (double?)r.confidence ?? 0,
+                RiskBand = (string?)r.risk_band ?? "Unknown",
+                BotName = (string?)r.bot_name,
+                BotType = (string?)r.bot_type,
+                Action = (string?)r.action,
+                CountryCode = (string?)r.country_code,
+                ProcessingTimeMs = (double?)r.processing_time_ms ?? 0,
+                StatusCode = (int?)r.status_code ?? 0,
+                UserAgentRaw = (string?)r.user_agent_raw,
+                ThreatScore = (double?)r.threat_score,
+                ThreatBand = (string?)r.threat_band
+            }).ToList();
+
+            return new InvestigationResult
+            {
+                Summary = summary,
+                Detections = detections,
+                TotalCount = (int)summary.TotalDetections
+            };
+        }
+        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException)
+        {
+            TripCircuit();
+            _logger.LogError(ex, "Failed to get investigation from PostgreSQL");
+            return new InvestigationResult { Summary = new InvestigationSummary(), TotalCount = 0 };
+        }
+    }
+
     /// <summary>
     /// Maps a TimeSpan bucket size to the nearest PostgreSQL date_trunc unit.
     /// </summary>
