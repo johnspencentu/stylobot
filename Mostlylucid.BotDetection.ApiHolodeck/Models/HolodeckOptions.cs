@@ -84,6 +84,55 @@ public class HolodeckOptions
     public string HiddenLinkClass { get; set; } = "honeypot-link";
 
     // ==========================================
+    // Holodeck Coordinator
+    // ==========================================
+
+    /// <summary>
+    ///     Maximum concurrent holodeck engagements across all fingerprints.
+    ///     When full, new requests get normal 403 block.
+    ///     Default: 10
+    /// </summary>
+    public int MaxConcurrentEngagements { get; set; } = 10;
+
+    /// <summary>
+    ///     Maximum concurrent engagements per fingerprint.
+    ///     Default: 1 (one fake response at a time per bot)
+    /// </summary>
+    public int MaxEngagementsPerFingerprint { get; set; } = 1;
+
+    /// <summary>
+    ///     Auto-release engagement slot after this timeout (ms).
+    ///     Prevents stuck slots from exhausting capacity.
+    ///     Default: 5000
+    /// </summary>
+    public int EngagementTimeoutMs { get; set; } = 5000;
+
+    // ==========================================
+    // Beacon Tracking
+    // ==========================================
+
+    /// <summary>
+    ///     Enable canary-based beacon tracking in holodeck responses.
+    ///     When enabled, fake responses contain unique canary values that
+    ///     are tracked — if a rotated fingerprint replays a canary, the
+    ///     two fingerprints are linked via beacon.matched signal.
+    ///     Default: true
+    /// </summary>
+    public bool EnableBeaconTracking { get; set; } = true;
+
+    /// <summary>
+    ///     Time-to-live for beacons in hours. Expired beacons are purged.
+    ///     Default: 24
+    /// </summary>
+    public int BeaconTtlHours { get; set; } = 24;
+
+    /// <summary>
+    ///     Length of canary strings (hex chars). Longer = fewer collisions.
+    ///     Default: 8
+    /// </summary>
+    public int BeaconCanaryLength { get; set; } = 8;
+
+    // ==========================================
     // Project Honeypot Reporting
     // ==========================================
 
