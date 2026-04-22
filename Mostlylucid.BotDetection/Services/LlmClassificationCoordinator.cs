@@ -143,8 +143,11 @@ public class LlmClassificationCoordinator : BackgroundService
         _logger.LogDebug("Processing LLM classification for {RequestId}", request.RequestId);
 
         // Try to resolve LlmClassificationService from DI (provided by Llm plugin packages)
-        var classificationService = _serviceProvider.GetService(
-            Type.GetType("Mostlylucid.BotDetection.Llm.Services.LlmClassificationService, Mostlylucid.BotDetection.Llm"));
+        var classificationServiceType =
+            Type.GetType("Mostlylucid.BotDetection.Llm.Services.LlmClassificationService, Mostlylucid.BotDetection.Llm");
+        var classificationService = classificationServiceType is null
+            ? null
+            : _serviceProvider.GetService(classificationServiceType);
 
         Detectors.DetectorResult? result = null;
 
@@ -284,7 +287,7 @@ public class LlmClassificationCoordinator : BackgroundService
                 Label = llmIsBot,
                 Pattern = request.PrimarySignature,
                 RequestId = request.RequestId,
-                Features = ExtractNumericSignalFeatures(request.Signals),
+                Features = ExtractNumericSignalFeatures(request.Signals ?? new Dictionary<string, object>()),
                 Metadata = learningMetadata
             });
 

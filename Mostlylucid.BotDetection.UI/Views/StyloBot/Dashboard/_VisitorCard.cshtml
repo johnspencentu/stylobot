@@ -1,4 +1,5 @@
 @using Mostlylucid.BotDetection.UI.Services
+@using Mostlylucid.BotDetection.UI.Helpers
 @model CachedVisitor
 @{
     var basePath = ViewData["BasePath"]?.ToString() ?? "/_stylobot";
@@ -11,22 +12,8 @@
     var displayName = Model.BotName ?? Model.BotType ?? (Model.IsBot ? "Unknown Bot" : "Visitor");
     var probPct = (Model.BotProbability * 100).ToString("F0");
     var confPct = (Model.Confidence * 100).ToString("F0");
-    var actionClass = Model.Action switch {
-        "Block" or "block" or "block-hard" => "bg-error/20 text-error",
-        "Throttle" or "throttle" or "throttle-stealth" => "bg-warning/20 text-warning",
-        "Challenge" or "challenge" => "bg-info/20 text-info",
-        "TarPit" => "bg-error/20 text-error",
-        "simulation-pack" => "bg-error/20 text-error",
-        _ => ""
-    };
-    var friendlyAction = Model.Action switch {
-        "throttle-stealth" => "Silent Throttle",
-        "block-hard" => "Hard Block",
-        "logonly" => "Monitor Only",
-        "redirect-honeypot" => "Honeypot",
-        "simulation-pack" => "Honeypot",
-        _ => Model.Action
-    };
+    var actionClass = ActionDisplayHelper.GetBadgeCssClass(Model.Action);
+    var friendlyAction = ActionDisplayHelper.GetFriendlyName(Model.Action);
     var threatClass = Model.ThreatBand switch {
         "Critical" or "High" => "bg-error/20 text-error",
         "Medium" => "bg-warning/20 text-warning",

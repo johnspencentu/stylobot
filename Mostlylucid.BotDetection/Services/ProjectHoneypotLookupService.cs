@@ -112,11 +112,5 @@ public class ProjectHoneypotLookupService
         return type;
     }
 
-    internal static string MaskIp(string ip)
-    {
-        var parts = ip.Split('.');
-        if (parts.Length == 4)
-            return $"{parts[0]}.{parts[1]}.{parts[2]}.xxx";
-        return ip.Length > 10 ? ip[..10] + "..." : ip;
-    }
+    internal static string MaskIp(string ip) => Helpers.PrivacyHelper.MaskIp(ip);
 }

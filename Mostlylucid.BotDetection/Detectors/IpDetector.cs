@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Data;
+using Mostlylucid.BotDetection.Helpers;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Models;
 
@@ -208,13 +209,5 @@ public class IpDetector : IDetector
         return false;
     }
 
-    private static string MaskIp(IPAddress ip)
-    {
-        var s = ip.ToString();
-        var parts = s.Split('.');
-        if (parts.Length == 4)
-            return $"{parts[0]}.{parts[1]}.{parts[2]}.xxx";
-        // IPv6: truncate
-        return s.Length > 10 ? s[..10] + "..." : s;
-    }
+    private static string MaskIp(IPAddress ip) => Helpers.PrivacyHelper.MaskIp(ip);
 }

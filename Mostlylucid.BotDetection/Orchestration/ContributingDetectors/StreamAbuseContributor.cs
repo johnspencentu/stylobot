@@ -80,7 +80,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
             {
                 // Not a streaming request - still check cross-endpoint mixing
                 // (attacker doing page scraping alongside their streaming)
-                var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
+                var signature = state.GetSignal<string>(SignalKeys.PrimarySignature);
                 if (!string.IsNullOrEmpty(signature))
                 {
                     var window = GetOrCreateWindow(signature);
@@ -95,7 +95,7 @@ public class StreamAbuseContributor : ConfiguredContributorBase
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
             }
 
-            var sig = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? state.GetSignal<string>(SignalKeys.WaveformSignature);
+            var sig = state.GetSignal<string>(SignalKeys.PrimarySignature);
             if (string.IsNullOrEmpty(sig))
             {
                 contributions.Add(NeutralContribution("StreamAbuse", "Stream abuse check - no signature available"));

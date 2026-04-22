@@ -2870,6 +2870,7 @@ public class StyloBotDashboardMiddleware
     }
 
     private async Task<string> RenderPartialAsync<T>(HttpContext context, string viewPath, T model)
+        where T : notnull
         => await _razorViewRenderer.RenderViewToStringAsync(viewPath, model, context);
 
     private async Task<string> RenderVisitorPartialAsync(HttpContext context)

@@ -60,9 +60,9 @@ public partial class BehavioralWaveformContributor : ConfiguredContributorBase
 
         try
         {
-            // Get or create signature for this client
-            var signature = GetClientSignature(state);
-            state.WriteSignal(SignalKeys.WaveformSignature, signature);
+            // Use the unified HMAC primary signature when available. Fall back only for
+            // unusual custom pipelines that run waveform analysis before signatures.
+            var signature = state.GetSignal<string>(SignalKeys.PrimarySignature) ?? GetClientSignature(state);
 
             // Lock per-signature to prevent concurrent List<T> mutation
             var signatureLock = _signatureLocks.GetOrAdd(signature, _ => new object());

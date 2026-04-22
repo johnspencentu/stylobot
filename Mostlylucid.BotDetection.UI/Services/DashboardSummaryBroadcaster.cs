@@ -194,21 +194,7 @@ public class DashboardSummaryBroadcaster : BackgroundService
     // ─── Shared classification helpers ───────────────────────────────────
 
     internal static string ExtractBrowserFamily(string ua)
-    {
-        if (ua.Contains("Edg/", StringComparison.Ordinal)) return "Edge";
-        if (ua.Contains("OPR/", StringComparison.Ordinal) || ua.Contains("Opera", StringComparison.Ordinal)) return "Opera";
-        if (ua.Contains("Firefox/", StringComparison.Ordinal)) return "Firefox";
-        if (ua.Contains("Chrome/", StringComparison.Ordinal)) return "Chrome";
-        if (ua.Contains("Safari/", StringComparison.Ordinal) && !ua.Contains("Chrome/", StringComparison.Ordinal)) return "Safari";
-        if (ua.Contains("curl/", StringComparison.OrdinalIgnoreCase)) return "curl";
-        if (ua.Contains("python", StringComparison.OrdinalIgnoreCase)) return "Python";
-        if (ua.Contains("Go-http-client", StringComparison.Ordinal)) return "Go";
-        if (ua.Contains("Googlebot", StringComparison.OrdinalIgnoreCase)) return "Googlebot";
-        if (ua.Contains("bingbot", StringComparison.OrdinalIgnoreCase)) return "Bingbot";
-        if (ua.Contains("GPTBot", StringComparison.OrdinalIgnoreCase)) return "GPTBot";
-        if (ua.Contains("ClaudeBot", StringComparison.OrdinalIgnoreCase)) return "ClaudeBot";
-        return "Other";
-    }
+        => Mostlylucid.BotDetection.Helpers.UserAgentParser.Parse(ua).Family;
 
     internal static string InferUaCategory(string family)
     {

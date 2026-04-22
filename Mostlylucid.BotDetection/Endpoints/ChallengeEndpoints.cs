@@ -35,7 +35,7 @@ public static class ChallengeEndpoints
         // Full detection runs (UA, IP, header, reputation, etc.) but with a high block
         // threshold: the visitor was SENT here by a challenge action, so they're expected
         // to be in the 0.5-0.7 range. Only confirmed bots (0.95+) get blocked.
-        group.MapPost("/verify", HandleVerify)
+        group.MapPost("/verify", (Delegate)(Func<HttpContext, Task<IResult>>)HandleVerify)
             .WithMetadata(new BotPolicyAttribute("default") { BlockThreshold = 0.95 })
             .ExcludeFromDescription();
 

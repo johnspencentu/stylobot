@@ -26,6 +26,7 @@ using Mostlylucid.BotDetection.Persistence;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.Similarity;
+using Mostlylucid.BotDetection.Compliance;
 using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.Extensions;
@@ -746,6 +747,18 @@ public static class ServiceCollectionExtensions
 
         // Register action policy registry (holds named action policies)
         services.TryAddSingleton<IActionPolicyRegistry, ActionPolicyRegistry>();
+
+        // ==========================================
+        // Compliance packs
+        // ==========================================
+        services.TryAddSingleton<ICompliancePackProvider>(sp =>
+        {
+            var configuration = sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var compliancePackId = configuration?.GetValue<string>("BotDetection:CompliancePack") ?? "balanced-default";
+            return new InMemoryCompliancePackProvider(
+                compliancePackId,
+                sp.GetRequiredService<ILogger<InMemoryCompliancePackProvider>>());
+        });
     }
 
     /// <summary>

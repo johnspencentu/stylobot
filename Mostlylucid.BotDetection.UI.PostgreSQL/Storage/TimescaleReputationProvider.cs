@@ -40,39 +40,36 @@ public class TimescaleReputationProvider : ITimescaleReputationProvider
 
             const string sql = """
                 SELECT
-                    COUNT(*) as total_count,
-                    COUNT(*) FILTER (WHERE is_bot) as bot_count,
-                    COALESCE(AVG(bot_probability), 0) as avg_bot_prob,
-                    MIN(timestamp) as first_seen,
-                    MAX(timestamp) as last_seen,
-                    COUNT(DISTINCT DATE(timestamp)) as days_active,
-                    COUNT(*) FILTER (WHERE timestamp > NOW() - INTERVAL '1 hour') as recent_hour_count
+                    COUNT(*)::bigint as "TotalCount",
+                    COUNT(*) FILTER (WHERE is_bot)::bigint as "BotCount",
+                    COALESCE(AVG(bot_probability), 0)::double precision as "AverageBotProbability",
+                    MIN(timestamp) as "FirstSeen",
+                    MAX(timestamp) as "LastSeen",
+                    COUNT(DISTINCT DATE(timestamp))::bigint as "DaysActive",
+                    COUNT(*) FILTER (WHERE timestamp > NOW() - INTERVAL '1 hour')::bigint as "RecentHourHitCount"
                 FROM dashboard_detections
                 WHERE primary_signature = @Signature
                     AND timestamp > NOW() - INTERVAL '90 days'
                     AND confidence > 0
                 """;
 
-            var row = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            var row = await conn.QuerySingleOrDefaultAsync<TimescaleReputationRow>(
                 sql,
                 new { Signature = primarySignature },
                 commandTimeout: 5);
 
-            if (row == null || (long)row.total_count == 0)
+            if (row == null || row.TotalCount == 0 || row.FirstSeen is null || row.LastSeen is null)
                 return null;
-
-            var totalCount = (long)row.total_count;
-            var botCount = (long)row.bot_count;
 
             var data = new TimescaleReputationData
             {
-                BotRatio = totalCount > 0 ? (double)botCount / totalCount : 0,
-                TotalHitCount = (int)totalCount,
-                DaysActive = (int)(long)row.days_active,
-                RecentHourHitCount = (int)(long)row.recent_hour_count,
-                AverageBotProbability = (double)(decimal)row.avg_bot_prob,
-                FirstSeen = new DateTimeOffset((DateTime)row.first_seen, TimeSpan.Zero),
-                LastSeen = new DateTimeOffset((DateTime)row.last_seen, TimeSpan.Zero)
+                BotRatio = (double)row.BotCount / row.TotalCount,
+                TotalHitCount = (int)row.TotalCount,
+                DaysActive = (int)row.DaysActive,
+                RecentHourHitCount = (int)row.RecentHourHitCount,
+                AverageBotProbability = row.AverageBotProbability,
+                FirstSeen = new DateTimeOffset(row.FirstSeen.Value, TimeSpan.Zero),
+                LastSeen = new DateTimeOffset(row.LastSeen.Value, TimeSpan.Zero)
             };
 
             // Cache the result
@@ -90,5 +87,16 @@ public class TimescaleReputationProvider : ITimescaleReputationProvider
     public void InvalidateCache(string primarySignature)
     {
         _cache.TryRemove(primarySignature, out _);
+    }
+
+    private sealed class TimescaleReputationRow
+    {
+        public long TotalCount { get; init; }
+        public long BotCount { get; init; }
+        public double AverageBotProbability { get; init; }
+        public DateTime? FirstSeen { get; init; }
+        public DateTime? LastSeen { get; init; }
+        public long DaysActive { get; init; }
+        public long RecentHourHitCount { get; init; }
     }
 }

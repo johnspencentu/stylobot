@@ -317,23 +317,7 @@ public class SignatureFeedbackHandler : ILearningEventHandler
         return ip; // Fallback to exact IP
     }
 
-    private static bool IsLocalOrLoopback(string ip)
-    {
-        return ip is "::1" or "127.0.0.1" or "0.0.0.0"
-               || ip.StartsWith("127.", StringComparison.Ordinal)
-               || ip.StartsWith("10.", StringComparison.Ordinal)
-               || ip.StartsWith("192.168.", StringComparison.Ordinal)
-               || ip.StartsWith("172.16.", StringComparison.Ordinal)
-               || ip.StartsWith("172.17.", StringComparison.Ordinal)
-               || ip.StartsWith("172.18.", StringComparison.Ordinal)
-               || ip.StartsWith("172.19.", StringComparison.Ordinal)
-               || ip.StartsWith("172.2", StringComparison.Ordinal) // 172.20-29
-               || ip.StartsWith("172.30.", StringComparison.Ordinal)
-               || ip.StartsWith("172.31.", StringComparison.Ordinal)
-               || ip.StartsWith("fe80:", StringComparison.OrdinalIgnoreCase) // link-local
-               || ip.StartsWith("fc", StringComparison.OrdinalIgnoreCase)    // ULA
-               || ip.StartsWith("fd", StringComparison.OrdinalIgnoreCase);   // ULA
-    }
+    private static bool IsLocalOrLoopback(string ip) => Helpers.NetworkHelper.IsLocalIp(ip);
 
     /// <summary>
     ///     Normalize a path to a pattern.
