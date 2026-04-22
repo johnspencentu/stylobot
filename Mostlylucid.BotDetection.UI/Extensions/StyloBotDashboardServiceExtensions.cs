@@ -105,6 +105,9 @@ public static class StyloBotDashboardServiceExtensions
         // Razor view renderer for middleware-hosted dashboard
         services.AddSingleton<RazorViewRenderer>();
 
+        // Dashboard help system (Markdig-rendered markdown)
+        services.AddSingleton<DashboardHelpService>();
+
         // Dashboard event store: SQLite for FOSS (persists across restarts).
         // Commercial PostgreSQL package overrides via TryAddSingleton.
         services.TryAddSingleton<IDashboardEventStore, SqliteDashboardEventStore>();

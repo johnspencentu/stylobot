@@ -7,6 +7,10 @@
 @* Commercial config editor: load from control plane via HTMX when available *@
 @if (!string.IsNullOrEmpty(Model.ControlPlaneUrl) && Model.IsCommercialLicensed)
 {
+    <div class="flex items-center gap-1 mb-1">
+        <h3 class="text-sm font-bold text-base-content">Configuration</h3>
+        @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "configuration")
+    </div>
     <div id="commercial-config-editor"
          data-sb-widget="configuration"
          hx-get="@(Model.ControlPlaneUrl)/config-editor/overview"
@@ -25,6 +29,11 @@
 <div id="config-editor"
      data-sb-widget="configuration"
      class="grid grid-cols-12 gap-4">
+
+    <div class="col-span-12 flex items-center gap-1 mb-1">
+        <h3 class="text-sm font-bold text-base-content">Configuration</h3>
+        @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "configuration")
+    </div>
 
     <!-- LEFT: detector list -->
     <aside class="col-span-12 md:col-span-3 rounded-xl border overflow-hidden"

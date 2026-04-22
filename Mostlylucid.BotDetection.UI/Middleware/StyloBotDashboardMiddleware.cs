@@ -384,6 +384,10 @@ public class StyloBotDashboardMiddleware
                 await ServeLoadPresetAsync(context);
                 break;
 
+            case var p when p.StartsWith("help/", StringComparison.OrdinalIgnoreCase):
+                await ServeHelpAsync(context, relativePath["help/".Length..]);
+                break;
+
             case var p when p.StartsWith("signature/", StringComparison.OrdinalIgnoreCase):
                 // Use original relativePath (not lowercased) to preserve signature case
                 await ServeSignatureDetailAsync(context, relativePath.Substring("signature/".Length));
@@ -2044,6 +2048,28 @@ public class StyloBotDashboardMiddleware
     /// </summary>
     private LicenseCardModel BuildLicenseCardModel(HttpContext context) =>
         LicenseCardModelBuilder.Build(context, _options.BasePath.TrimEnd('/'));
+
+    private async Task ServeHelpAsync(HttpContext context, string sectionId)
+    {
+        var helpService = context.RequestServices.GetService<DashboardHelpService>();
+        if (helpService is null)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        var entry = helpService.GetHelp(sectionId, IsCommercialMode(context));
+        if (entry is null)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        var html = await _razorViewRenderer.RenderViewToStringAsync(
+            "/Views/StyloBot/Dashboard/_HelpPanel.cshtml", entry, context);
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(html);
+    }
 
     private StatusStripModel BuildStatusStripModel(HttpContext context)
     {

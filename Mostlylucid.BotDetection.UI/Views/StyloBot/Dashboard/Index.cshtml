@@ -195,7 +195,10 @@
                 <div class="flex flex-col gap-4">
                     <div class="rounded-xl border overflow-hidden" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
                         <div class="flex items-center justify-between px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
-                            <span class="text-[10px] font-semibold text-base-content/70">TRAFFIC OVER TIME</span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[10px] font-semibold text-base-content/70">TRAFFIC OVER TIME</span>
+                                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "traffic-chart")
+                            </div>
                             <span class="text-[9px] text-base-content/40">Last 6 hours</span>
                         </div>
                         <div class="p-2">
@@ -231,6 +234,7 @@
                     <div class="flex items-center justify-between px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
                         <div class="flex items-center gap-2">
                             <span class="text-[10px] font-semibold text-base-content/70">GLOBAL THREAT MAP</span>
+                            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "world-map")
                             <span class="text-[9px] px-1 py-0.5 rounded status-badge-danger font-medium">LIVE</span>
                         </div>
                     </div>

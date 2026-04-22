@@ -17,6 +17,7 @@
         <div class="flex items-center justify-between">
             <h3 class="text-xs font-bold text-base-content flex items-center gap-2">
                 Your Detection
+                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "your-detection")
                 @if (Model.HasData)
                 {
                     @if (Model.IsBot)

@@ -34,6 +34,7 @@
         <div class="flex items-center justify-between mb-1">
             <div class="flex items-center gap-2">
                 <h3 class="text-sm font-bold text-base-content">Recent Activity</h3>
+                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "recent-activity")
                 <span class="text-[9px] px-1 py-0.5 rounded status-badge-danger font-medium">LIVE</span>
             </div>
             <div class="flex items-center gap-1">

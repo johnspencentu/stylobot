@@ -20,7 +20,10 @@
      data-sb-depends="signature,summary"
      class="card bg-base-200 transition-all duration-200">
     <div class="card-body p-3">
-        <h3 class="text-sm font-bold text-base-content mb-1">Top Bots</h3>
+        <div class="flex items-center gap-1 mb-1">
+            <h3 class="text-sm font-bold text-base-content">Top Bots</h3>
+            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "top-bots")
+        </div>
 
         @if (Model.Bots.Count == 0)
         {
