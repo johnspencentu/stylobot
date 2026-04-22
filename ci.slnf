@@ -4,7 +4,7 @@
     "projects": [
       "Mostlylucid.BotDetection\\Mostlylucid.BotDetection.csproj",
       "Mostlylucid.BotDetection.Demo\\Mostlylucid.BotDetection.Demo.csproj",
-      "Mostlylucid.BotDetection.MinimalDemo\\Mostlylucid.BotDetection.MinimalDemo.csproj",
+      "Mostlylucid.BotDetection.Llm.Holodeck\\Mostlylucid.BotDetection.Llm.Holodeck.csproj",
       "Mostlylucid.BotDetection.Console\\Mostlylucid.BotDetection.Console.csproj",
       "Mostlylucid.BotDetection.UI\\Mostlylucid.BotDetection.UI.csproj",
       "Mostlylucid.BotDetection.UI.PostgreSQL\\Mostlylucid.BotDetection.UI.PostgreSQL.csproj",
@@ -25,8 +25,7 @@
       "Mostlylucid.BotDetection.ApiHolodeck\\Mostlylucid.BotDetection.ApiHolodeck.csproj",
       "Mostlylucid.BotDetection.Api\\Mostlylucid.BotDetection.Api.csproj",
       "Mostlylucid.BotDetection.Api.Tests\\Mostlylucid.BotDetection.Api.Tests.csproj",
-      "Mostlylucid.BotDetection.Llm\\Mostlylucid.BotDetection.Llm.csproj",
-      "Mostlylucid.BotDetection.SignatureStore\\Mostlylucid.BotDetection.SignatureStore.csproj"
+      "Mostlylucid.BotDetection.Llm\\Mostlylucid.BotDetection.Llm.csproj"
     ]
   }
 }
