@@ -1,7 +1,10 @@
-using Mostlylucid.BotDetection.SimulationPacks;
+namespace Mostlylucid.BotDetection.SimulationPacks;
 
-namespace Mostlylucid.BotDetection.Llm.Holodeck;
-
+/// <summary>
+///     Generates dynamic fake responses for holodeck honeypots.
+///     Registered optionally by LLM holodeck plugin. SimulationPackResponder
+///     resolves via optional constructor injection -- null when plugin not registered.
+/// </summary>
 public interface IHolodeckResponder
 {
     Task<HolodeckResponse> GenerateAsync(
@@ -9,6 +12,7 @@ public interface IHolodeckResponder
         HolodeckRequestContext requestContext,
         string? canary,
         CancellationToken ct = default);
+
     bool IsAvailable { get; }
 }
 

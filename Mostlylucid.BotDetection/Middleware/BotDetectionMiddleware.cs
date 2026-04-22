@@ -1037,6 +1037,13 @@ public class BotDetectionMiddleware(
 
         if (isHoneypotPath || hasAttackSignal)
         {
+            // Set fingerprint for downstream action policies (SimulationPackResponder uses this)
+            if (aggregated.Signals.TryGetValue(SignalKeys.PrimarySignature, out var sigVal2))
+            {
+                var fp = sigVal2?.ToString();
+                if (fp != null) context.Items["Holodeck.Fingerprint"] = fp;
+            }
+
             var holodeckRegistry = context.RequestServices.GetService<IActionPolicyRegistry>();
             var holodeckPolicy = holodeckRegistry?.GetPolicy("holodeck");
             if (holodeckPolicy != null)

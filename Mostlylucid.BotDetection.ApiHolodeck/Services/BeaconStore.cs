@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.ApiHolodeck.Services;
 
@@ -6,7 +7,7 @@ namespace Mostlylucid.BotDetection.ApiHolodeck.Services;
 ///     Stores beacon canary to fingerprint mappings in SQLite.
 ///     Used to correlate rotated fingerprints when they replay canary values.
 /// </summary>
-public sealed class BeaconStore : IDisposable
+public sealed class BeaconStore : IBeaconStore, IDisposable
 {
     private readonly string _connectionString;
     private bool _initialized;

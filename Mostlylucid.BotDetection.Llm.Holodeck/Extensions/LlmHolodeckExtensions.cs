@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.Llm.Holodeck.Extensions;
 

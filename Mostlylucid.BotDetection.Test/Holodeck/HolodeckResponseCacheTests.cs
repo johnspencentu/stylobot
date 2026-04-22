@@ -1,4 +1,5 @@
 using Mostlylucid.BotDetection.Llm.Holodeck;
+using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.Test.Holodeck;
 

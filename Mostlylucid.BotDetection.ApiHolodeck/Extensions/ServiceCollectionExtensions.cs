@@ -9,6 +9,7 @@ using Mostlylucid.BotDetection.ApiHolodeck.Models;
 using Mostlylucid.BotDetection.ApiHolodeck.Services;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
+using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.ApiHolodeck.Extensions;
 
@@ -88,6 +89,7 @@ public static class ServiceCollectionExtensions
             var secret = botOptions.SignatureHashKey ?? "stylobot-default-beacon-key";
             return new BeaconCanaryGenerator(secret, holoOptions.BeaconCanaryLength);
         });
+        services.AddSingleton<ICanaryGenerator>(sp => sp.GetRequiredService<BeaconCanaryGenerator>());
 
         services.AddSingleton<BeaconStore>(sp =>
         {
@@ -95,6 +97,7 @@ public static class ServiceCollectionExtensions
             var dbPath = Path.Combine(env.ContentRootPath, "beacons.db");
             return new BeaconStore($"Data Source={dbPath};Cache=Shared");
         });
+        services.AddSingleton<IBeaconStore>(sp => sp.GetRequiredService<BeaconStore>());
 
         // Beacon contributor (detects canary replay from rotated fingerprints)
         services.AddSingleton<BeaconContributor>();
@@ -148,6 +151,7 @@ public static class ServiceCollectionExtensions
             var secret = botOptions.SignatureHashKey ?? "stylobot-default-beacon-key";
             return new BeaconCanaryGenerator(secret, holoOptions.BeaconCanaryLength);
         });
+        services.AddSingleton<ICanaryGenerator>(sp => sp.GetRequiredService<BeaconCanaryGenerator>());
 
         services.AddSingleton<BeaconStore>(sp =>
         {
@@ -155,6 +159,7 @@ public static class ServiceCollectionExtensions
             var dbPath = Path.Combine(env.ContentRootPath, "beacons.db");
             return new BeaconStore($"Data Source={dbPath};Cache=Shared");
         });
+        services.AddSingleton<IBeaconStore>(sp => sp.GetRequiredService<BeaconStore>());
 
         // Beacon contributor (detects canary replay from rotated fingerprints)
         services.AddSingleton<BeaconContributor>();

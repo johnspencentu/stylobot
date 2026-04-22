@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.ApiHolodeck.Services;
 
@@ -8,7 +9,7 @@ namespace Mostlylucid.BotDetection.ApiHolodeck.Services;
 ///     Same fingerprint + path always produces the same canary.
 ///     Different fingerprints produce different canaries.
 /// </summary>
-public sealed class BeaconCanaryGenerator
+public sealed class BeaconCanaryGenerator : ICanaryGenerator
 {
     private readonly byte[] _keyBytes;
     private readonly int _canaryLength;
