@@ -83,6 +83,15 @@ public class StyloBotDashboardMiddleware
     /// <summary>Shared JSON options: camelCase to match SSR initial page load and JS frontend expectations.</summary>
     private static readonly JsonSerializerOptions CamelCaseJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+    /// <summary>
+    ///     Per-request commercial feature check. Returns false if the request has
+    ///     <c>?mode=foss</c> (used by the marketing site demo toggle), even when
+    ///     <see cref="StyloBotDashboardOptions.EnableConfigEditing"/> is true.
+    /// </summary>
+    private bool IsCommercialMode(HttpContext context) =>
+        _options.EnableConfigEditing &&
+        !string.Equals(context.Request.Query["mode"].FirstOrDefault(), "foss", StringComparison.OrdinalIgnoreCase);
+
     public StyloBotDashboardMiddleware(
         RequestDelegate next,
         StyloBotDashboardOptions options,
@@ -531,7 +540,7 @@ public class StyloBotDashboardMiddleware
         {
             var invFilter = ParseInvestigationFilter(context);
             var invResult = await _eventStore.GetInvestigationAsync(invFilter);
-            investigationVm = BuildInvestigationViewModel(invFilter, invResult);
+            investigationVm = BuildInvestigationViewModel(invFilter, invResult, context);
         }
 
         var model = new DashboardShellModel
@@ -563,7 +572,8 @@ public class StyloBotDashboardMiddleware
                 ? BuildConfigurationModel(context)
                 : null,
             // Only run investigation queries when the operator is on the Investigate tab.
-            Investigation = investigationVm
+            Investigation = investigationVm,
+            IsCommercial = IsCommercialMode(context)
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -3750,7 +3760,7 @@ public class StyloBotDashboardMiddleware
             ? await shapeStore.GetPresetsAsync()
             : Array.Empty<InvestigationPreset>();
 
-        var hasCommercial = _options.EnableConfigEditing;
+        var hasCommercial = IsCommercialMode(context);
         var tabs = new List<string> { "detections", "signatures", "endpoints", "geo", "signaltrace" };
         if (hasCommercial) tabs.Insert(tabs.Count - 1, "fingerprints");
 
@@ -3816,7 +3826,7 @@ public class StyloBotDashboardMiddleware
     {
         var filter = ParseInvestigationFilter(context) with { Tab = tab };
         var result = await _eventStore.GetInvestigationAsync(filter);
-        var vm = BuildInvestigationViewModel(filter, result);
+        var vm = BuildInvestigationViewModel(filter, result, context);
 
         var partialName = tab.ToLowerInvariant() switch
         {
@@ -3918,7 +3928,7 @@ public class StyloBotDashboardMiddleware
     }
 
     private InvestigationViewModel BuildInvestigationViewModel(
-        InvestigationFilter filter, InvestigationResult result)
+        InvestigationFilter filter, InvestigationResult result, HttpContext? httpContext = null)
     {
         var filters = new List<FilterOption>
         {
@@ -3930,8 +3940,8 @@ public class StyloBotDashboardMiddleware
 
         var tabs = new List<string> { "detections", "signatures", "endpoints", "geo", "signaltrace" };
 
-        // Commercial features -- check if config editing is enabled (proxy for paid license)
-        if (_options.EnableConfigEditing)
+        // Commercial features -- gated by license + demo mode toggle
+        if (httpContext is not null ? IsCommercialMode(httpContext) : _options.EnableConfigEditing)
         {
             filters.Add(new FilterOption { Value = "ip", Label = "IP Address" });
             filters.Add(new FilterOption { Value = "fingerprint", Label = "Fingerprint" });

@@ -336,6 +336,9 @@ public sealed class DashboardShellModel
     ///     to avoid running investigation queries on every dashboard render.
     /// </summary>
     public InvestigationViewModel? Investigation { get; init; }
+
+    /// <summary>Whether commercial features (config editor, IP search, fingerprints) are enabled for this request.</summary>
+    public bool IsCommercial { get; init; }
 }
 
 /// <summary>
