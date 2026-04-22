@@ -7,9 +7,8 @@ namespace Mostlylucid.BotDetection.UI.Services;
 ///     state so offline weight-tuning can compute per-detector precision/recall against
 ///     real ground truth.
 ///
-///     FOSS ships <see cref="InMemorySignatureLabelStore"/> (lost on restart - fine for
-///     small manual labeling sessions). Production wires a SQLite or PostgreSQL implementation
-///     so labels accumulate across deploys.
+///     FOSS ships a SQLite implementation. Commercial wires PostgreSQL so labels
+///     accumulate across deploys.
 /// </summary>
 public interface ISignatureLabelStore
 {

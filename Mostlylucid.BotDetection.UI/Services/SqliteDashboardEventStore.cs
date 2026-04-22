@@ -20,6 +20,7 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
 
     private readonly string _connectionString;
     private readonly ILogger<SqliteDashboardEventStore> _logger;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private bool _initialized;
 
@@ -39,12 +40,15 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
     private async Task EnsureInitializedAsync(CancellationToken ct = default)
     {
         if (_initialized) return;
+        await _initLock.WaitAsync(ct);
+        try
+        {
+            if (_initialized) return;
 
-        await using var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(ct);
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
 
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
+            const string schemaSql = """
             PRAGMA journal_mode=WAL;
             PRAGMA synchronous=NORMAL;
             PRAGMA cache_size=-4000;
@@ -112,17 +116,36 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             );
             CREATE INDEX IF NOT EXISTS idx_ua_family ON user_agent_stats(ua_family, hit_count DESC);
             """;
-        await cmd.ExecuteNonQueryAsync(ct);
+            foreach (var statement in schemaSql.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                try
+                {
+                    await using var cmd = conn.CreateCommand();
+                    cmd.CommandText = statement;
+                    await cmd.ExecuteNonQueryAsync(ct);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to initialize SQLite dashboard schema statement: {statement}",
+                        ex);
+                }
+            }
 
-        // Prune old detections (keep last 7 days)
-        await using var pruneCmd = conn.CreateCommand();
-        pruneCmd.CommandText = "DELETE FROM detections WHERE timestamp < @cutoff";
-        pruneCmd.Parameters.AddWithValue("@cutoff", DateTime.UtcNow.AddDays(-7).ToString("O"));
-        var pruned = await pruneCmd.ExecuteNonQueryAsync(ct);
-        if (pruned > 0) _logger.LogDebug("Pruned {Count} old dashboard detections", pruned);
+            // Prune old detections (keep last 7 days)
+            await using var pruneCmd = conn.CreateCommand();
+            pruneCmd.CommandText = "DELETE FROM detections WHERE timestamp < @cutoff";
+            pruneCmd.Parameters.AddWithValue("@cutoff", DateTime.UtcNow.AddDays(-7).ToString("O"));
+            var pruned = await pruneCmd.ExecuteNonQueryAsync(ct);
+            if (pruned > 0) _logger.LogDebug("Pruned {Count} old dashboard detections", pruned);
 
-        _initialized = true;
-        _logger.LogInformation("SQLite dashboard event store initialized at {Path}", _connectionString);
+            _initialized = true;
+            _logger.LogInformation("SQLite dashboard event store initialized at {Path}", _connectionString);
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     public async Task AddDetectionAsync(DashboardDetectionEvent detection)
