@@ -125,6 +125,9 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+// Holodeck path tagger: tags honeypot paths on HttpContext.Items before detection runs
+app.UseMiddleware<Mostlylucid.BotDetection.ApiHolodeck.Middleware.HoneypotPathTagger>();
+
 // Full StyloBot: detection + dashboard, correct middleware ordering guaranteed.
 // Broadcast middleware wraps detection so blocked requests are always recorded.
 app.UseStyloBot();

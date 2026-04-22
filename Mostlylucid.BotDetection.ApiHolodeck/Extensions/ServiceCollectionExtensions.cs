@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Actions;
 using Mostlylucid.BotDetection.ApiHolodeck.Actions;
 using Mostlylucid.BotDetection.ApiHolodeck.Contributors;
 using Mostlylucid.BotDetection.ApiHolodeck.Models;
 using Mostlylucid.BotDetection.ApiHolodeck.Services;
+using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
 
 namespace Mostlylucid.BotDetection.ApiHolodeck.Extensions;
@@ -74,6 +77,29 @@ public static class ServiceCollectionExtensions
         // Register the honeypot reporter background service
         services.AddHostedService<HoneypotReporter>();
 
+        // Holodeck coordinator for per-fingerprint engagement slots
+        services.AddSingleton<HolodeckCoordinator>();
+
+        // Beacon tracking
+        services.AddSingleton<BeaconCanaryGenerator>(sp =>
+        {
+            var botOptions = sp.GetRequiredService<IOptions<BotDetectionOptions>>().Value;
+            var holoOptions = sp.GetRequiredService<IOptions<HolodeckOptions>>().Value;
+            var secret = botOptions.SignatureHashKey ?? "stylobot-default-beacon-key";
+            return new BeaconCanaryGenerator(secret, holoOptions.BeaconCanaryLength);
+        });
+
+        services.AddSingleton<BeaconStore>(sp =>
+        {
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var dbPath = Path.Combine(env.ContentRootPath, "beacons.db");
+            return new BeaconStore($"Data Source={dbPath};Cache=Shared");
+        });
+
+        // Beacon contributor (detects canary replay from rotated fingerprints)
+        services.AddSingleton<BeaconContributor>();
+        services.AddSingleton<IContributingDetector>(sp => sp.GetRequiredService<BeaconContributor>());
+
         return services;
     }
 
@@ -110,6 +136,29 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<HoneypotLinkContributor>();
         services.AddSingleton<IContributingDetector>(sp => sp.GetRequiredService<HoneypotLinkContributor>());
         services.AddHostedService<HoneypotReporter>();
+
+        // Holodeck coordinator for per-fingerprint engagement slots
+        services.AddSingleton<HolodeckCoordinator>();
+
+        // Beacon tracking
+        services.AddSingleton<BeaconCanaryGenerator>(sp =>
+        {
+            var botOptions = sp.GetRequiredService<IOptions<BotDetectionOptions>>().Value;
+            var holoOptions = sp.GetRequiredService<IOptions<HolodeckOptions>>().Value;
+            var secret = botOptions.SignatureHashKey ?? "stylobot-default-beacon-key";
+            return new BeaconCanaryGenerator(secret, holoOptions.BeaconCanaryLength);
+        });
+
+        services.AddSingleton<BeaconStore>(sp =>
+        {
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var dbPath = Path.Combine(env.ContentRootPath, "beacons.db");
+            return new BeaconStore($"Data Source={dbPath};Cache=Shared");
+        });
+
+        // Beacon contributor (detects canary replay from rotated fingerprints)
+        services.AddSingleton<BeaconContributor>();
+        services.AddSingleton<IContributingDetector>(sp => sp.GetRequiredService<BeaconContributor>());
 
         return services;
     }

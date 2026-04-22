@@ -1029,6 +1029,29 @@ public class BotDetectionMiddleware(
         BotPolicyAttribute? policyAttr,
         BotBlockAction action)
     {
+        // --- Holodeck engagement check ---
+        // If path was tagged as honeypot (pre-detection) or attack signals fired,
+        // try holodeck action policy instead of hard block.
+        var isHoneypotPath = context.Items.TryGetValue("Holodeck.IsHoneypotPath", out var hpVal) && hpVal is true;
+        var hasAttackSignal = aggregated.Signals.ContainsKey(SignalKeys.AttackDetected);
+
+        if (isHoneypotPath || hasAttackSignal)
+        {
+            var holodeckRegistry = context.RequestServices.GetService<IActionPolicyRegistry>();
+            var holodeckPolicy = holodeckRegistry?.GetPolicy("holodeck");
+            if (holodeckPolicy != null)
+            {
+                _logger.LogInformation(
+                    "[HOLODECK] Engaging for {Path} (honeypot={IsHoneypot}, attack={HasAttack})",
+                    context.Request.Path, isHoneypotPath, hasAttackSignal);
+
+                var holoResult = await holodeckPolicy.ExecuteAsync(context, aggregated, context.RequestAborted);
+                if (!holoResult.Continue) return;
+                // If holodeck returned Continue (e.g., coordinator busy), fall through to normal block
+            }
+        }
+        // --- End holodeck check ---
+
         var riskScore = aggregated.BotProbability;
 
         _logger.LogWarning(
