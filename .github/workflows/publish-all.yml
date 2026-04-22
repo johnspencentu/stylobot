@@ -73,7 +73,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Create MinVer tag
-      run: git tag "botdetection-v${{ needs.validate-version.outputs.version }}"
+      run: git tag -f "botdetection-v${{ needs.validate-version.outputs.version }}"
 
     - name: Restore dependencies
       run: dotnet restore Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj
@@ -113,7 +113,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Create MinVer tag
-      run: git tag "common-v${{ needs.validate-version.outputs.version }}"
+      run: git tag -f "common-v${{ needs.validate-version.outputs.version }}"
 
     - name: Restore, Build, Pack
       run: |
@@ -151,7 +151,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Create MinVer tag
-      run: git tag "geodetection-v${{ needs.validate-version.outputs.version }}"
+      run: git tag -f "geodetection-v${{ needs.validate-version.outputs.version }}"
 
     - name: Restore, Build, Pack
       run: |
