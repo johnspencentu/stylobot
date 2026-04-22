@@ -739,7 +739,8 @@ public class StyloBotDashboardMiddleware
             Confidence = Math.Clamp(payload.Confidence ?? 1.0, 0.0, 1.0),
             LabeledBy = ResolveLabeler(context),
             LabeledAt = DateTime.UtcNow,
-            Note = string.IsNullOrWhiteSpace(payload.Note) ? null : payload.Note.Trim()
+            Note = string.IsNullOrWhiteSpace(payload.Note) ? null : payload.Note.Trim(),
+            DisplayName = string.IsNullOrWhiteSpace(payload.DisplayName) ? null : payload.DisplayName.Trim()
         };
 
         var saved = await labelStore.UpsertAsync(label, context.RequestAborted);
@@ -999,7 +1000,7 @@ public class StyloBotDashboardMiddleware
         }
     }
 
-    private sealed record LabelPayload(string? Kind, double? Confidence, string? Note);
+    private sealed record LabelPayload(string? Kind, double? Confidence, string? Note, string? DisplayName);
 
     private async Task ServeDetectionsApiAsync(HttpContext context)
     {

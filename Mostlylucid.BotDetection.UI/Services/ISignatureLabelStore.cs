@@ -45,8 +45,11 @@ public sealed record SignatureLabel
 
     public DateTime LabeledAt { get; init; } = DateTime.UtcNow;
 
-    /// <summary>Short free-text justification - e.g., "Classic cred-stuffing pattern on /login".</summary>
+    /// <summary>Short free-text justification -- e.g., "Classic cred-stuffing pattern on /login".</summary>
     public string? Note { get; init; }
+
+    /// <summary>Human-readable display name -- e.g., "Partner Crawler - Acme Corp", "Internal Monitoring Bot".</summary>
+    public string? DisplayName { get; init; }
 }
 
 /// <summary>Operator's judgement about a signature. Keep the set small and unambiguous.</summary>
