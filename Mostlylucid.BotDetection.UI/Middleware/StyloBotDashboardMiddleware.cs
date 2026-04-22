@@ -578,7 +578,10 @@ public class StyloBotDashboardMiddleware
             // Only run investigation queries when the operator is on the Investigate tab.
             Investigation = investigationVm,
             IsCommercial = IsCommercialMode(context),
-            StatusStrip = BuildStatusStripModel(context)
+            StatusStrip = BuildStatusStripModel(context),
+            Compliance = tab.Equals("compliance", StringComparison.OrdinalIgnoreCase)
+                ? BuildComplianceTabModel(context)
+                : null
         };
 
         var html = await _razorViewRenderer.RenderViewToStringAsync(
@@ -2070,6 +2073,44 @@ public class StyloBotDashboardMiddleware
             "/Views/StyloBot/Dashboard/_HelpPanel.cshtml", entry, context);
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.WriteAsync(html);
+    }
+
+    private ComplianceTabModel? BuildComplianceTabModel(HttpContext context)
+    {
+        try
+        {
+            var packProvider = context.RequestServices.GetService<Mostlylucid.BotDetection.Compliance.ICompliancePackProvider>();
+            if (packProvider is null)
+                return new ComplianceTabModel
+                {
+                    ActivePackId = "default", ActivePackName = "Default (no compliance module)",
+                    BasePath = _options.BasePath.TrimEnd('/'), IsCommercial = IsCommercialMode(context)
+                };
+
+            var pack = packProvider.ActivePack;
+            return new ComplianceTabModel
+            {
+                ActivePackId = pack.Id,
+                ActivePackName = pack.Name,
+                ActivePackExplain = pack.Explain,
+                LegalReferences = pack.LegalReferences,
+                Jurisdiction = pack.Jurisdiction,
+                Position = pack.Position,
+                IsCommercial = IsCommercialMode(context),
+                BasePath = _options.BasePath.TrimEnd('/'),
+                AvailablePacks = packProvider.AvailablePacks
+                    .Select(p => new CompliancePackSummary(p.Id, p.Name, p.Jurisdiction))
+                    .ToList()
+            };
+        }
+        catch
+        {
+            return new ComplianceTabModel
+            {
+                ActivePackId = "default", ActivePackName = "Default",
+                BasePath = _options.BasePath.TrimEnd('/'), IsCommercial = false
+            };
+        }
     }
 
     private StatusStripModel BuildStatusStripModel(HttpContext context)

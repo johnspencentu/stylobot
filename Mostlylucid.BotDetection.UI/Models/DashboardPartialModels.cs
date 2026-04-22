@@ -342,6 +342,9 @@ public sealed class DashboardShellModel
 
     /// <summary>System status strip model (overview tab header).</summary>
     public StatusStripModel? StatusStrip { get; init; }
+
+    /// <summary>Compliance tab model. Only set when active tab is "compliance".</summary>
+    public ComplianceTabModel? Compliance { get; init; }
 }
 
 /// <summary>
