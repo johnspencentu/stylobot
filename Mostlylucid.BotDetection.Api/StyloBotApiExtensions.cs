@@ -22,6 +22,11 @@ public static class StyloBotApiExtensions
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
                 ApiKeyAuthenticationHandler.SchemeName, null);
 
+        services.AddAuthorizationBuilder()
+            .AddPolicy(ApiKeyAuthenticationHandler.SchemeName, policy =>
+                policy.AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                      .RequireAuthenticatedUser());
+
         if (options.EnableOpenApi)
         {
             services.AddOpenApi();
