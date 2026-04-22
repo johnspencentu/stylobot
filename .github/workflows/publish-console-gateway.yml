@@ -165,47 +165,19 @@ jobs:
         cp ../../Mostlylucid.BotDetection.Console/README.md ../../dist/ || true
 
         # Create README
-        cat > ../../dist/README.txt << 'EOF'
-        Mostlylucid Bot Detection Console Gateway
-        ==========================================
+        cat > ../../dist/README.txt << 'READMEEOF'
+        StyloBot - Self-hosted bot defense
+        ==================================
 
-        Version: ${{ steps.get_version.outputs.VERSION }}
-        Platform: ${{ matrix.runtime }}
+        Quick start:
 
-        Quick Start:
-        ------------
+          stylobot 5080 https://www.example.com
+          stylobot 5080 https://www.example.com --tunnel
+          stylobot 5080 https://www.example.com --mode production
 
-        # macOS: Remove quarantine first
-        xattr -d com.apple.quarantine stylobot
+        Full docs: https://github.com/scottgal/stylobot
 
-        # Linux/macOS: Make executable
-        chmod +x stylobot
-
-        # Demo mode (verbose logging)
-        ./stylobot${{ matrix.file-ext }} --upstream http://localhost:8080 --port 5080 --mode demo
-
-        # Production mode (structured logging, blocking)
-        ./stylobot${{ matrix.file-ext }} --upstream http://backend:8080 --port 80 --mode production
-
-        # Using environment variables
-        export UPSTREAM=http://backend:8080
-        export PORT=5080
-        export MODE=production
-        ./stylobot${{ matrix.file-ext }}
-
-        Documentation:
-        --------------
-        https://github.com/scottgal/mostlylucid.nugetpackages
-
-        Configuration:
-        --------------
-        Edit appsettings.json or appsettings.production.json to customize:
-        - Detection policies
-        - Action policies
-        - Thresholds
-        - Learning settings
-
-        EOF
+        READMEEOF
 
         cd ../../dist
 
@@ -297,17 +269,14 @@ jobs:
         Extract the archive and run:
 
         ```bash
-        # Linux - make executable first
+        # Linux/macOS
         chmod +x stylobot
-        ./stylobot --upstream http://localhost:8080 --port 5080
-
-        # macOS - remove quarantine then make executable
-        xattr -d com.apple.quarantine stylobot
-        chmod +x stylobot
-        ./stylobot --upstream http://localhost:8080 --port 5080
+        stylobot 5080 https://www.example.com                       # demo mode (verbose, no blocking)
+        stylobot 5080 https://www.example.com --mode production      # production (blocking enabled)
+        stylobot 5080 https://www.example.com --tunnel               # instant Cloudflare public URL
 
         # Windows
-        stylobot.exe --upstream http://localhost:8080 --port 5080
+        stylobot.exe 5080 https://www.example.com --mode production
         ```
 
         ### Features
@@ -328,16 +297,12 @@ jobs:
         ### Configuration
 
         ```bash
-        # Command-line arguments
-        --upstream <url>    # Upstream backend URL (default: http://localhost:8080)
-        --port <port>       # Listen port (default: 5080)
-        --mode <mode>       # demo or production (default: demo)
-
-        # Environment variables
-        export UPSTREAM=http://backend:8080
-        export PORT=5080
-        export MODE=production
-        ./stylobot
+        stylobot <port> <upstream>                     # Demo mode (default)
+        stylobot <port> <upstream> --mode production   # Production (blocking)
+        stylobot <port> <upstream> --tunnel            # Cloudflare public URL
+        stylobot <port> <upstream> --policy block      # Explicit block policy
+        stylobot <port> <upstream> --policy throttle   # Stealth throttling
+        stylobot man                                   # Full reference
         ```
 
         ### Demo Loop
@@ -345,14 +310,14 @@ jobs:
         See the complete YARP → Backend demo:
 
         1. Start backend: `cd demo && dotnet run`
-        2. Start gateway: `./stylobot --upstream http://localhost:5080 --port 5100 --mode demo`
+        2. Start gateway: `stylobot 5100 http://localhost:5080 --mode demo`
         3. Open: `http://localhost:5100/YarpProxyDemo`
 
         ### Documentation
 
-        - [Console Gateway README](https://github.com/scottgal/mostlylucid.nugetpackages/blob/main/Mostlylucid.BotDetection.Console/README.md)
-        - [Blackboard Architecture](https://github.com/scottgal/mostlylucid.nugetpackages/blob/main/BLACKBOARD_ARCHITECTURE.md)
-        - [Full Documentation](https://github.com/scottgal/mostlylucid.nugetpackages)
+        - [Console Gateway README](https://github.com/scottgal/stylobot/blob/main/Mostlylucid.BotDetection.Console/README.md)
+        - [Vector Search Projection](https://github.com/scottgal/stylobot/blob/main/docs/vector-search-projection.md)
+        - [Documentation](https://github.com/scottgal/stylobot)
 
         ### Checksums
 
