@@ -19,6 +19,7 @@ using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Telemetry;
 using Mostlylucid.BotDetection.ThreatIntel;
 using Mostlylucid.BotDetection.Orchestration;
+using Mostlylucid.BotDetection.Orchestration.Audit;
 using Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.BotDetection.Persistence;
@@ -321,6 +322,16 @@ public static class ServiceCollectionExtensions
         // container can render live events without being in the request path.
         services.TryAddSingleton<Orchestration.Telemetry.IDetectionEventPublisher,
             Orchestration.Telemetry.NullDetectionEventPublisher>();
+
+        // Audit processors read the same raw signal trace used by the detection pipeline
+        // and emit derived audit records to one or more sinks. Commercial packages can
+        // add processor/sink packs without replacing the FOSS defaults.
+        services.AddOptions<AuditProcessorOptions>()
+            .BindConfiguration("BotDetection:AuditProcessors");
+        services.TryAddSingleton<AuditProcessorDispatcher>();
+        services.TryAddSingleton<IAuditRecordWriter, AuditRecordWriter>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditSink, LoggerAuditSink>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditProcessor, ErrorSignalAuditProcessor>());
 
         // FOSS hot-reload: watch {ContentRoot}/stylobot-config for YAML/JSON edits and
         // invalidate the DetectorConfigProvider cache on change. Hosted service starts

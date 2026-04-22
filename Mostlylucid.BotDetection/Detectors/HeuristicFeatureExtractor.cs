@@ -43,7 +43,7 @@ public static class HeuristicFeatureExtractor
     /// </remarks>
     public static Dictionary<string, float> ExtractFeatures(HttpContext context, AggregatedEvidence evidence)
     {
-        var features = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        var features = new Dictionary<string, float>(128, StringComparer.OrdinalIgnoreCase);
 
         // === Basic Request Metadata ===
         ExtractRequestMetadata(context, features);
@@ -84,7 +84,7 @@ public static class HeuristicFeatureExtractor
     /// </summary>
     public static Dictionary<string, float> ExtractBasicFeatures(HttpContext context)
     {
-        var features = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        var features = new Dictionary<string, float>(32, StringComparer.OrdinalIgnoreCase);
         ExtractRequestMetadata(context, features);
         return features;
     }

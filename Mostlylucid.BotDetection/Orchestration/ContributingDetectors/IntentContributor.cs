@@ -82,7 +82,7 @@ public class IntentContributor : ConfiguredContributorBase
     private async Task<IReadOnlyList<DetectionContribution>> ContributeInternalAsync(
         BlackboardState state, CancellationToken ct)
     {
-        var contributions = new List<DetectionContribution>();
+        var contributions = new List<DetectionContribution>(1);
 
         try
         {
@@ -177,7 +177,7 @@ public class IntentContributor : ConfiguredContributorBase
 
     private Dictionary<string, float> BuildIntentFeatures(BlackboardState state)
     {
-        var features = new Dictionary<string, float>();
+        var features = new Dictionary<string, float>(40);
 
         // Attack features from HaxxorContributor
         var attackCategories = state.GetSignal<string>(SignalKeys.AttackCategories) ?? "";
@@ -199,7 +199,13 @@ public class IntentContributor : ConfiguredContributorBase
         features["attack:has_injection"] = hasInjection ? 1.0f : 0.0f;
         features["attack:has_scanning"] = hasScanning ? 1.0f : 0.0f;
 
-        var categoryCount = string.IsNullOrEmpty(attackCategories) ? 0 : attackCategories.Split(',').Length;
+        var categoryCount = 0;
+        if (!string.IsNullOrEmpty(attackCategories))
+        {
+            categoryCount = 1;
+            foreach (var c in attackCategories.AsSpan())
+                if (c == ',') categoryCount++;
+        }
         features["attack:category_count"] = Math.Min(categoryCount / 5.0f, 1.0f); // Normalize to 0-1
 
         features["attack:severity"] = attackSeverity switch
@@ -284,23 +290,33 @@ public class IntentContributor : ConfiguredContributorBase
 
     private static void ClassifyPath(string path, Dictionary<string, float> features)
     {
-        var lowerPath = path.ToLowerInvariant();
-
         // Simple path classification - probe paths get special treatment
-        var isProbe = lowerPath.Contains(".env") || lowerPath.Contains("wp-admin") ||
-                      lowerPath.Contains("phpmyadmin") || lowerPath.Contains(".git") ||
-                      lowerPath.Contains("/.") || lowerPath.Contains("actuator") ||
-                      lowerPath.Contains("phpinfo") || lowerPath.Contains("wp-login");
-        var isAdmin = lowerPath.Contains("/admin") || lowerPath.Contains("/dashboard") ||
-                      lowerPath.Contains("/cpanel") || lowerPath.Contains("/jenkins");
-        var isAuth = lowerPath.Contains("/login") || lowerPath.Contains("/signin") ||
-                     lowerPath.Contains("/auth") || lowerPath.Contains("/token") ||
-                     lowerPath.Contains("/oauth");
-        var isApi = lowerPath.StartsWith("/api/") || lowerPath.Contains("/graphql");
-        var isStatic = lowerPath.EndsWith(".js") || lowerPath.EndsWith(".css") ||
-                       lowerPath.EndsWith(".png") || lowerPath.EndsWith(".jpg") ||
-                       lowerPath.EndsWith(".svg") || lowerPath.EndsWith(".ico") ||
-                       lowerPath.EndsWith(".woff2");
+        var isProbe = path.Contains(".env", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("wp-admin", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("phpmyadmin", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains(".git", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("/.", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("actuator", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("phpinfo", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("wp-login", StringComparison.OrdinalIgnoreCase);
+        var isAdmin = path.Contains("/admin", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("/dashboard", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("/cpanel", StringComparison.OrdinalIgnoreCase) ||
+                      path.Contains("/jenkins", StringComparison.OrdinalIgnoreCase);
+        var isAuth = path.Contains("/login", StringComparison.OrdinalIgnoreCase) ||
+                     path.Contains("/signin", StringComparison.OrdinalIgnoreCase) ||
+                     path.Contains("/auth", StringComparison.OrdinalIgnoreCase) ||
+                     path.Contains("/token", StringComparison.OrdinalIgnoreCase) ||
+                     path.Contains("/oauth", StringComparison.OrdinalIgnoreCase);
+        var isApi = path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
+                    path.Contains("/graphql", StringComparison.OrdinalIgnoreCase);
+        var isStatic = path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
+                       path.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+                       path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                       path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                       path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) ||
+                       path.EndsWith(".ico", StringComparison.OrdinalIgnoreCase) ||
+                       path.EndsWith(".woff2", StringComparison.OrdinalIgnoreCase);
 
         features["path:probe"] = isProbe ? 1.0f : 0.0f;
         features["path:admin"] = isAdmin ? 1.0f : 0.0f;

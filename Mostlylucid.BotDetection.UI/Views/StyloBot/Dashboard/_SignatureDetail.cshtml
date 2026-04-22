@@ -1,4 +1,5 @@
 @using Mostlylucid.BotDetection.UI.Models
+@using Mostlylucid.BotDetection.UI.Helpers
 @model SignatureDetailModel
 @{
     Layout = null;
@@ -15,13 +16,7 @@
         _ => "text-success"
     };
 
-    string ActionColor(string? action) => action switch
-    {
-        "Block" or "Blocked" => "text-error",
-        "Throttle" or "throttle-stealth" => "text-warning",
-        "Challenge" => "text-warning",
-        _ => "text-success"
-    };
+    string ActionColor(string? action) => ActionDisplayHelper.GetCssClass(action);
 
     string ThreatColor(string? band) => band switch
     {
@@ -183,21 +178,7 @@ else
         {
             <div class="flex items-center gap-1.5 text-xs">
                 <span class="text-base-content/50">Policy:</span>
-                @{
-                    var friendlyAction = Model.Action switch
-                    {
-                        "throttle-stealth" => "Silent Throttle",
-                        "throttle" => "Throttle",
-                        "block" => "Block",
-                        "block-hard" => "Hard Block",
-                        "challenge" => "Challenge",
-                        "logonly" => "Monitor Only",
-                        "redirect-honeypot" => "Honeypot Redirect",
-                        "simulation-pack" => "Simulation Pack",
-                        _ => Model.Action
-                    };
-                }
-                <span class="font-bold @ActionColor(Model.Action)">@friendlyAction</span>
+                <span class="font-bold @ActionColor(Model.Action)">@ActionDisplayHelper.GetFriendlyName(Model.Action)</span>
             </div>
         }
     </div>
@@ -370,10 +351,7 @@ else
                                     <td class="py-1 text-right text-xs @(d.BotProbability >= 0.7 ? "text-error" : d.BotProbability >= 0.4 ? "text-warning" : "text-success")">@($"{d.BotProbability:P0}")</td>
                                     <td class="py-1 text-right text-xs text-base-content/60">@($"{d.Confidence:P0}")</td>
                                     <td class="py-1 text-[10px] @RiskColor(d.RiskBand)">@d.RiskBand</td>
-                                    @{
-                                        var dAction = d.Action switch { "throttle-stealth" => "Silent Throttle", "block-hard" => "Hard Block", "logonly" => "Monitor Only", "redirect-honeypot" => "Honeypot", "simulation-pack" => "Honeypot", _ => d.Action };
-                                    }
-                                    <td class="py-1 text-[10px] @ActionColor(d.Action)">@(dAction ?? "Allow")</td>
+                                    <td class="py-1 text-[10px] @ActionColor(d.Action)">@ActionDisplayHelper.GetFriendlyName(d.Action)</td>
                                     <td class="py-1 text-right text-[10px] text-base-content/40 font-mono">@($"{d.ProcessingTimeMs:F1}")ms</td>
                                 </tr>
                             }
@@ -521,21 +499,9 @@ else
                 }
                 @if (!string.IsNullOrEmpty(Model.Action))
                 {
-                    var friendlyAction2 = Model.Action switch
-                    {
-                        "throttle-stealth" => "Silent Throttle",
-                        "throttle" => "Throttle",
-                        "block" => "Block",
-                        "block-hard" => "Hard Block",
-                        "challenge" => "Challenge",
-                        "logonly" => "Monitor Only",
-                        "redirect-honeypot" => "Honeypot Redirect",
-                        "simulation-pack" => "Simulation Pack",
-                        _ => Model.Action
-                    };
                     <div>
                         <span class="text-sm text-base-content/50">Policy:</span>
-                        <span class="text-sm font-bold @ActionColor(Model.Action)">@friendlyAction2</span>
+                        <span class="text-sm font-bold @ActionColor(Model.Action)">@ActionDisplayHelper.GetFriendlyName(Model.Action)</span>
                     </div>
                 }
             </div>

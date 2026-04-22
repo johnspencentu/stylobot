@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Detectors;
 using Mostlylucid.BotDetection.Extensions;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Orchestration.Audit;
 using Mostlylucid.BotDetection.Services;
 
 namespace Mostlylucid.BotDetection.Test.Extensions;
@@ -106,6 +107,24 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
         var service = provider.GetService<IBotDetectionService>();
         Assert.NotNull(service);
+    }
+
+    [Fact]
+    public void AddBotDetection_RegistersAuditProcessorServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        AddTestDependencies(services);
+
+        // Act
+        services.AddBotDetection();
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        Assert.NotNull(provider.GetService<AuditProcessorDispatcher>());
+        Assert.NotNull(provider.GetService<IAuditRecordWriter>());
+        Assert.Contains(provider.GetServices<IAuditSink>(), sink => sink is LoggerAuditSink);
+        Assert.Contains(provider.GetServices<IAuditProcessor>(), processor => processor is ErrorSignalAuditProcessor);
     }
 
     [Fact]
