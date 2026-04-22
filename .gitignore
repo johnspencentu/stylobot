@@ -472,3 +472,4 @@ stylobot-react/
 *.playwright-mcp/
 docs/legacy/
 .worktrees/
+*.xml
