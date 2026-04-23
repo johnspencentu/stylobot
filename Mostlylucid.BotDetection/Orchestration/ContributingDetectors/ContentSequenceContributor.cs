@@ -37,6 +37,8 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     private readonly ILogger<ContentSequenceContributor> _logger;
     private readonly SequenceContextStore _contextStore;
     private readonly CentroidSequenceStore _centroidStore;
+    private readonly EndpointDivergenceTracker _divergenceTracker;
+    private readonly AssetHashStore? _assetHashStore;
     private readonly BotClusterService? _clusterService;
 
     // Phase windows (ms since window start): critical, mid, late, settled
@@ -60,12 +62,16 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         IDetectorConfigProvider configProvider,
         SequenceContextStore contextStore,
         CentroidSequenceStore centroidStore,
+        EndpointDivergenceTracker divergenceTracker,
+        AssetHashStore? assetHashStore = null,
         BotClusterService? clusterService = null)
         : base(configProvider)
     {
         _logger = logger;
         _contextStore = contextStore;
         _centroidStore = centroidStore;
+        _divergenceTracker = divergenceTracker;
+        _assetHashStore = assetHashStore;
         _clusterService = clusterService;
     }
 
@@ -181,6 +187,13 @@ public class ContentSequenceContributor : ConfiguredContributorBase
 
         var contentPath = request.Path.Value ?? "/";
 
+        // Track session for divergence rate analysis
+        _divergenceTracker.RecordSession(contentPath);
+
+        // Check if this path's asset hash changed recently (deploy happened)
+        var assetChanged = _assetHashStore?.IsRecentlyChanged(contentPath) ?? false;
+        var centroidStale = _centroidStore.IsEndpointStale(contentPath);
+
         _logger.LogDebug(
             "ContentSequence: document hit for {Signature}, chain={ChainId}, centroid={CentroidId}",
             signature, newCtx.ChainId, centroidId);
@@ -192,7 +205,9 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             new(SignalKeys.SequenceDivergenceScore, 0.0),
             new(SignalKeys.SequenceChainId, newCtx.ChainId),
             new(SignalKeys.SequenceCentroidType, chain.Type.ToString()),
-            new(SignalKeys.SequenceContentPath, contentPath)
+            new(SignalKeys.SequenceContentPath, contentPath),
+            new(SignalKeys.SequenceCentroidStale, centroidStale),
+            new(SignalKeys.AssetContentChanged, assetChanged)
         ]);
 
         return new[] { NeutralContribution("Sequence", $"Document hit — sequence reset at {contentPath}") };
@@ -234,6 +249,24 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         var hasDiverged = divergenceScore >= DivergenceThreshold;
         var divergenceCount = ctx.DivergenceCount + (hasDiverged && !ctx.HasDiverged ? 1 : 0);
 
+        // On divergence: record for staleness tracking; if rate exceeds threshold, mark centroid stale
+        if (hasDiverged)
+        {
+            var contentPath = state.GetSignal<string>(SignalKeys.SequenceContentPath) ?? string.Empty;
+            if (!string.IsNullOrEmpty(contentPath))
+            {
+                _divergenceTracker.RecordDivergence(contentPath);
+                if (_divergenceTracker.IsStale(contentPath))
+                {
+                    _centroidStore.MarkEndpointStale(contentPath);
+                    _divergenceTracker.Reset(contentPath);
+                    _logger.LogInformation(
+                        "ContentSequence: divergence rate threshold exceeded for {Path} — marking centroid stale",
+                        contentPath);
+                }
+            }
+        }
+
         // SignalR expected: next step in chain is SignalR AND centroid is not Bot
         var signalRExpected = IsSignalRExpected(ctx, position);
 
@@ -263,7 +296,9 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             new(SignalKeys.SequenceDivergenceScore, divergenceScore),
             new(SignalKeys.SequenceChainId, ctx.ChainId),
             new(SignalKeys.SequenceCentroidType, ctx.CentroidType.ToString()),
-            new(SignalKeys.SequenceCacheWarm, cacheWarm)
+            new(SignalKeys.SequenceCacheWarm, cacheWarm),
+            new(SignalKeys.SequenceCentroidStale, _centroidStore.IsEndpointStale(
+                state.GetSignal<string>(SignalKeys.SequenceContentPath) ?? string.Empty))
         ]);
 
         if (isPrefetch)

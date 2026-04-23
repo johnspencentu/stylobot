@@ -594,6 +594,7 @@ public static class ServiceCollectionExtensions
             var logger = sp.GetRequiredService<ILogger<CentroidSequenceStore>>();
             return new CentroidSequenceStore(sessionStore.ConnectionString, logger);
         });
+        services.TryAddSingleton<EndpointDivergenceTracker>();
         services.AddSingleton<IContributingDetector, ContentSequenceContributor>();
         services.AddHostedService<CentroidSequenceRebuildHostedService>();
         // Constrained LLM description coordinator (KeyedSequentialAtom, 50% CPU concurrency)
