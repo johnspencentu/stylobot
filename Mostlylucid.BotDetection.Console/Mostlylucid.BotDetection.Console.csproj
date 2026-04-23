@@ -51,6 +51,7 @@
         <ProjectReference Include="..\Mostlylucid.BotDetection.Llm.Ollama\Mostlylucid.BotDetection.Llm.Ollama.csproj" />
         <ProjectReference Include="..\Mostlylucid.BotDetection.Llm.Cloud\Mostlylucid.BotDetection.Llm.Cloud.csproj" />
         <ProjectReference Include="..\Mostlylucid.BotDetection.Llm.LlamaSharp\Mostlylucid.BotDetection.Llm.LlamaSharp.csproj" />
+        <ProjectReference Include="..\Mostlylucid.BotDetection.Llm.Tunnel\Mostlylucid.BotDetection.Llm.Tunnel.csproj" />
     </ItemGroup>
 
     <ItemGroup>

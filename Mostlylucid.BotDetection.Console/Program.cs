@@ -47,6 +47,15 @@ switch (firstArg)
     case "man":
         ShowManPage();
         return 0;
+    case "llmtunnel":
+        return await LlmTunnelCommand.RunAsync(cmdArgs);
+}
+
+// llmtunnel also accepts as a flag form: --llm-tunnel or -llmtunnel
+if (cmdArgs.Any(a => a.Equals("-llmtunnel", StringComparison.OrdinalIgnoreCase)
+                  || a.Equals("--llm-tunnel", StringComparison.OrdinalIgnoreCase)))
+{
+    return await LlmTunnelCommand.RunAsync(cmdArgs);
 }
 
 // Show help if no args or --help
@@ -67,6 +76,14 @@ if (cmdArgs.Length <= 1 || cmdArgs.Contains("--help") || cmdArgs.Contains("-h"))
     Console.WriteLine("    stylobot status                             Check if daemon is running");
     Console.WriteLine("    stylobot logs                               Show recent log output");
     Console.WriteLine("    stylobot man                                Full reference manual");
+    Console.WriteLine("    stylobot llmtunnel [token] [opts]           Start local LLM agent + Cloudflare tunnel");
+    Console.WriteLine();
+    Console.WriteLine("  LLM Tunnel Options:");
+    Console.WriteLine("    --ollama <url>              Local Ollama URL (default: http://127.0.0.1:11434)");
+    Console.WriteLine("    --models <csv>              Comma-separated model allowlist");
+    Console.WriteLine("    --max-concurrency <n>       Max concurrent inference requests (default: 2)");
+    Console.WriteLine("    --max-context <tokens>      Max context tokens (default: 8192)");
+    Console.WriteLine("    --agent-port <port>         Loopback agent port (default: random)");
     Console.WriteLine();
     Console.WriteLine("  Options:");
     Console.WriteLine("    --port <port>               Port to listen on (default: 5080)");
@@ -852,7 +869,7 @@ try
     Process? tunnelProcess = null;
     if (tunnelEnabled)
     {
-        tunnelProcess = LaunchCloudflaredTunnel(port, scheme, tunnelToken, url => tunnelUrl = url);
+        tunnelProcess = CloudflaredTunnelLauncher.Launch(portNumber, scheme, tunnelToken, url => tunnelUrl = url);
     }
 
     // Start live detection table (replaces verbose log output)
@@ -948,6 +965,35 @@ static void ShowManPage()
         [bold]status[/]    Check if daemon is running + hit /health
         [bold]logs[/]      Show recent log output
         [bold]man[/]       This manual page
+
+        [bold]llmtunnel[/] [[token]]
+                  Start a local LLM agent and Cloudflare tunnel so a remote StyloBot
+                  site can use your local GPU for bot classification.
+                  'token' is an optional named Cloudflare tunnel token.
+                  Without it, an anonymous quick tunnel is used.
+
+        [bold]LLM Tunnel Options[/]
+          [bold]--ollama[/] <url>         Local Ollama URL (default: http://127.0.0.1:11434)
+          [bold]--models[/] <csv>         Comma-separated model allowlist
+          [bold]--max-concurrency[/] <n>  Max concurrent inference requests (default: 2)
+          [bold]--max-context[/] <tokens> Max context tokens (default: 8192)
+          [bold]--agent-port[/] <port>    Loopback agent port (default: random)
+
+        [bold]LLM Tunnel Examples[/]
+          stylobot llmtunnel
+          stylobot llmtunnel eyJhIjoiNjQ2...              Named permanent tunnel
+          stylobot llmtunnel --models llama3.2:3b,qwen2.5:14b
+          stylobot llmtunnel --max-concurrency 4 --max-context 16384
+
+        [bold]LLM Tunnel Security[/]
+          - Anonymous tunnel URLs are NOT credentials. The connection key IS.
+          - Connection keys are sensitive. Treat them like API keys.
+          - Named Cloudflare tunnels provide stable hostnames for production use.
+          - Quick tunnels are ephemeral: re-import the key after each restart.
+          - Imported nodes can be revoked via DELETE /api/v1/llm-nodes/[[nodeId]].
+          - Every inference request is signed and replay-protected (30s TTL).
+          - Raw Ollama endpoints are never exposed through the tunnel.
+          - Optional AES-GCM payload encryption can be enabled for stronger privacy.
 
     [bold]OPTIONS[/]
         [bold]--port[/] <port>                   Listen port (alternative to positional)
@@ -1179,98 +1225,6 @@ static string BuildDemoClientCallbackJson(
     writer.Flush();
 
     return Encoding.UTF8.GetString(stream.ToArray());
-}
-
-// Launch cloudflared tunnel subprocess
-static Process? LaunchCloudflaredTunnel(string port, string scheme, string? token, Action<string>? onTunnelUrl = null)
-{
-    // Check cloudflared is installed
-    try
-    {
-        var check = Process.Start(new ProcessStartInfo
-        {
-            FileName = "cloudflared",
-            Arguments = "version",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        });
-        check?.WaitForExit(5000);
-        if (check is null || check.ExitCode != 0)
-        {
-            Log.Error("cloudflared not found. Install: brew install cloudflared (macOS) | apt install cloudflared (Linux) | winget install Cloudflare.cloudflared (Windows)");
-            return null;
-        }
-    }
-    catch
-    {
-        Log.Error("cloudflared not found. Install: brew install cloudflared (macOS) | apt install cloudflared (Linux) | winget install Cloudflare.cloudflared (Windows)");
-        return null;
-    }
-
-    ProcessStartInfo psi;
-    if (token != null)
-    {
-        // Named tunnel with pre-configured token
-        Log.Information("Starting Cloudflare named tunnel...");
-        psi = new ProcessStartInfo
-        {
-            FileName = "cloudflared",
-            Arguments = $"tunnel run --token {token}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-    }
-    else
-    {
-        // Quick tunnel (random *.trycloudflare.com URL)
-        Log.Information("Starting Cloudflare quick tunnel...");
-        psi = new ProcessStartInfo
-        {
-            FileName = "cloudflared",
-            Arguments = $"tunnel --url {scheme}://localhost:{port}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-    }
-
-    var process = Process.Start(psi);
-    if (process == null)
-    {
-        Log.Error("Failed to start cloudflared process");
-        return null;
-    }
-
-    // Log tunnel output in background (tunnel URL appears in stderr)
-    _ = Task.Run(async () =>
-    {
-        while (!process.HasExited)
-        {
-            var line = await process.StandardError.ReadLineAsync();
-            if (line != null)
-            {
-                // Look for the tunnel URL in output
-                if (line.Contains(".trycloudflare.com") || line.Contains("Registered tunnel connection"))
-                {
-                    Log.Information("  ✓ Tunnel: {TunnelInfo}", line.Trim());
-                    // Extract URL from the line (e.g., "https://foo-bar.trycloudflare.com")
-                    var match = System.Text.RegularExpressions.Regex.Match(line, @"(https://[^\s|]+\.trycloudflare\.com)");
-                    if (match.Success) onTunnelUrl?.Invoke(match.Groups[1].Value);
-                }
-                else if (line.Contains("ERR"))
-                    Log.Warning("[cloudflared] {Line}", line.Trim());
-                else
-                    Log.Debug("[cloudflared] {Line}", line.Trim());
-            }
-        }
-    });
-
-    return process;
 }
 
 file sealed record DemoClientSideSession(

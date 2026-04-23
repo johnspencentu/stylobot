@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mostlylucid.BotDetection.Api.Auth;
 using Mostlylucid.BotDetection.Api.Endpoints;
 using Mostlylucid.BotDetection.Api.Middleware;
+using Mostlylucid.BotDetection.Llm.Tunnel;
 
 namespace Mostlylucid.BotDetection.Api;
 
@@ -32,6 +34,8 @@ public static class StyloBotApiExtensions
             services.AddOpenApi();
         }
 
+        services.TryAddSingleton<ILlmNodeRegistry, InMemoryLlmNodeRegistry>();
+
         return services;
     }
 
@@ -42,6 +46,7 @@ public static class StyloBotApiExtensions
         endpoints.MapDetectEndpoints();
         endpoints.MapReadEndpoints();
         endpoints.MapMeEndpoints();
+        endpoints.MapLlmNodeControllerEndpoints();
 
         if (options.EnableOpenApi)
         {

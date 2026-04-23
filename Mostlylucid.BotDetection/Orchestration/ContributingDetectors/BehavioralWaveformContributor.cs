@@ -46,19 +46,12 @@ public partial class BehavioralWaveformContributor : ConfiguredContributorBase
     public override string Name => "BehavioralWaveform";
     public override int Priority => Manifest?.Priority ?? 3;
 
-    private static readonly AnyOfTrigger SequenceGuard = new([
-        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
-        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
-    ]);
-
     // Requires basic Wave 0 detection to have completed (UA signal is always present after Wave 0)
     // SequenceGuard: skip when on-track at positions 0-2 (not enough data for meaningful signal).
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
         new SignalExistsTrigger(SignalKeys.UserAgent),
-        SequenceGuard
+        SequenceGuardTrigger.Default
     ];
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(

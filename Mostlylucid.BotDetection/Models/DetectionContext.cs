@@ -1254,4 +1254,10 @@ public static class SignalKeys
 
     /// <summary>Bool: true when no static assets appeared in the critical window — cache warm hit.</summary>
     public const string SequenceCacheWarm = "sequence.cache_warm";
+
+    /// <summary>Bool: true when divergence rate for this endpoint is high enough to indicate content changed.</summary>
+    public const string SequenceCentroidStale = "sequence.centroid_stale";
+
+    /// <summary>Bool: true when a static asset's content fingerprint (ETag/Last-Modified) changed since last recorded.</summary>
+    public const string AssetContentChanged = "asset.content_changed";
 }

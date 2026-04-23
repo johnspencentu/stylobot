@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Analysis;
@@ -37,6 +38,8 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     private readonly ILogger<ContentSequenceContributor> _logger;
     private readonly SequenceContextStore _contextStore;
     private readonly CentroidSequenceStore _centroidStore;
+    private readonly EndpointDivergenceTracker _divergenceTracker;
+    private readonly AssetHashStore? _assetHashStore;
     private readonly BotClusterService? _clusterService;
 
     // Phase windows (ms since window start): critical, mid, late, settled
@@ -60,12 +63,16 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         IDetectorConfigProvider configProvider,
         SequenceContextStore contextStore,
         CentroidSequenceStore centroidStore,
+        EndpointDivergenceTracker divergenceTracker,
+        AssetHashStore? assetHashStore = null,
         BotClusterService? clusterService = null)
         : base(configProvider)
     {
         _logger = logger;
         _contextStore = contextStore;
         _centroidStore = centroidStore;
+        _divergenceTracker = divergenceTracker;
+        _assetHashStore = assetHashStore;
         _clusterService = clusterService;
     }
 
@@ -76,14 +83,16 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
     // Config-driven parameters
-    // Consumed by deferred detectors' AnyOfTrigger sequence guards (Task 8), not used here.
-    // Declared here so all sequence configuration lives in one YAML section.
-    private int DeferredDetectorMinPosition => GetParam("deferred_detector_min_position", 3);
     private double DivergenceThreshold => GetParam("divergence_threshold", 0.4);
     private double TimingToleranceMultiplier => GetParam("timing_tolerance_multiplier", 3.0);
     private int MinCentroidSampleSize => GetParam("min_centroid_sample_size", 20);
     private int SessionGapMinutes => GetParam("session_gap_minutes", 30);
     private int MaxTrackedPositions => GetParam("max_tracked_positions", 20);
+    private double MachineSpeedThresholdMs => GetParam("machine_speed_threshold_ms", 20.0);
+    private double MachineSpeedScore => GetParam("machine_speed_score", 0.4);
+    private double UnexpectedStateScore => GetParam("unexpected_state_score", 0.5);
+    private double HighRequestCountScore => GetParam("high_request_count_score", 0.3);
+    private int HighRequestCountThreshold => GetParam("high_request_count_threshold", 50);
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
         BlackboardState state,
@@ -160,6 +169,8 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         // Resolve the best available chain for this fingerprint
         var (chain, centroidId) = ResolveChain(signature);
 
+        var contentPath = request.Path.Value ?? "/";
+
         // Build fresh context at position 0
         var newCtx = ctx with
         {
@@ -172,14 +183,20 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             WindowStartTime = DateTimeOffset.UtcNow,
             RequestCountInWindow = 1,
             LastRequest = DateTimeOffset.UtcNow,
-            ObservedStateSet = [],
+            ObservedStateSet = ImmutableHashSet<RequestState>.Empty,
             HasDiverged = false,
             DivergenceCount = 0,
-            CacheWarm = false
+            CacheWarm = false,
+            ContentPath = contentPath
         };
         _contextStore.Update(signature, newCtx);
 
-        var contentPath = request.Path.Value ?? "/";
+        // Track session for divergence rate analysis
+        _divergenceTracker.RecordSession(contentPath);
+
+        // Check if this path's asset hash changed recently (deploy happened)
+        var assetChanged = _assetHashStore?.IsRecentlyChanged(contentPath) ?? false;
+        var centroidStale = _centroidStore.IsEndpointStale(contentPath);
 
         _logger.LogDebug(
             "ContentSequence: document hit for {Signature}, chain={ChainId}, centroid={CentroidId}",
@@ -192,7 +209,9 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             new(SignalKeys.SequenceDivergenceScore, 0.0),
             new(SignalKeys.SequenceChainId, newCtx.ChainId),
             new(SignalKeys.SequenceCentroidType, chain.Type.ToString()),
-            new(SignalKeys.SequenceContentPath, contentPath)
+            new(SignalKeys.SequenceContentPath, contentPath),
+            new(SignalKeys.SequenceCentroidStale, centroidStale),
+            new(SignalKeys.AssetContentChanged, assetChanged)
         ]);
 
         return new[] { NeutralContribution("Sequence", $"Document hit — sequence reset at {contentPath}") };
@@ -215,7 +234,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         var position = Math.Min(ctx.Position + 1, MaxTrackedPositions);
 
         // Track observed states (prefetch requests are recorded but not used for divergence scoring)
-        var observedSet = new HashSet<RequestState>(ctx.ObservedStateSet) { requestState };
+        var observedSet = ctx.ObservedStateSet.Add(requestState);
 
         // Phase window detection
         var phaseIndex = GetPhaseIndex(elapsedMs);
@@ -233,6 +252,24 @@ public class ContentSequenceContributor : ConfiguredContributorBase
 
         var hasDiverged = divergenceScore >= DivergenceThreshold;
         var divergenceCount = ctx.DivergenceCount + (hasDiverged && !ctx.HasDiverged ? 1 : 0);
+
+        // On divergence: record for staleness tracking; if rate exceeds threshold, mark centroid stale
+        if (hasDiverged)
+        {
+            var contentPath = ctx.ContentPath;
+            if (!string.IsNullOrEmpty(contentPath))
+            {
+                _divergenceTracker.RecordDivergence(contentPath);
+                if (_divergenceTracker.IsStale(contentPath))
+                {
+                    _centroidStore.MarkEndpointStale(contentPath);
+                    _divergenceTracker.Reset(contentPath);
+                    _logger.LogInformation(
+                        "ContentSequence: divergence rate threshold exceeded for {Path} — marking centroid stale",
+                        contentPath);
+                }
+            }
+        }
 
         // SignalR expected: next step in chain is SignalR AND centroid is not Bot
         var signalRExpected = IsSignalRExpected(ctx, position);
@@ -263,7 +300,8 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             new(SignalKeys.SequenceDivergenceScore, divergenceScore),
             new(SignalKeys.SequenceChainId, ctx.ChainId),
             new(SignalKeys.SequenceCentroidType, ctx.CentroidType.ToString()),
-            new(SignalKeys.SequenceCacheWarm, cacheWarm)
+            new(SignalKeys.SequenceCacheWarm, cacheWarm),
+            new(SignalKeys.SequenceCentroidStale, _centroidStore.IsEndpointStale(ctx.ContentPath))
         ]);
 
         if (isPrefetch)
@@ -310,10 +348,10 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     {
         double score = 0.0;
 
-        // Machine-speed timing: sub-20ms between requests is bot-like
+        // Machine-speed timing: sub-threshold ms between requests is bot-like
         var msSinceLastRequest = (DateTimeOffset.UtcNow - ctx.LastRequest).TotalMilliseconds;
-        if (msSinceLastRequest < 20.0)
-            score += 0.4;
+        if (msSinceLastRequest < MachineSpeedThresholdMs)
+            score += MachineSpeedScore;
 
         // State not in expected set for this phase
         // Exception: if cache-warm and ApiCall in critical window, don't penalise
@@ -322,12 +360,12 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         {
             var isCacheWarmException = cacheWarm && requestState == RequestState.ApiCall;
             if (!isCacheWarmException)
-                score += 0.5;
+                score += UnexpectedStateScore;
         }
 
         // High request volume in window
-        if (ctx.RequestCountInWindow > 50)
-            score += 0.3;
+        if (ctx.RequestCountInWindow > HighRequestCountThreshold)
+            score += HighRequestCountScore;
 
         return Math.Min(score, 1.0);
     }

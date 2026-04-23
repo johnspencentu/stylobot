@@ -46,6 +46,23 @@ internal sealed class CentroidSequenceRebuildHostedService : IHostedService
         IReadOnlyList<BotCluster> clusters,
         IReadOnlyList<SignatureBehavior> behaviors)
     {
-        _ = _centroidStore.RebuildAsync(clusters, CancellationToken.None);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _centroidStore.RebuildAsync(clusters, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CentroidSequenceStore rebuild failed after cluster update");
+            }
+        });
     }
+}
+
+/// <summary>Calls AssetHashStore.InitializeAsync on startup to create the SQLite table.</summary>
+internal sealed class AssetHashInitHostedService(AssetHashStore store) : IHostedService
+{
+    public Task StartAsync(CancellationToken ct) => store.InitializeAsync(ct);
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
 }

@@ -594,8 +594,17 @@ public static class ServiceCollectionExtensions
             var logger = sp.GetRequiredService<ILogger<CentroidSequenceStore>>();
             return new CentroidSequenceStore(sessionStore.ConnectionString, logger);
         });
+        services.TryAddSingleton<EndpointDivergenceTracker>();
+        services.AddSingleton(sp =>
+        {
+            var sessionStore = (Data.SqliteSessionStore)sp.GetRequiredService<Data.ISessionStore>();
+            var centroidStore = sp.GetRequiredService<CentroidSequenceStore>();
+            var logger = sp.GetRequiredService<ILogger<AssetHashStore>>();
+            return new AssetHashStore(sessionStore.ConnectionString, centroidStore, logger);
+        });
         services.AddSingleton<IContributingDetector, ContentSequenceContributor>();
         services.AddHostedService<CentroidSequenceRebuildHostedService>();
+        services.AddHostedService<AssetHashInitHostedService>();
         // Constrained LLM description coordinator (KeyedSequentialAtom, 50% CPU concurrency)
         services.AddSingleton<LlmDescriptionCoordinator>();
         // LLM-based cluster descriptions (background, never in request pipeline)

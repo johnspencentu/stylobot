@@ -2267,6 +2267,7 @@ public static class BotDetectionMiddlewareExtensions
     /// </example>
     public static IApplicationBuilder UseBotDetection(this IApplicationBuilder builder)
     {
+        builder.UseMiddleware<AssetHashMiddleware>();
         return builder.UseMiddleware<BotDetectionMiddleware>();
     }
 }

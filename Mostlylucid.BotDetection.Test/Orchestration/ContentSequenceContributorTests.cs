@@ -80,6 +80,8 @@ public class ContentSequenceContributorTests : IDisposable
             new StubConfigProvider(configParams),
             _contextStore,
             _centroidStore,
+            new EndpointDivergenceTracker(),
+            assetHashStore: null,
             clusterService);
 
     private static BlackboardState CreateState(
