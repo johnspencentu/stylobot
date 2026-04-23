@@ -1,6 +1,6 @@
 # StyloBot Release Notes
 
-## v6.0.1-beta1 — 2026-04-23
+## v6.0.1-beta.0 — 2026-04-23
 
 ### New: Content Sequence Detection
 
@@ -39,19 +39,6 @@ Centroid Freshness detects this situation and suppresses divergence scoring for 
 Full documentation: `docs/centroid-freshness.md`
 
 ---
-
-### Test Site Refresh
-
-The `Mostlylucid.BotDetection.Demo` project has been stripped of its outdated web UI. It now acts purely as an API simulator: run it, fire requests at it, check the dashboard. Four new BDF scenarios cover the content sequence feature:
-
-```bash
-dotnet run --project Mostlylucid.BotDetection.Demo
-./scripts/soak/run-sequence-bdf.sh
-```
-
----
-
-## v6.0.1-beta.0 — 2026-04-23
 
 ### New: Local LLM GPU Tunnel
 

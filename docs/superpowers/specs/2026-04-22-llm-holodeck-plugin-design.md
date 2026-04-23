@@ -45,10 +45,10 @@ builder.Services.AddLlmHolodeck();     // registers IHolodeckResponder
 
 // Node WITHOUT LLM (detection only, static templates)
 builder.Services.AddBotDetection();
-// No AddLlmHolodeck() — IHolodeckResponder is null, static templates served
+// No AddLlmHolodeck()- IHolodeckResponder is null, static templates served
 ```
 
-`SimulationPackResponder` resolves `IHolodeckResponder` via `GetService<IHolodeckResponder>()`. If null or `IsAvailable == false`, it serves static `template.Body`. No hard dependency. Future multi-node deployments assign LLM capability to specific nodes — nodes without `AddLlmHolodeck()` serve static templates automatically.
+`SimulationPackResponder` resolves `IHolodeckResponder` via `GetService<IHolodeckResponder>()`. If null or `IsAvailable == false`, it serves static `template.Body`. No hard dependency. Future multi-node deployments assign LLM capability to specific nodes- nodes without `AddLlmHolodeck()` serve static templates automatically.
 
 ---
 
@@ -114,7 +114,7 @@ if (template.Dynamic && _holodeckResponder?.IsAvailable == true)
 }
 else
 {
-    // Static fallback — embed canary via placeholder replacement
+    // Static fallback- embed canary via placeholder replacement
     var body = template.Body;
     if (canary != null)
         body = body.Replace("{{nonce}}", canary)
@@ -237,9 +237,9 @@ Mostlylucid.BotDetection.Llm.Holodeck/
 
 ### Dependencies
 
-- `Mostlylucid.BotDetection` — for `SimulationPack`, `PackResponseTemplate`, `IActionPolicy`
-- `Mostlylucid.BotDetection.Llm` — for `ILlmProvider`, `LlmRequest`
-- No dependency on `Mostlylucid.BotDetection.ApiHolodeck` — the interface `IHolodeckResponder` is defined in the core project or in this plugin
+- `Mostlylucid.BotDetection`- for `SimulationPack`, `PackResponseTemplate`, `IActionPolicy`
+- `Mostlylucid.BotDetection.Llm`- for `ILlmProvider`, `LlmRequest`
+- No dependency on `Mostlylucid.BotDetection.ApiHolodeck`- the interface `IHolodeckResponder` is defined in the core project or in this plugin
 
 ### Modified files (outside the new package)
 
@@ -266,16 +266,16 @@ Mostlylucid.BotDetection.Llm.Holodeck/
 }
 ```
 
-No LLM endpoint config — it uses whatever `ILlmProvider` is already registered.
+No LLM endpoint config- it uses whatever `ILlmProvider` is already registered.
 
 ---
 
 ## What Does NOT Change
 
-- `ILlmProvider` interface — untouched, consumed as-is
-- Existing LLM providers (Ollama, LlamaSharp, Cloud) — untouched
-- `SimulationPack` YAML format — unchanged (just `PromptPersonality` field added to C# model)
-- `BeaconCanaryGenerator` / `BeaconStore` — untouched, canaries still work the same
-- `HolodeckCoordinator` — still gates engagements per fingerprint
-- `HoneypotPathTagger` — still tags paths pre-detection
-- Detection pipeline — untouched
+- `ILlmProvider` interface- untouched, consumed as-is
+- Existing LLM providers (Ollama, LlamaSharp, Cloud)- untouched
+- `SimulationPack` YAML format- unchanged (just `PromptPersonality` field added to C# model)
+- `BeaconCanaryGenerator` / `BeaconStore`- untouched, canaries still work the same
+- `HolodeckCoordinator`- still gates engagements per fingerprint
+- `HoneypotPathTagger`- still tags paths pre-detection
+- Detection pipeline- untouched

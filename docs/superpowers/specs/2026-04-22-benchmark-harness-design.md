@@ -75,7 +75,7 @@ tags: [pipeline, human]
 
 ## C# Architecture
 
-### `BenchmarkScenario.cs` — YAML model and state builder
+### `BenchmarkScenario.cs`- YAML model and state builder
 
 Deserializes `*.benchmark.yaml` into a typed model. Core method:
 
@@ -87,7 +87,7 @@ Constructs `DefaultHttpContext` from `request` fields (reuses the same pattern a
 
 `ToString()` returns `Name` for BenchmarkDotNet display.
 
-### `BenchmarkScenarioLoader.cs` — File discovery
+### `BenchmarkScenarioLoader.cs`- File discovery
 
 ```csharp
 public static class BenchmarkScenarioLoader
@@ -100,7 +100,7 @@ public static class BenchmarkScenarioLoader
 
 Globs `**/*.benchmark.yaml`, deserializes with YamlDotNet, returns sorted by detector name then scenario name.
 
-### `DetectorBenchmarkRunner.cs` — Individual detector benchmarks
+### `DetectorBenchmarkRunner.cs`- Individual detector benchmarks
 
 ```csharp
 [MemoryDiagnoser]
@@ -136,11 +136,11 @@ public class DetectorBenchmarkRunner
 }
 ```
 
-### `PipelineBenchmarkRunner.cs` — Full orchestrator benchmarks
+### `PipelineBenchmarkRunner.cs`- Full orchestrator benchmarks
 
 Same pattern but filters to `detector: _pipeline` scenarios and calls `BlackboardOrchestrator.DetectAsync(httpContext)`.
 
-### `RegressionChecker.cs` — Post-run threshold validation
+### `RegressionChecker.cs`- Post-run threshold validation
 
 After BenchmarkDotNet finishes, parses `BenchmarkDotNet.Artifacts/results/*.json`. For each scenario that has `thresholds`, compares actual results against limits. Prints violations and returns exit code 1 if any exceeded.
 
@@ -151,7 +151,7 @@ public static class RegressionChecker
 }
 ```
 
-### `Program.cs` — Entry point with CLI
+### `Program.cs`- Entry point with CLI
 
 ```csharp
 if (args.Contains("--regression"))
@@ -199,36 +199,36 @@ dotnet run -c Release -- --list
 Ship with scenarios covering the most performance-critical detectors:
 
 ### Fast-path detectors (should be <5µs each)
-- `header-human-chrome.benchmark.yaml` — HeaderContributor with standard browser
-- `header-bot-curl.benchmark.yaml` — HeaderContributor with curl UA
-- `useragent-human.benchmark.yaml` — UserAgentContributor with Chrome
-- `useragent-known-bot.benchmark.yaml` — UserAgentContributor with Googlebot
-- `ip-residential.benchmark.yaml` — IpContributor with residential IP
-- `ip-datacenter.benchmark.yaml` — IpContributor with datacenter signals
-- `fastpath-reputation-hit.benchmark.yaml` — FastPathReputationContributor with cached signature
-- `behavioral-normal.benchmark.yaml` — BehavioralContributor with typical human patterns
+- `header-human-chrome.benchmark.yaml`- HeaderContributor with standard browser
+- `header-bot-curl.benchmark.yaml`- HeaderContributor with curl UA
+- `useragent-human.benchmark.yaml`- UserAgentContributor with Chrome
+- `useragent-known-bot.benchmark.yaml`- UserAgentContributor with Googlebot
+- `ip-residential.benchmark.yaml`- IpContributor with residential IP
+- `ip-datacenter.benchmark.yaml`- IpContributor with datacenter signals
+- `fastpath-reputation-hit.benchmark.yaml`- FastPathReputationContributor with cached signature
+- `behavioral-normal.benchmark.yaml`- BehavioralContributor with typical human patterns
 
 ### Fingerprint detectors
-- `tls-chrome.benchmark.yaml` — TlsFingerprintContributor with Chrome JA3
-- `tls-bot.benchmark.yaml` — TlsFingerprintContributor with Python requests JA3
-- `http2-normal.benchmark.yaml` — Http2FingerprintContributor with standard settings
-- `multilayer-correlation.benchmark.yaml` — MultiLayerCorrelation with full signal set
+- `tls-chrome.benchmark.yaml`- TlsFingerprintContributor with Chrome JA3
+- `tls-bot.benchmark.yaml`- TlsFingerprintContributor with Python requests JA3
+- `http2-normal.benchmark.yaml`- Http2FingerprintContributor with standard settings
+- `multilayer-correlation.benchmark.yaml`- MultiLayerCorrelation with full signal set
 
 ### Session/advanced detectors
-- `session-vector-short.benchmark.yaml` — SessionVectorContributor with 5-request session
-- `inconsistency-mismatch.benchmark.yaml` — InconsistencyDetector with TLS/UA mismatch
-- `heuristic-features.benchmark.yaml` — HeuristicFeatureExtractor with full feature set
+- `session-vector-short.benchmark.yaml`- SessionVectorContributor with 5-request session
+- `inconsistency-mismatch.benchmark.yaml`- InconsistencyDetector with TLS/UA mismatch
+- `heuristic-features.benchmark.yaml`- HeuristicFeatureExtractor with full feature set
 
 ### Pipeline benchmarks
-- `pipeline-human-browsing.benchmark.yaml` — Full pipeline, human Chrome
-- `pipeline-obvious-bot.benchmark.yaml` — Full pipeline, curl bot
-- `pipeline-ai-scraper.benchmark.yaml` — Full pipeline, GPTBot
+- `pipeline-human-browsing.benchmark.yaml`- Full pipeline, human Chrome
+- `pipeline-obvious-bot.benchmark.yaml`- Full pipeline, curl bot
+- `pipeline-ai-scraper.benchmark.yaml`- Full pipeline, GPTBot
 
 ---
 
 ## What Changes in Existing Code
 
-- **`Mostlylucid.BotDetection.Benchmarks/`** — New files added alongside existing benchmark classes. Existing `IndividualDetectorBenchmarks.cs` and `DetectionPipelineBenchmarks.cs` are left as-is (they still work, just aren't YAML-driven). They can be removed later once the YAML harness proves out.
+- **`Mostlylucid.BotDetection.Benchmarks/`**- New files added alongside existing benchmark classes. Existing `IndividualDetectorBenchmarks.cs` and `DetectionPipelineBenchmarks.cs` are left as-is (they still work, just aren't YAML-driven). They can be removed later once the YAML harness proves out.
 - **No changes to the core detection library.**
 
 ---
@@ -242,5 +242,5 @@ After running benchmarks, the output tells you which detectors are hot. The tuni
 3. Profile with `--profiler ETW` or `--profiler diagnoser` for allocation details
 4. Make code changes to the detector
 5. Re-run the same benchmark
-6. Compare — BenchmarkDotNet's `--join` flag overlays runs for comparison
+6. Compare- BenchmarkDotNet's `--join` flag overlays runs for comparison
 7. If happy, update `thresholds` in the YAML to lock in the new baseline

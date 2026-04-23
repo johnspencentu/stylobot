@@ -284,7 +284,7 @@ public class RequestMarkovClassifierTests
 }
 ```
 
-- [ ] **Step 4: Run tests — expect them to pass**
+- [ ] **Step 4: Run tests- expect them to pass**
 
 ```bash
 dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~RequestMarkovClassifierTests" -v
@@ -337,7 +337,7 @@ public const string SequenceDivergenceAtPosition = "sequence.divergence_at_posit
 /// <summary>String: UUID identifying the current content sequence context.</summary>
 public const string SequenceChainId = "sequence.chain_id";
 
-/// <summary>String: centroid classification — "Unknown", "Human", or "Bot".</summary>
+/// <summary>String: centroid classification- "Unknown", "Human", or "Bot".</summary>
 public const string SequenceCentroidType = "sequence.centroid_type";
 
 /// <summary>String: path of the document that started this sequence.</summary>
@@ -349,7 +349,7 @@ public const string SequenceSignalRExpected = "sequence.signalr_expected";
 /// <summary>Bool: true when a prefetch request (Purpose: prefetch) is observed in the sequence.</summary>
 public const string SequencePrefetchDetected = "sequence.prefetch_detected";
 
-/// <summary>Bool: true when no static assets appeared in the critical window — cache warm hit.</summary>
+/// <summary>Bool: true when no static assets appeared in the critical window- cache warm hit.</summary>
 public const string SequenceCacheWarm = "sequence.cache_warm";
 ```
 
@@ -469,13 +469,13 @@ public class SequenceContextStoreTests
 }
 ```
 
-- [ ] **Step 2: Run tests — expect compile errors (type not yet defined)**
+- [ ] **Step 2: Run tests- expect compile errors (type not yet defined)**
 
 ```bash
 dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~SequenceContextStoreTests" 2>&1 | head -20
 ```
 
-Expected: Build error — `SequenceContextStore` and `CentroidType` not found.
+Expected: Build error- `SequenceContextStore` and `CentroidType` not found.
 
 - [ ] **Step 3: Create `SequenceContextStore.cs`**
 
@@ -488,7 +488,7 @@ using Mostlylucid.BotDetection.Analysis;
 namespace Mostlylucid.BotDetection.Services;
 
 /// <summary>
-///     Classification of a sequence context's centroid — human, bot, or unknown.
+///     Classification of a sequence context's centroid- human, bot, or unknown.
 /// </summary>
 public enum CentroidType { Unknown = 0, Human = 1, Bot = 2 }
 
@@ -517,7 +517,7 @@ public sealed record SequenceContext
 }
 
 /// <summary>
-///     Transient per-fingerprint sequence state. ConcurrentDictionary backed — no SQLite.
+///     Transient per-fingerprint sequence state. ConcurrentDictionary backed- no SQLite.
 ///     Loss on restart is acceptable: fingerprints just get a fresh context.
 ///     TTL sweep runs every 5 minutes, evicts entries older than the session gap.
 /// </summary>
@@ -594,7 +594,7 @@ public sealed class SequenceContextStore : IDisposable
 }
 ```
 
-- [ ] **Step 4: Run tests — expect them to pass**
+- [ ] **Step 4: Run tests- expect them to pass**
 
 ```bash
 dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~SequenceContextStoreTests" -v
@@ -621,7 +621,7 @@ This store manages two things:
 1. The hard-coded **Tier 1 global chain** (used on request 1 before any cluster data is available)
 2. The cluster-specific **Tier 2 chains** (persisted in SQLite, rebuilt when clustering runs)
 
-The Tier 2 rebuilding reads `BotCluster` data from `BotClusterService` and assigns expected chains based on cluster type. For the MVP, Bot and Human clusters get different hard-coded sequences (configurable from YAML). The important part is divergence detection, not per-cluster chain accuracy — that improves over time.
+The Tier 2 rebuilding reads `BotCluster` data from `BotClusterService` and assigns expected chains based on cluster type. For the MVP, Bot and Human clusters get different hard-coded sequences (configurable from YAML). The important part is divergence detection, not per-cluster chain accuracy- that improves over time.
 
 - [ ] **Step 1: Create `CentroidSequenceStore.cs`**
 
@@ -661,7 +661,7 @@ public sealed class CentroidSequenceStore
     private readonly ILogger<CentroidSequenceStore> _logger;
 
     // Global fallback chain (Tier 1): typical human sequence from PageView.
-    // Hard-coded sensible defaults — configurable by the caller via SetGlobalChain().
+    // Hard-coded sensible defaults- configurable by the caller via SetGlobalChain().
     private CentroidSequence _globalChain = new()
     {
         CentroidId = "global",
@@ -1063,7 +1063,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             var signature = state.GetSignal<string>(SignalKeys.PrimarySignature);
             if (string.IsNullOrEmpty(signature))
             {
-                // No signature yet — write sequence.position not present, deferred detectors run normally
+                // No signature yet- write sequence.position not present, deferred detectors run normally
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
             }
 
@@ -1073,13 +1073,13 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             if (ctx.Position == 0 && !isDocument)
             {
                 // Non-document entry point (e.g., direct API call, bot starting mid-sequence)
-                // Do not write sequence signals — deferred detectors will run via NotExists fallback
+                // Do not write sequence signals- deferred detectors will run via NotExists fallback
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
             }
 
             if (isDocument && ctx.Position == 0)
             {
-                // Request 1: document hit — start the sequence
+                // Request 1: document hit- start the sequence
                 ctx = HandleDocumentHit(state, signature, ctx);
             }
             else if (ctx.Position > 0 && ctx.Position < MaxTrackedPositions)
@@ -1089,7 +1089,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             }
             else if (ctx.Position >= MaxTrackedPositions)
             {
-                // Sequence too long — stop tracking, let all detectors run freely
+                // Sequence too long- stop tracking, let all detectors run freely
                 state.WriteSignal(SignalKeys.SequencePosition, ctx.Position);
                 state.WriteSignal(SignalKeys.SequenceOnTrack, false);
                 return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
@@ -1100,7 +1100,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "ContentSequenceContributor error — deferred detectors will run normally");
+            _logger.LogWarning(ex, "ContentSequenceContributor error- deferred detectors will run normally");
             // Do NOT write sequence signals on error; deferred detectors use NotExists fallback
         }
 
@@ -1109,7 +1109,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
 
     /// <summary>
     ///     Returns true if this request is an HTML document navigation.
-    ///     Checked in priority order — Sec-Fetch-Mode is most reliable.
+    ///     Checked in priority order- Sec-Fetch-Mode is most reliable.
     /// </summary>
     private static bool IsDocumentRequest(BlackboardState state)
     {
@@ -1337,7 +1337,7 @@ public async Task Cache_warm_browser_skipping_assets_does_not_diverge()
     var state1 = BuildDocumentState(sig);
     await contributor.ContributeAsync(state1);
 
-    // Jump forward 600ms (past the 500ms critical window) — assets came from cache
+    // Jump forward 600ms (past the 500ms critical window)- assets came from cache
     store.Update(sig, store.TryGet(sig)! with
     {
         Position = 0,
@@ -1442,7 +1442,7 @@ private static BlackboardState BuildStaticAssetState(string signature = "test-si
 }
 ```
 
-- [ ] **Step 2: Run tests — expect them to fail**
+- [ ] **Step 2: Run tests- expect them to fail**
 
 ```bash
 dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~ContentSequenceContributorTests" 2>&1 | tail -20
@@ -1485,7 +1485,7 @@ Replace the existing `ComputeDivergenceScore` and `HandleContinuation` methods w
 // Phase window boundaries (ms since document hit or last window open)
 private static readonly double[] PhaseThresholdsMs = [500, 2000, 30_000];
 
-// Expected state sets per phase — index matches PhaseThresholdsMs
+// Expected state sets per phase- index matches PhaseThresholdsMs
 private static readonly RequestState[][] PhaseExpectedSets =
 [
     // Critical (0-500ms): static assets + page views (preload)
@@ -1558,7 +1558,7 @@ private SequenceContext HandleContinuation(
     var cacheWarm = ctx.CacheWarm;
     if (!cacheWarm && phaseIndex > 0 && !ctx.ObservedStateSet.Contains(RequestState.StaticAsset))
     {
-        // Critical window has passed, no static assets seen — likely cache warm
+        // Critical window has passed, no static assets seen- likely cache warm
         cacheWarm = true;
     }
 
@@ -1605,7 +1605,7 @@ if (ctx.CacheWarm)
     state.WriteSignal(SignalKeys.SequenceCacheWarm, true);
 ```
 
-- [ ] **Step 5: Run tests — expect all to pass**
+- [ ] **Step 5: Run tests- expect all to pass**
 
 ```bash
 dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~ContentSequenceContributorTests" -v
@@ -1878,7 +1878,7 @@ Expected: All 9 tests PASS.
 
 ```bash
 git add Mostlylucid.BotDetection.Test/Orchestration/ContentSequenceContributorTests.cs
-git commit -m "test: ContentSequenceContributor — document detection, position, divergence"
+git commit -m "test: ContentSequenceContributor- document detection, position, divergence"
 ```
 
 ---
@@ -1890,14 +1890,14 @@ git commit -m "test: ContentSequenceContributor — document detection, position
 - Modify: `Mostlylucid.BotDetection/Orchestration/ContributingDetectors/PeriodicityContributor.cs`
 - Modify: `Mostlylucid.BotDetection/Orchestration/ContributingDetectors/BehavioralWaveformContributor.cs`
 
-These three detectors are contractually useless at sequence position 0 — they need N>1 requests to produce meaningful signal. Add an `AnyOfTrigger` that skips them when the visitor is on-track early in the sequence, but always lets them run when: diverged, past position 3, or sequence signals are absent (direct API entry).
+These three detectors are contractually useless at sequence position 0- they need N>1 requests to produce meaningful signal. Add an `AnyOfTrigger` that skips them when the visitor is on-track early in the sequence, but always lets them run when: diverged, past position 3, or sequence signals are absent (direct API entry).
 
 The existing `TriggerConditions` on each detector return a plain array (All must satisfy). The new pattern wraps the sequence-aware skip logic using `AnyOfTrigger`:
 
 ```csharp
 // The sequence guard: run if ANY of these is true:
 // - sequence.position doesn't exist (non-document entry, no sequence tracking)
-// - sequence.on_track is false (diverged — run full pipeline)
+// - sequence.on_track is false (diverged- run full pipeline)
 // - sequence.diverged is true (explicit divergence signal)
 // - sequence.position >= 3 (enough requests to have meaningful data)
 private static readonly AnyOfTrigger SequenceGuard = new([
@@ -2045,7 +2045,7 @@ git commit -m "feat: StreamAbuse skips expected SignalR continuations from known
 In `ServiceCollectionExtensions.cs`, find the block where `FastPathReputationContributor` is registered (line ~488). Just before it, add:
 
 ```csharp
-// Content sequence detection (Priority 4 — must come before all other detectors)
+// Content sequence detection (Priority 4- must come before all other detectors)
 services.AddSingleton<SequenceContextStore>();
 services.AddSingleton(sp =>
 {
@@ -2185,7 +2185,7 @@ git commit -m "feat: register ContentSequence in dashboard narrative builder"
 
 ---
 
-## Task 12: Smoke Test — Run Demo and Verify
+## Task 12: Smoke Test- Run Demo and Verify
 
 **Files:** None (verification only)
 
@@ -2206,7 +2206,7 @@ sleep 3
 curl -s -H "Sec-Fetch-Mode: navigate" -H "Accept: text/html" https://localhost:5001/ -k -o /dev/null -w "%{http_code}\n"
 ```
 
-Expected: `200` (page loads successfully — not blocked by sequence detection).
+Expected: `200` (page loads successfully- not blocked by sequence detection).
 
 - [ ] **Step 3: Check dashboard for sequence signals**
 
@@ -2249,13 +2249,13 @@ If any config files changed, commit them. If nothing changed, the run was clean.
 | `sequence.signalr_expected` written by contributor | Task 6 |
 | Tier 1 global chain (hard-coded from YAML defaults) | Task 5 |
 | Tier 2 centroid chain (from cluster data) | Task 5, 6 |
-| Zero orchestrator changes | All tasks — confirmed |
+| Zero orchestrator changes | All tasks- confirmed |
 | `NotExists` fallback so non-document requests always run full pipeline | Task 8 |
 
 All spec requirements covered. ✓
 
 **Type consistency:**
-- `SequenceContext.ExpectedChain` is `RequestState[]` — matches `CentroidSequence.ExpectedStates` (same type) ✓
+- `SequenceContext.ExpectedChain` is `RequestState[]`- matches `CentroidSequence.ExpectedStates` (same type) ✓
 - `CentroidType` enum defined in `SequenceContextStore.cs`, used in `CentroidSequence` and `SequenceContext` ✓
 - `SignalKeys.SequencePosition` used as `int` throughout ✓
 - `SignalKeys.SequenceOnTrack` used as `bool` throughout ✓

@@ -1,4 +1,4 @@
-# Content Sequence Detection — Design Spec
+# Content Sequence Detection- Design Spec
 
 **Date:** 2026-04-23  
 **Status:** Approved  
@@ -11,7 +11,7 @@
 The first HTML document request from a new fingerprint incurs full pipeline latency because all
 detectors run synchronously regardless of whether they have useful data. Detectors like
 `SessionVector`, `Periodicity`, and `Similarity` contractually need N>1 requests to produce
-meaningful signal — on request 1 they waste time and contribute noise. Meanwhile, follow-on
+meaningful signal- on request 1 they waste time and contribute noise. Meanwhile, follow-on
 requests (static assets, API calls, SignalR) that are healthy continuations of a page load can
 appear robotic in isolation, causing false positives.
 
@@ -38,7 +38,7 @@ This is implemented entirely via the existing blackboard signal + `TriggerCondit
 
 A new `ContentSequenceContributor` (Priority 4, runs after `FastPathReputation` at P3, before
 everything else) writes signals that the rest of the pipeline reacts to via their existing YAML
-`TriggerConditions`. No orchestrator changes. No new persistence — sequence context is transient
+`TriggerConditions`. No orchestrator changes. No new persistence- sequence context is transient
 (30-min TTL matching session boundary).
 
 ---
@@ -51,22 +51,22 @@ everything else) writes signals that the rest of the pipeline reacts to via thei
 **Priority:** 4  
 **Inherits:** `ConfiguredContributorBase`
 
-#### Request 1 — Document hit (new or unknown fingerprint)
+#### Request 1- Document hit (new or unknown fingerprint)
 
-Detection criteria for "this is a document request" — checked in this order, first match wins:
+Detection criteria for "this is a document request"- checked in this order, first match wins:
 1. `Sec-Fetch-Mode: navigate` header present (most reliable, covers all modern browsers)
 2. `Accept` contains `text/html` AND method is `GET` (fallback for older clients)
-3. `transport.protocol_class == "document"` signal already in blackboard (opportunistic — 
+3. `transport.protocol_class == "document"` signal already in blackboard (opportunistic- 
    `TransportProtocolContributor` runs at P5 in the same wave, so this is only available
    if a prior wave already ran Transport; do not depend on it for request 1 classification)
 
 Note: `ContentSequenceContributor` (P4) and `TransportProtocolContributor` (P5) run in the
 same Wave 0 in parallel. ContentSequenceContributor must not depend on Transport's signals
-for its document classification — direct header inspection is the authoritative check.
+for its document classification- direct header inspection is the authoritative check.
 
 On detection:
 1. Create `SequenceContext` for this signature, write to `SequenceContextStore`
-2. Load Tier 1 chain (global fallback — top-5 `PageView→*` transitions from global Markov matrix)
+2. Load Tier 1 chain (global fallback- top-5 `PageView→*` transitions from global Markov matrix)
 3. Write signals:
    - `sequence.position = 0`
    - `sequence.on_track = true`
@@ -75,11 +75,11 @@ On detection:
    - `sequence.content_path = <request path>`
 4. Most expensive detectors see `sequence.on_track=true` + `sequence.position=0` → skip
 
-#### Requests 2-N — Continuation
+#### Requests 2-N- Continuation
 
 1. Look up `SequenceContext` by signature
 2. If the signature now has a known cluster ID, swap Tier 1 → Tier 2 chain via `BotClusterService.FindCluster(signature)`
-3. Classify this request into a `MarkovState` using `RequestMarkovClassifier.Classify(HttpContext)` — the shared static helper extracted from `SessionVectorContributor`
+3. Classify this request into a `MarkovState` using `RequestMarkovClassifier.Classify(HttpContext)`- the shared static helper extracted from `SessionVectorContributor`
 4. **Set-based divergence** (see Page→Resource Chain Model below): check whether the actual `MarkovState` falls in the *expected state set* for the current time window; compare timing against `TypicalGapsMs ± GapToleranceMs`
 5. Write:
    - `sequence.position = N`
@@ -129,7 +129,7 @@ T+any       SignalR negotiate + WebSocket upgrade
 
 If a browser has a warm cache, the critical asset burst (positions 1-N) won't appear because
 the browser serves them from cache without making network requests. A position-indexed scorer
-would see `ApiCall` at position 1 instead of `StaticAsset` and flag divergence — but this is
+would see `ApiCall` at position 1 instead of `StaticAsset` and flag divergence- but this is
 correct human behavior.
 
 Similarly, prefetched resources can arrive in a burst at any point during page render, and
@@ -149,9 +149,9 @@ IsOnTrack(window) = true  when:
 ```
 
 The `SequenceContext` accumulates:
-- `ObservedStateSet` — the `HashSet<RequestState>` of all states seen in the current window
-- `WindowStartTime` — when the current window opened
-- `RequestCountInWindow` — total requests in window
+- `ObservedStateSet`- the `HashSet<RequestState>` of all states seen in the current window
+- `WindowStartTime`- when the current window opened
+- `RequestCountInWindow`- total requests in window
 
 Windows are defined by time breaks (200ms, 500ms, 2s, 5s, 30s) that correspond to the natural
 phases of page load. When the time since the last observed request exceeds the phase threshold,
@@ -163,7 +163,7 @@ A request is classified as `RequestCategory.Prefetch` (annotated on the `MarkovS
 1. `Purpose: prefetch` header is present (Chromium ≥ 80, Firefox ≥ 110)
 2. OR `Sec-Fetch-Mode: no-cors` + `Sec-Fetch-Dest: document` with idle-priority signals
 3. OR path matches a `<link rel="prefetch">` hint observed in the document response headers
-   (this requires the document response to have been inspected — not available in Wave 0)
+   (this requires the document response to have been inspected- not available in Wave 0)
 
 Prefetch requests are **never** counted as divergence regardless of their Markov state, because
 they represent browser speculation, not user intent.
@@ -184,7 +184,7 @@ Downstream detectors (StreamAbuse, BehavioralWaveform) can use this as a trust s
 | Paths after document | Assets then API | API only, or ghost paths |
 | SignalR/WebSocket | After assets + API | Never, or immediately |
 
-**Ghost paths** — URLs only discoverable via JavaScript execution (e.g., paths loaded via
+**Ghost paths**- URLs only discoverable via JavaScript execution (e.g., paths loaded via
 dynamic `import()`, paths in inline JS). A request to a ghost path proves JS ran, which is
 strong human signal. Bot requests to ghost paths prove JS execution capability (headless) and
 are suspicious when not preceded by the expected asset load.
@@ -225,7 +225,7 @@ record SequenceContext {
 ```
 
 TTL sweep runs every 5 minutes, evicts entries where `LastRequest` is older than 30 minutes.
-This is transient state — **not persisted to SQLite**. Loss on restart is acceptable (new
+This is transient state- **not persisted to SQLite**. Loss on restart is acceptable (new
 fingerprint just gets a fresh context).
 
 ---
@@ -268,7 +268,7 @@ in that cluster).
 ### 4. Global Fallback Chain (Tier 1)
 
 Computed once at startup (and refreshed hourly) from the aggregate `PageView→*` transition
-probabilities in `MarkovTracker`. Stored as a singleton `GlobalExpectedChain` — the top-5
+probabilities in `MarkovTracker`. Stored as a singleton `GlobalExpectedChain`- the top-5
 most probable next Markov states from a `PageView` entry point, with median timing gaps
 derived from all sessions.
 
@@ -307,7 +307,7 @@ defaults:
 
 Heavy detectors that have no useful data on request 1 get a new trigger guard.
 
-**Pattern — skip when on-track and early in sequence:**
+**Pattern- skip when on-track and early in sequence:**
 
 ```yaml
 # heuristic.detector.yaml, intent.detector.yaml, sessionvector.detector.yaml etc.
@@ -325,7 +325,7 @@ triggers:
         condition: NotExists
 ```
 
-The `NotExists` fallback is critical — requests that don't go through the sequence (direct API
+The `NotExists` fallback is critical- requests that don't go through the sequence (direct API
 calls, non-browser clients) must not be blocked from detection just because `sequence.position`
 was never written.
 
@@ -337,7 +337,7 @@ was never written.
 # In StreamAbuse and TransportProtocol trigger guards
 triggers:
   skip_when:
-    - sequence.signalr_expected  # SignalR is an expected continuation — don't penalise
+    - sequence.signalr_expected  # SignalR is an expected continuation- don't penalise
 ```
 
 ---
@@ -404,10 +404,10 @@ timeline and Threats tab via the `sequence.diverged` signal.
 
 ## What Does Not Change
 
-- `BlackboardOrchestrator` — zero changes
-- Existing detector C# classes — only YAML `triggers` sections updated
-- `MarkovTracker` — reads its data, doesn't modify it
-- Session boundary logic — reuses the 30-min TTL already in MarkovTracker
+- `BlackboardOrchestrator`- zero changes
+- Existing detector C# classes- only YAML `triggers` sections updated
+- `MarkovTracker`- reads its data, doesn't modify it
+- Session boundary logic- reuses the 30-min TTL already in MarkovTracker
 - SQLite schema (except adding `centroid_sequences` table)
 - All existing detection paths for non-document requests (direct API, bots that never hit a page)
 
@@ -417,7 +417,7 @@ timeline and Threats tab via the `sequence.diverged` signal.
 
 - A request with no `sequence.position` signal must never be silently skipped. The `NotExists`
   fallback trigger on all deferred detectors guarantees this.
-- `SequenceContextStore` entries must expire correctly. A 30-min TTL sweep is not optional —
+- `SequenceContextStore` entries must expire correctly. A 30-min TTL sweep is not optional-
   stale contexts accumulate position counts incorrectly.
 - `CentroidSequenceStore` must not serve centroid chains with `SampleSize < min_centroid_sample_size`.
   Poorly sampled centroids produce noisy expected chains. Fall back to Tier 1 (global) if

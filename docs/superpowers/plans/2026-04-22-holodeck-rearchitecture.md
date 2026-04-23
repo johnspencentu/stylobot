@@ -46,7 +46,7 @@
 
 ---
 
-## Task 1: HolodeckOptions — add new config properties
+## Task 1: HolodeckOptions- add new config properties
 
 **Files:**
 - Modify: `Mostlylucid.BotDetection.ApiHolodeck/Models/HolodeckOptions.cs`
@@ -87,7 +87,7 @@ Add these properties to the end of `HolodeckOptions` class in `Mostlylucid.BotDe
     /// <summary>
     ///     Enable canary-based beacon tracking in holodeck responses.
     ///     When enabled, fake responses contain unique canary values that
-    ///     are tracked — if a rotated fingerprint replays a canary, the
+    ///     are tracked- if a rotated fingerprint replays a canary, the
     ///     two fingerprints are linked via beacon.matched signal.
     ///     Default: true
     /// </summary>
@@ -196,7 +196,7 @@ public class BeaconCanaryGeneratorTests
 dotnet test Mostlylucid.BotDetection.Test/ --filter "BeaconCanaryGeneratorTests" -v m
 ```
 
-Expected: FAIL — `BeaconCanaryGenerator` doesn't exist.
+Expected: FAIL- `BeaconCanaryGenerator` doesn't exist.
 
 - [ ] **Step 3: Implement BeaconCanaryGenerator**
 
@@ -254,7 +254,7 @@ git commit -m "Add BeaconCanaryGenerator with HMAC deterministic canaries"
 
 ---
 
-## Task 3: BeaconStore — SQLite persistence
+## Task 3: BeaconStore- SQLite persistence
 
 **Files:**
 - Create: `Mostlylucid.BotDetection.ApiHolodeck/Services/BeaconStore.cs`
@@ -347,7 +347,7 @@ public class BeaconStoreTests : IDisposable
 dotnet test Mostlylucid.BotDetection.Test/ --filter "BeaconStoreTests" -v m
 ```
 
-Expected: FAIL — `BeaconStore` doesn't exist.
+Expected: FAIL- `BeaconStore` doesn't exist.
 
 - [ ] **Step 3: Implement BeaconStore**
 
@@ -624,7 +624,7 @@ public class HoneypotPathTaggerTests
 dotnet test Mostlylucid.BotDetection.Test/ --filter "HoneypotPathTaggerTests" -v m
 ```
 
-Expected: FAIL — class doesn't exist.
+Expected: FAIL- class doesn't exist.
 
 - [ ] **Step 3: Implement HoneypotPathTagger**
 
@@ -712,7 +712,7 @@ git commit -m "Add HoneypotPathTagger pre-detection middleware with tests"
 
 ---
 
-## Task 5: HolodeckCoordinator — keyed sequential engagement slots
+## Task 5: HolodeckCoordinator- keyed sequential engagement slots
 
 **Files:**
 - Create: `Mostlylucid.BotDetection.ApiHolodeck/Services/HolodeckCoordinator.cs`
@@ -816,7 +816,7 @@ public class HolodeckCoordinatorTests
 dotnet test Mostlylucid.BotDetection.Test/ --filter "HolodeckCoordinatorTests" -v m
 ```
 
-Expected: FAIL — class doesn't exist.
+Expected: FAIL- class doesn't exist.
 
 - [ ] **Step 3: Implement HolodeckCoordinator**
 
@@ -870,7 +870,7 @@ public sealed class HolodeckCoordinator
         // Increment global counter
         if (Interlocked.Increment(ref _activeCount) > _maxConcurrent)
         {
-            // Raced past capacity — release and fail
+            // Raced past capacity- release and fail
             _activeSlots.TryRemove(fingerprint, out _);
             Interlocked.Decrement(ref _activeCount);
             return false;
@@ -925,7 +925,7 @@ git commit -m "Add HolodeckCoordinator with keyed per-fingerprint engagement slo
 
 ---
 
-## Task 6: BeaconContributor — canary scan detector
+## Task 6: BeaconContributor- canary scan detector
 
 **Files:**
 - Create: `Mostlylucid.BotDetection.ApiHolodeck/Contributors/BeaconContributor.cs`
@@ -1042,7 +1042,7 @@ public class BeaconContributorTests : IDisposable
 dotnet test Mostlylucid.BotDetection.Test/ --filter "BeaconContributorTests" -v m
 ```
 
-Expected: FAIL — class doesn't exist.
+Expected: FAIL- class doesn't exist.
 
 - [ ] **Step 3: Implement BeaconContributor**
 
@@ -1328,9 +1328,9 @@ using Mostlylucid.BotDetection.ApiHolodeck.Services;
 using Mostlylucid.BotDetection.Actions;
 ```
 
-**Note:** This creates a soft dependency on ApiHolodeck — `GetService<HolodeckCoordinator>()` returns null when ApiHolodeck isn't registered. The core middleware never directly references the type; it resolves via DI at runtime.
+**Note:** This creates a soft dependency on ApiHolodeck- `GetService<HolodeckCoordinator>()` returns null when ApiHolodeck isn't registered. The core middleware never directly references the type; it resolves via DI at runtime.
 
-Wait — that creates a project reference dependency we don't want. The core `BotDetection` project should not reference `ApiHolodeck`. Instead, resolve the coordinator by a well-known `HttpContext.Items` key or by an interface in the core project.
+Wait- that creates a project reference dependency we don't want. The core `BotDetection` project should not reference `ApiHolodeck`. Instead, resolve the coordinator by a well-known `HttpContext.Items` key or by an interface in the core project.
 
 Better approach: use `IActionPolicy` resolution by name, which already works:
 
@@ -1355,7 +1355,7 @@ Better approach: use `IActionPolicy` resolution by name, which already works:
         // --- End holodeck check ---
 ```
 
-This keeps the core middleware decoupled — it resolves `"holodeck"` from the action policy registry (already injected). The `HolodeckActionPolicy` internally uses the coordinator for rate limiting.
+This keeps the core middleware decoupled- it resolves `"holodeck"` from the action policy registry (already injected). The `HolodeckActionPolicy` internally uses the coordinator for rate limiting.
 
 - [ ] **Step 3: Add coordinator gate inside HolodeckActionPolicy.ExecuteAsync**
 
@@ -1443,7 +1443,7 @@ Expected: 0 Warning(s), 0 Error(s).
 dotnet run --project Mostlylucid.BotDetection.Demo -c Release --urls "http://localhost:5080"
 ```
 
-Test honeypot paths with bot UA — should now get holodeck responses instead of 403:
+Test honeypot paths with bot UA- should now get holodeck responses instead of 403:
 
 ```bash
 curl -s http://localhost:5080/wp-login.php -H "User-Agent: python-requests/2.31.0"

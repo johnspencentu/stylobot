@@ -100,7 +100,7 @@ Long-term stability proof. Only after Stage 2 passes.
 
 ### Human browsing (60%, from Mac)
 
-- 40 browser UA profiles (Chrome, Firefox, Safari, Edge — desktop + mobile)
+- 40 browser UA profiles (Chrome, Firefox, Safari, Edge- desktop + mobile)
 - Realistic navigation: page → assets → API calls → next page
 - Sec-Fetch-* headers, Accept-Language, cookies
 - Mixed referers (Google, direct, internal)
@@ -183,7 +183,7 @@ Stage: SOAK | Elapsed: 4h 12m | Total: 756,230 req | Accuracy: 91.2% | Errors: 0
 `soak-gate-check.mjs` reads metrics CSV + k6 JSON, evaluates thresholds:
 
 ```
-Stage 2 SOAK — Gate Check
+Stage 2 SOAK- Gate Check
   ✓ p95_latency: 423ms (< 1000ms)
   ✓ memory_rss: 892MB (< 1500MB)
   ✓ memory_delta: +47MB (< 500MB)
@@ -235,7 +235,7 @@ During soak, outbound connections are captured every 5 minutes via `ss -tnp` on 
 Each soak run produces `external-call-audit.md`:
 
 ```markdown
-# External Call Audit — Soak Run 2026-04-23
+# External Call Audit- Soak Run 2026-04-23
 
 | Target | Count | Data | Expected |
 |--------|-------|------|----------|
@@ -274,7 +274,7 @@ soak-results/
 ./scripts/soak/run-soak.sh smoke      # 30 min → gate check
 ./scripts/soak/run-soak.sh soak       # 8 hours → gate check  
 ./scripts/soak/run-soak.sh endurance   # 72 hours → gate check
-./scripts/soak/run-soak.sh plateau     # Breaking point — ramp to failure
+./scripts/soak/run-soak.sh plateau     # Breaking point- ramp to failure
 ```
 
 ---

@@ -11,17 +11,17 @@
 The holodeck never fires. `FastPathReputation` (priority 3) sees known-bad bots as `ConfirmedBad`, triggers early exit, and blocks the request before `HoneypotLinkContributor` (priority 5) runs. The `HoneypotTriggered` signal is never written, so signal-based transitions to the `holodeck` action policy never match. Every bot gets a generic 403 instead of a fake response.
 
 Additionally:
-- No rate limiting per fingerprint — an attacker could overwhelm the holodeck
-- Served fake data isn't stored — missed opportunity to correlate rotated fingerprints
-- Simulation pack selection isn't signal-driven — no connection between CVE detector output and which pack serves the response
+- No rate limiting per fingerprint- an attacker could overwhelm the holodeck
+- Served fake data isn't stored- missed opportunity to correlate rotated fingerprints
+- Simulation pack selection isn't signal-driven- no connection between CVE detector output and which pack serves the response
 
 ## Solution
 
 Make holodeck a **response mode within blocking**, not an alternative to it. Three new components:
 
-1. **HoneypotPathTagger** — pre-detection middleware that tags honeypot paths via hash set lookup, before any detector runs
-2. **HolodeckCoordinator** — ephemeral keyed sequential processor, one engagement per fingerprint at a time, global capacity cap
-3. **BeaconStore + BeaconContributor** — canary values in fake responses become fingerprint correlation beacons
+1. **HoneypotPathTagger**- pre-detection middleware that tags honeypot paths via hash set lookup, before any detector runs
+2. **HolodeckCoordinator**- ephemeral keyed sequential processor, one engagement per fingerprint at a time, global capacity cap
+3. **BeaconStore + BeaconContributor**- canary values in fake responses become fingerprint correlation beacons
 
 ---
 
@@ -52,7 +52,7 @@ ShouldBlock?
 
 ### Why pre-detection path tagging?
 
-Honeypot path matching doesn't need the detection pipeline. `/wp-login.php` is a honeypot path from config — that's a hash set lookup, not a detection decision. Detection tells you *who's* hitting it (bot vs human). The holodeck decision combines both:
+Honeypot path matching doesn't need the detection pipeline. `/wp-login.php` is a honeypot path from config- that's a hash set lookup, not a detection decision. Detection tells you *who's* hitting it (bot vs human). The holodeck decision combines both:
 
 - Honeypot path + bot → holodeck
 - Honeypot path + human → normal 404 (don't reveal the trap)
@@ -98,10 +98,10 @@ public class HolodeckCoordinator
 
 ### Constraints
 
-- **One engagement per fingerprint** — while fingerprint "abc123" has an active holodeck response being generated, subsequent requests from "abc123" get normal 403
-- **Global capacity** — max concurrent engagements across all fingerprints (configurable, default 10). When full, all new requests get 403 regardless of fingerprint
-- **Timeout** — engagement auto-releases after `EngagementTimeoutMs` (default 5000ms) to prevent stuck slots
-- **Metrics** — track: total engagements, rejections (fingerprint busy), rejections (capacity full), active count
+- **One engagement per fingerprint**- while fingerprint "abc123" has an active holodeck response being generated, subsequent requests from "abc123" get normal 403
+- **Global capacity**- max concurrent engagements across all fingerprints (configurable, default 10). When full, all new requests get 403 regardless of fingerprint
+- **Timeout**- engagement auto-releases after `EngagementTimeoutMs` (default 5000ms) to prevent stuck slots
+- **Metrics**- track: total engagements, rejections (fingerprint busy), rejections (capacity full), active count
 
 ### Configuration
 
@@ -132,7 +132,7 @@ When an engagement starts, the coordinator selects the simulation pack. Priority
 
 ### Concept
 
-Every holodeck response contains unique **canary values** — fake usernames, nonces, API keys, form field names — that are deterministic per fingerprint but globally unique. When any future request references a canary value, the beacon fires and links the new fingerprint to the old one.
+Every holodeck response contains unique **canary values**- fake usernames, nonces, API keys, form field names- that are deterministic per fingerprint but globally unique. When any future request references a canary value, the beacon fires and links the new fingerprint to the old one.
 
 ### Canary generation
 
@@ -140,8 +140,8 @@ Every holodeck response contains unique **canary values** — fake usernames, no
 canary = HMAC-SHA256(fingerprint + path + beaconSecret)[0:8]  // 8-char hex
 ```
 
-- **Deterministic per fingerprint + path** — same fingerprint hitting same path always gets same canary → consistent fake world
-- **Globally unique** — different fingerprints get different canaries → match is a strong correlation signal
+- **Deterministic per fingerprint + path**- same fingerprint hitting same path always gets same canary → consistent fake world
+- **Globally unique**- different fingerprints get different canaries → match is a strong correlation signal
 - `beaconSecret` is the same `SignatureHashKey` used for PrimarySignature (already configured)
 
 ### Where canaries go
@@ -190,7 +190,7 @@ New detector, priority 2 (before FastPathReputation). Scans incoming request for
 - `Referer` header query parameters
 - POST body form values (if Content-Type is `application/x-www-form-urlencoded`)
 
-**Scan method:** Extract all candidate strings of length 8 (the canary length), batch-lookup against beacon store. This is a single SQLite query per request — fast.
+**Scan method:** Extract all candidate strings of length 8 (the canary length), batch-lookup against beacon store. This is a single SQLite query per request- fast.
 
 **Signals written when matched:**
 - `beacon.matched = true`
@@ -199,7 +199,7 @@ New detector, priority 2 (before FastPathReputation). Scans incoming request for
 - `beacon.age_seconds = 3600`
 - `beacon.path = "/wp-login.php"` (the original honeypot path)
 
-**Entity resolution integration:** The existing `EntityResolutionService` already watches for signals that link fingerprints. `beacon.original_fingerprint` is a direct merge hint — if fingerprint "xyz789" carries a beacon from "abc123", entity resolution can propose a merge.
+**Entity resolution integration:** The existing `EntityResolutionService` already watches for signals that link fingerprints. `beacon.original_fingerprint` is a direct merge hint- if fingerprint "xyz789" carries a beacon from "abc123", entity resolution can propose a merge.
 
 ---
 
@@ -215,7 +215,7 @@ private async Task HandleBlockedRequest(HttpContext context, AggregatedEvidence 
     // Check 1: honeypot path (pre-tagged, always available)
     var isHoneypotPath = context.Items["Holodeck.IsHoneypotPath"] is true;
     
-    // Check 2: attack signal (written by Haxxor, CveProbe — these run before early exit)
+    // Check 2: attack signal (written by Haxxor, CveProbe- these run before early exit)
     var hasAttackSignal = evidence.Signals.ContainsKey(SignalKeys.AttackDetected)
                        || evidence.Signals.ContainsKey(SignalKeys.CveProbeDetected);
     
@@ -314,9 +314,9 @@ Full `HolodeckOptions` with new fields:
 
 ## What Does NOT Change
 
-- Detection pipeline / orchestrator — untouched
-- Early exit logic — still works, path tagging is pre-detection
-- Simulation pack format — consumed as-is by coordinator
-- Existing action policies (block, throttle, challenge) — untouched
-- Entity resolution — already consumes signals, beacon signals feed in naturally
-- Dashboard — holodeck engagements appear as blocked requests with `action=holodeck`
+- Detection pipeline / orchestrator- untouched
+- Early exit logic- still works, path tagging is pre-detection
+- Simulation pack format- consumed as-is by coordinator
+- Existing action policies (block, throttle, challenge)- untouched
+- Entity resolution- already consumes signals, beacon signals feed in naturally
+- Dashboard- holodeck engagements appear as blocked requests with `action=holodeck`

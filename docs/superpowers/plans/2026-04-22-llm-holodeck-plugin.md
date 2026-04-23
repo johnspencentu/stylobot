@@ -148,7 +148,7 @@ namespace Mostlylucid.BotDetection.Llm.Holodeck;
 
 /// <summary>
 ///     Generates dynamic fake responses for holodeck honeypots using an LLM.
-///     Registered optionally — SimulationPackResponder resolves via GetService
+///     Registered optionally- SimulationPackResponder resolves via GetService
 ///     and falls back to static templates when null.
 /// </summary>
 public interface IHolodeckResponder
@@ -615,7 +615,7 @@ git commit -m "Add HolodeckResponseCache with TTL and max-size eviction"
 
 ---
 
-## Task 5: LlmHolodeckResponder — the core implementation
+## Task 5: LlmHolodeckResponder- the core implementation
 
 **Files:**
 - Create: `Mostlylucid.BotDetection.Llm.Holodeck/LlmHolodeckResponder.cs`
@@ -692,7 +692,7 @@ public class LlmHolodeckResponderTests
         var r2 = await responder.GenerateAsync(DynamicTemplate, TestContext, "abc12345");
 
         Assert.Equal(r1.Content, r2.Content);
-        // LLM called only once — second hit from cache
+        // LLM called only once- second hit from cache
         mockLlm.Verify(l => l.CompleteAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1160,7 +1160,7 @@ namespace Mostlylucid.BotDetection.SimulationPacks;
 
 /// <summary>
 ///     Generates dynamic fake responses for holodeck honeypots.
-///     Registered optionally — SimulationPackResponder resolves via GetService
+///     Registered optionally- SimulationPackResponder resolves via GetService
 ///     and falls back to static templates when null or unavailable.
 /// </summary>
 public interface IHolodeckResponder
@@ -1222,7 +1222,7 @@ public class SimulationPackResponder : IActionPolicy
 In `ExecuteAsync`, replace the body-writing section (lines 85-88) with:
 
 ```csharp
-        // Serve response — dynamic (LLM) or static
+        // Serve response- dynamic (LLM) or static
         if (template.Dynamic && _holodeckResponder?.IsAvailable == true)
         {
             var requestCtx = new HolodeckRequestContext
@@ -1260,7 +1260,7 @@ In `ExecuteAsync`, replace the body-writing section (lines 85-88) with:
         }
         else
         {
-            // Static fallback — embed canary via placeholder replacement
+            // Static fallback- embed canary via placeholder replacement
             var body = template.Body ?? "";
             var canaryGenerator = context.RequestServices.GetService<BeaconCanaryGenerator>();
             if (canaryGenerator != null)
@@ -1284,9 +1284,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Mostlylucid.BotDetection.ApiHolodeck.Services;
 ```
 
-Wait — the core project should NOT reference ApiHolodeck. `BeaconCanaryGenerator` and `BeaconStore` live in ApiHolodeck. Use service locator with `GetService` by type name, or move the beacon types to core.
+Wait- the core project should NOT reference ApiHolodeck. `BeaconCanaryGenerator` and `BeaconStore` live in ApiHolodeck. Use service locator with `GetService` by type name, or move the beacon types to core.
 
-**Simpler approach:** Resolve `BeaconCanaryGenerator` and `BeaconStore` dynamically via `context.RequestServices`. Since `SimulationPackResponder` already has `HttpContext`, it can use `GetService<T>()`. The types resolve at runtime only when registered — no compile-time dependency needed. But we still need `using` for the types.
+**Simpler approach:** Resolve `BeaconCanaryGenerator` and `BeaconStore` dynamically via `context.RequestServices`. Since `SimulationPackResponder` already has `HttpContext`, it can use `GetService<T>()`. The types resolve at runtime only when registered- no compile-time dependency needed. But we still need `using` for the types.
 
 **Cleanest approach:** Pass canary as a parameter from the middleware that already has access to beacon services. The `HandleBlockedRequest` method in `BotDetectionMiddleware` already knows the fingerprint and has access to all services. It can compute the canary and pass it via `HttpContext.Items["Holodeck.Canary"]`.
 
@@ -1395,7 +1395,7 @@ In the holodeck engagement check block in `HandleBlockedRequest` (added in the e
                 }
 ```
 
-Wait — reflection is ugly. Better: define a simple `IBeaconCanaryGenerator` interface in the core project:
+Wait- reflection is ugly. Better: define a simple `IBeaconCanaryGenerator` interface in the core project:
 
 Actually even simpler: the `SimulationPackResponder` or `HolodeckActionPolicy` can set the canary itself since it has access to DI. The middleware just needs to set the fingerprint. Let me simplify.
 
@@ -1432,7 +1432,7 @@ public interface ICanaryGenerator
 }
 ```
 
-Make `BeaconCanaryGenerator` implement it — add to its class declaration:
+Make `BeaconCanaryGenerator` implement it- add to its class declaration:
 
 ```csharp
 public sealed class BeaconCanaryGenerator : ICanaryGenerator
