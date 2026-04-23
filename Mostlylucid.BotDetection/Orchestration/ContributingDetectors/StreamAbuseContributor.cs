@@ -36,11 +36,13 @@ public class StreamAbuseContributor : ConfiguredContributorBase
     public override string Name => "StreamAbuse";
     public override int Priority => 35; // After behavioral detectors
 
-    public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
-    {
+    public override IReadOnlyList<TriggerCondition> TriggerConditions =>
+    [
         new SignalExistsTrigger(SignalKeys.TransportProtocol),
-        new SignalExistsTrigger(SignalKeys.PrimarySignature)
-    };
+        new SignalExistsTrigger(SignalKeys.PrimarySignature),
+        // Skip if this is an expected SignalR continuation from a known-good document sequence
+        new SignalNotExistsTrigger(SignalKeys.SequenceSignalRExpected)
+    ];
 
     // Config-driven parameters from YAML - no magic numbers
     private int HandshakeStormThreshold => GetParam("handshake_storm_threshold", 10);
