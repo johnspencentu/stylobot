@@ -55,6 +55,7 @@ public static class DetectionNarrativeBuilder
         ["Periodicity"] = "temporal periodicity analysis",
         ["Signature"] = "identity signature computation",
         ["CveFingerprint"] = "CVE threat intelligence matching",
+        ["ContentSequence"] = "content sequence detection",
         ["CookieBehavior"] = "cookie behavior analysis",
         ["ResourceWaterfall"] = "resource loading pattern analysis",
         ["HeaderCorrelation"] = "UA rotation detection via header correlation"
@@ -107,6 +108,7 @@ public static class DetectionNarrativeBuilder
         ["Periodicity"] = "Identity",
         ["Signature"] = "Identity",
         ["CveFingerprint"] = "Security",
+        ["ContentSequence"] = "Behavioral",
         ["CookieBehavior"] = "Behavioral",
         ["HeaderCorrelation"] = "Identity",
         ["ResourceWaterfall"] = "Behavioral"
