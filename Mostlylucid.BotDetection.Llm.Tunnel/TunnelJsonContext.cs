@@ -2,6 +2,9 @@ using System.Text.Json.Serialization;
 
 namespace Mostlylucid.BotDetection.Llm.Tunnel;
 
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(LlmTunnelConnectionPayload))]
 [JsonSerializable(typeof(LlmNodeImportRequest))]
 [JsonSerializable(typeof(LlmNodeImportResponse))]
