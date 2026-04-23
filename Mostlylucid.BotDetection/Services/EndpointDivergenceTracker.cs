@@ -76,19 +76,11 @@ public sealed class EndpointDivergenceTracker
 
     private DivergenceWindow GetOrRefreshWindow(string path)
     {
-        if (_windows.TryGetValue(path, out var existing))
-        {
-            if (DateTimeOffset.UtcNow - existing.WindowStart > _windowDuration)
-            {
-                var fresh = new DivergenceWindow();
-                _windows[path] = fresh;
-                return fresh;
-            }
-            return existing;
-        }
-
-        var created = new DivergenceWindow();
-        _windows.TryAdd(path, created);
-        return _windows[path];
+        return _windows.AddOrUpdate(
+            path,
+            _ => new DivergenceWindow(),
+            (_, existing) => DateTimeOffset.UtcNow - existing.WindowStart > _windowDuration
+                ? new DivergenceWindow()
+                : existing);
     }
 }
