@@ -49,3 +49,10 @@ internal sealed class CentroidSequenceRebuildHostedService : IHostedService
         _ = _centroidStore.RebuildAsync(clusters, CancellationToken.None);
     }
 }
+
+/// <summary>Calls AssetHashStore.InitializeAsync on startup to create the SQLite table.</summary>
+internal sealed class AssetHashInitHostedService(AssetHashStore store) : IHostedService
+{
+    public Task StartAsync(CancellationToken ct) => store.InitializeAsync(ct);
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+}
