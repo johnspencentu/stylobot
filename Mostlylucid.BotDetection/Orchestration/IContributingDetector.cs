@@ -230,6 +230,14 @@ public static class Triggers
     }
 
     /// <summary>
+    ///     Trigger when a signal does not exist
+    /// </summary>
+    public static TriggerCondition WhenSignalNotExists(string signalKey)
+    {
+        return new SignalNotExistsTrigger(signalKey);
+    }
+
+    /// <summary>
     ///     Trigger when a signal has a specific value
     /// </summary>
     public static TriggerCondition WhenSignalEquals<T>(string signalKey, T value)

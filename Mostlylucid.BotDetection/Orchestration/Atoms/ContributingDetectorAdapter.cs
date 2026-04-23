@@ -97,6 +97,10 @@ public sealed class ContributingDetectorAdapter : IDetectorAtom
                 case SignalValueTrigger<bool> boolTrigger when boolTrigger.ExpectedValue:
                     patterns.Add(boolTrigger.SignalKey);
                     break;
+                case SignalNotExistsTrigger:
+                    // Intentionally excluded: "signal must not exist" cannot be expressed
+                    // as a required signal pattern. IsSatisfied handles this at runtime.
+                    break;
                 // Other trigger types map to signal patterns where possible
             }
         }
