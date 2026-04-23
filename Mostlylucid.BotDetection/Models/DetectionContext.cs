@@ -1215,4 +1215,43 @@ public static class SignalKeys
 
     /// <summary>String: specific automation framework name (e.g., "Puppeteer", "Playwright", "Selenium")</summary>
     public const string HeadlessFramework = "headless.framework";
+
+    // ==========================================
+    // Content Sequence signals
+    // Written by ContentSequenceContributor (Priority 4).
+    // Consumed by deferred detectors via TriggerConditions.
+    // ==========================================
+
+    /// <summary>Int: current position in the request sequence (0 = document hit).</summary>
+    public const string SequencePosition = "sequence.position";
+
+    /// <summary>Bool: true while actual requests match the expected Markov chain.</summary>
+    public const string SequenceOnTrack = "sequence.on_track";
+
+    /// <summary>Bool: true once the sequence has diverged from the expected chain.</summary>
+    public const string SequenceDiverged = "sequence.diverged";
+
+    /// <summary>Double: 0.0-1.0 divergence score for the current request.</summary>
+    public const string SequenceDivergenceScore = "sequence.divergence_score";
+
+    /// <summary>Int: sequence position at which the first divergence occurred.</summary>
+    public const string SequenceDivergenceAtPosition = "sequence.divergence_at_position";
+
+    /// <summary>String: UUID identifying the current content sequence context.</summary>
+    public const string SequenceChainId = "sequence.chain_id";
+
+    /// <summary>String: centroid classification — "Unknown", "Human", or "Bot".</summary>
+    public const string SequenceCentroidType = "sequence.centroid_type";
+
+    /// <summary>String: path of the document that started this sequence.</summary>
+    public const string SequenceContentPath = "sequence.content_path";
+
+    /// <summary>Bool: true when SignalR is the expected next Markov state and centroid is not Bot.</summary>
+    public const string SequenceSignalRExpected = "sequence.signalr_expected";
+
+    /// <summary>Bool: true when a prefetch request (Purpose: prefetch / Sec-Purpose: prefetch) is observed.</summary>
+    public const string SequencePrefetchDetected = "sequence.prefetch_detected";
+
+    /// <summary>Bool: true when no static assets appeared in the critical window — cache warm hit.</summary>
+    public const string SequenceCacheWarm = "sequence.cache_warm";
 }
