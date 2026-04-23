@@ -57,7 +57,7 @@ Every detected bot gets a 403. Search engines, social media previews, and monito
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddBotDetection();          // ← registers all 32 detectors
+builder.Services.AddBotDetection();          // ← registers all 33 detectors
 
 var app = builder.Build();
 app.UseBotDetection();                       // ← detection middleware
@@ -516,11 +516,11 @@ StyloBot is designed to start with zero dependencies and scale to a full product
 Your App + AddBotDetection()
     └── SQLite (auto-created botdetection.db)
     └── In-process HNSW similarity search
-    └── 32 detectors, <1ms per request
+    └── 33 detectors, <1ms per request
     └── No external services
 ```
 
-**What runs:** All 32 detectors execute in a wave-based pipeline, including the new `Threat Intelligence` detector. Fast-path detectors (UserAgent, Header, IP, SecurityTool, VersionAge, AiScraper, VerifiedBot, etc.) run in parallel in <1ms. Protocol fingerprinting (TLS, TCP/IP, HTTP/2, HTTP/3) catches bots that spoof everything else. Heuristic scoring extracts ~50 features and runs a lightweight scoring model. Everything persists to SQLite for learning across restarts.
+**What runs:** All 33 detectors execute in a wave-based pipeline, including the new `Threat Intelligence` detector. Fast-path detectors (UserAgent, Header, IP, SecurityTool, VersionAge, AiScraper, VerifiedBot, etc.) run in parallel in <1ms. Protocol fingerprinting (TLS, TCP/IP, HTTP/2, HTTP/3) catches bots that spoof everything else. Heuristic scoring extracts ~50 features and runs a lightweight scoring model. Everything persists to SQLite for learning across restarts.
 
 **Good for:** Single app, <100K requests/day, getting started.
 

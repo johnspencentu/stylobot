@@ -19,7 +19,7 @@ Fast-path heuristic detection only. No LLM, no database, no external services. D
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// One line: registers all 32 detectors with sensible defaults
+// One line: registers all 33 detectors with sensible defaults
 builder.Services.AddBotDetection();
 
 var app = builder.Build();
@@ -986,7 +986,7 @@ The gateway adds bot intelligence as HTTP headers to every proxied request. Your
 | `GATEWAY_HTTP_PORT` | `8080` | Listen port |
 | `ADMIN_SECRET` | -- | Protects `/admin` endpoints |
 | `ADMIN_BASE_PATH` | `/admin` | Admin API path prefix |
-| `GATEWAY_DEMO_MODE` | `false` | Enable all 32 detectors |
+| `GATEWAY_DEMO_MODE` | `false` | Enable all 33 detectors |
 | `DB_PROVIDER` | `none` | `none`, `postgres`, `sqlserver` |
 | `DB_CONNECTION_STRING` | -- | Database connection string |
 | `YARP_CONFIG_FILE` | `/app/config/yarp.json` | YARP routing config path |

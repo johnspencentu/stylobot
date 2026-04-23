@@ -1,6 +1,6 @@
 # StyloBot
 
-**Open source bot defense and anonymous entity resolution.** 46 detectors, sub-millisecond inference, progressive identity that learns who keeps coming back - even when they rotate everything. One binary. No cloud dependency.
+**Open source bot defense and anonymous entity resolution.** 47 detectors, sub-millisecond inference, progressive identity that learns who keeps coming back - even when they rotate everything. One binary. No cloud dependency.
 
 [![NuGet](https://img.shields.io/nuget/v/mostlylucid.botdetection)](https://www.nuget.org/packages/mostlylucid.botdetection)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
@@ -50,14 +50,15 @@ app.MapControllers();
 
 ## How it works
 
-StyloBot uses a **blackboard architecture** where 46 detectors run in parallel waves, writing signals that downstream detectors consume. The system progressively builds identity from multiple layers:
+StyloBot uses a **blackboard architecture** where 47 detectors run in parallel waves, writing signals that downstream detectors consume. The system progressively builds identity from multiple layers:
 
 ```
 Request → Wave 0 (< 1ms)      → Wave 1 (behavioral)    → Wave 2 (AI)        → Verdict
           Identity, UA, IP,      Session vectors,          Heuristic model,     Bot probability
           Headers, TLS/TCP,      Periodicity, Cookies,     Intent scoring,      Risk band
           HTTP/2, HTTP/3,        Resource waterfall,       Cluster detection,   Action policy
-          Transport, Haxxor      CVE probes, Waveform      LLM escalation       Entity resolution
+          Transport, Haxxor,     CVE probes, Waveform      LLM escalation       Entity resolution
+          ContentSequence
 ```
 
 ### Vector search projection
@@ -68,13 +69,13 @@ The 129-dimensional session vector is projected into interpretable axes for simi
 
 *Left: 129 raw dimensions aggregated into 16 consolidated axes. Right: bot archetype profiles in radar space - scrapers show sharp spiky profiles, headless browsers show broad spread, humans show low uniform values. Bottom: temporal evolution as the fingerprint crystallizes over time.*
 
-## Detection surface - 46 detectors
+## Detection surface - 47 detectors
 
 | Layer | Detectors | What it catches |
 |-------|-----------|-----------------|
 | **Identity** | Signature, HeaderCorrelation, Periodicity | UA rotation, identity factors, temporal patterns |
 | **Protocol** | TLS (JA3/JA4), TCP/IP (p0f), HTTP/2, HTTP/3, Transport, StreamAbuse | Spoofed browser fingerprints, protocol inconsistencies |
-| **Behavioral** | Waveform, SessionVector, AdvancedBehavioral, CacheBehavior, CookieBehavior, ResourceWaterfall | Timing patterns, Markov chains, missing assets, cookie ignoring |
+| **Behavioral** | Waveform, SessionVector, AdvancedBehavioral, CacheBehavior, CookieBehavior, ResourceWaterfall, ContentSequence | Timing patterns, Markov chains, missing assets, cookie ignoring, page-load sequence divergence |
 | **Content** | UserAgent, Header, AiScraper, Haxxor, SecurityTool, VersionAge | Known bots, attack payloads, impossible browser versions |
 | **Network** | IP, GeoChange, ResponseBehavior, MultiLayerCorrelation, CveProbe | Datacenter IPs, impossible travel, CVE scanning, cross-layer mismatches |
 | **Intelligence** | FastPathReputation, ReputationBias, TimescaleReputation, Cluster, Similarity, Intent | Historical reputation, Leiden clustering, HNSW similarity, threat scoring |
@@ -83,9 +84,11 @@ The 129-dimensional session vector is projected into interpretable axes for simi
 
 ### Key capabilities
 
-- **Sub-millisecond fast path** - 46 detectors, ~150µs per request, ~175KB allocation
+- **Sub-millisecond fast path** - 47 detectors, ~150µs per request, ~175KB allocation
+- **Content sequence detection** - tracks the natural document→asset→API page-load order; flags bots skipping directly to APIs or firing at machine speed (<20ms). Centroid freshness auto-suppresses false positives after deploys
 - **Anonymous entity resolution** - progressive identity (L0→L5) with merge/split/rewind. Rotation creates a trail of near-miss fingerprints that get linked back to the same actor
 - **129-dim session vectors** - Markov chain transitions + timing + fingerprints. Partial chain archetypes detect bots at 3-5 requests before full session maturity
+- **Local GPU tunnel** - route LLM inference from a cloud instance to a local GPU via `stylobot llmtunnel` + Cloudflare tunnel; HMAC-signed, zero-config
 - **Simulation packs** - honeypots that look like real products. WordPress 5.9 pack included with 8 CVE modules
 - **Zero PII** - HMAC-SHA256 hashed signatures. Raw UAs stored PII-stripped (emails/phones redacted). No raw IPs persisted
 - **Headless framework naming** - identifies Puppeteer, Playwright, Selenium, PhantomJS by name, not "Unknown Bot"
@@ -96,7 +99,7 @@ Two products, same engine. The FOSS product in this repo is complete - it detect
 
 ### What's in FOSS (this repo)
 
-- All 46 detectors - same detection pipeline as commercial
+- All 47 detectors - same detection pipeline as commercial
 - Anonymous entity resolution (merge/split/rewind, L0-L5 confidence)
 - Real-time dashboard with all tabs (Overview, Visitors, Sessions, Threats, Clusters, User Agents, Configuration)
 - Session vectors, Markov chains, behavioral radar charts
@@ -107,6 +110,7 @@ Two products, same engine. The FOSS product in this repo is complete - it detect
 - CLI binary (6 platforms)
 - Docker gateway (YARP reverse proxy)
 - Optional LLM enrichment (any provider)
+- Local GPU tunnel (`stylobot llmtunnel`) - route cloud LLM inference to a local GPU
 - Configuration via YAML manifests (read-only in dashboard)
 - Public REST API
 - Node.js SDK
@@ -162,6 +166,10 @@ Detection works fully without any LLM. LLM enriches bot names and handles ambigu
 stylobot 5080 http://localhost:3000 --llm ollama          # local, free (default: gemma4)
 stylobot 5080 http://localhost:3000 --llm openai --llm-key sk-...
 stylobot 5080 http://localhost:3000 --llm anthropic --llm-key sk-ant-...
+
+# Route inference from a cloud instance to a local GPU
+stylobot llmtunnel                                         # on the GPU machine — prints a connection key
+stylobot 5080 http://localhost:3000 --llm localtunnel --llm-key "sb_llmtunnel_v1_..."
 ```
 
 | Provider | Default model | Cost |
@@ -171,6 +179,7 @@ stylobot 5080 http://localhost:3000 --llm anthropic --llm-key sk-ant-...
 | `anthropic` | claude-haiku-4-5 | ~$0.25/1M tokens |
 | `gemini` | gemini-2.0-flash | Free tier |
 | `groq` | llama-3.3-70b | Free tier |
+| `localtunnel` | (your local model) | Free — via `Mostlylucid.BotDetection.Llm.Tunnel` |
 
 ## Dashboard
 
@@ -187,14 +196,14 @@ Real-time monitoring at `/stylobot`. All data persists to SQLite.
 ## Repo layout
 
 ```
-Mostlylucid.BotDetection/          Core detection library (NuGet)
-Mostlylucid.BotDetection.UI/       Dashboard + SignalR hub (NuGet)
-Mostlylucid.BotDetection.Api/      Public REST API
-Mostlylucid.BotDetection.Demo/     Dev harness / reference app
-Mostlylucid.BotDetection.Console/  Standalone CLI (6 platforms)
-Stylobot.Gateway/                   Docker YARP reverse proxy
-test-bdf-scenarios/                 BDF replay test scenarios
-docs/                               Architecture + specs
+Mostlylucid.BotDetection/              Core detection library (NuGet)
+Mostlylucid.BotDetection.UI/           Dashboard + SignalR hub (NuGet)
+Mostlylucid.BotDetection.Api/          Public REST API
+Mostlylucid.BotDetection.Llm.Tunnel/   GPU tunnel relay — route inference to a local GPU
+Mostlylucid.BotDetection.Console/      Standalone CLI (6 platforms)
+Stylobot.Gateway/                       Docker YARP reverse proxy
+test-bdf-scenarios/                     BDF replay test scenarios
+docs/                                   Architecture + specs
 ```
 
 ## Requirements
@@ -209,7 +218,10 @@ docs/                               Architecture + specs
 - [Configuration reference](Mostlylucid.BotDetection/docs/configuration.md)
 - [Integration levels](Mostlylucid.BotDetection/docs/integration-levels.md)
 - [Action policies](Mostlylucid.BotDetection/docs/action-policies.md)
-- [CHANGELOG](Mostlylucid.BotDetection/CHANGELOG.md)
+- [Content sequence detection](Mostlylucid.BotDetection/docs/content-sequence-detection.md)
+- [Centroid freshness (deploy false-positive suppression)](Mostlylucid.BotDetection/docs/centroid-freshness.md)
+- [Local GPU tunnel](Mostlylucid.BotDetection/docs/local-llm-tunnel.md)
+- [CHANGELOG](CHANGELOG.md)
 
 ## License
 
