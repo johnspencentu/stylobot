@@ -180,6 +180,47 @@ stylobot 5080 http://localhost:3000 --tunnel eyJhIjoiNjQ2...
 
 The tunnel URL is displayed in the live detection table.
 
+## LLM Tunnel (Contribute Local GPU)
+
+The `llmtunnel` command lets you share your local GPU with a remote StyloBot site. An agent process
+wraps your local Ollama instance and registers itself with the StyloBot node registry. The remote
+site routes LLM escalation requests through a Cloudflare tunnel to your machine.
+
+```bash
+# Anonymous quick tunnel (ephemeral URL, good for testing)
+stylobot llmtunnel
+
+# Named permanent tunnel (stable hostname, good for production)
+stylobot llmtunnel eyJhIjoiNjQ2...
+
+# Restrict which models are exposed
+stylobot llmtunnel --models llama3.2:3b,qwen2.5:14b
+
+# Raise concurrency / context limits
+stylobot llmtunnel --max-concurrency 4 --max-context 16384
+```
+
+### LLM Tunnel Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--ollama <url>` | Local Ollama base URL | `http://127.0.0.1:11434` |
+| `--models <csv>` | Comma-separated model allowlist (empty = all) | all |
+| `--max-concurrency <n>` | Max concurrent inference requests | `2` |
+| `--max-context <tokens>` | Max context window in tokens | `8192` |
+| `--agent-port <port>` | Loopback port for the agent HTTP listener | random |
+
+### Security Notes
+
+- Anonymous tunnel URLs are **not** credentials. The connection key printed on startup is.
+- Connection keys are sensitive — treat them like API keys.
+- Named Cloudflare tunnels provide stable hostnames; quick tunnels are ephemeral.
+- Re-import the connection key each time a quick tunnel restarts.
+- Registered nodes can be revoked via `DELETE /api/v1/llm-nodes/{nodeId}`.
+- Every inference request is signed and replay-protected (30-second TTL).
+- Raw Ollama endpoints are never exposed through the tunnel.
+- Optional AES-GCM payload encryption can be enabled via appsettings for stronger privacy.
+
 ## Live Detection Table
 
 The default output is a Spectre.Console live table showing:

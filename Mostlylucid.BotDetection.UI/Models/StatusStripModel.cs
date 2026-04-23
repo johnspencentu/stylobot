@@ -11,6 +11,15 @@ public sealed class StatusStripModel
     public bool LlmConnected { get; init; }
     public string? LlmProvider { get; init; }
     public bool IsCommercial { get; init; }
+    public IReadOnlyList<TunnelNodeStatus> TunnelNodes { get; init; } = [];
 }
 
 public sealed record ServiceStatus(string Name, bool Connected);
+
+public sealed record TunnelNodeStatus(
+    string NodeId,
+    string Name,
+    bool Enabled,
+    IReadOnlyList<string> Models,
+    int QueueDepth,
+    string TunnelKind);

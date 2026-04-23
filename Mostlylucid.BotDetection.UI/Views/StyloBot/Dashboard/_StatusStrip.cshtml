@@ -96,4 +96,43 @@
             }
         </div>
     }
+
+    <div class="w-px h-4 bg-base-300"></div>
+
+    <!-- GPU Tunnel Nodes -->
+    @{
+        var activeCount = Model.TunnelNodes.Count(n => n.Enabled);
+    }
+    <div class="flex items-center gap-1.5">
+        <span class="font-semibold text-base-content/60">GPU Tunnels:</span>
+        @if (Model.TunnelNodes.Count == 0)
+        {
+            <span class="text-base-content/40">None configured</span>
+        }
+        else
+        {
+            <span class="@Badge($"{activeCount}/{Model.TunnelNodes.Count}", activeCount > 0)"
+                  title="@activeCount of @Model.TunnelNodes.Count node(s) active">
+                <span class="@Dot(activeCount > 0)"></span>
+                @activeCount/@Model.TunnelNodes.Count active
+            </span>
+            @foreach (var node in Model.TunnelNodes)
+            {
+                var modelList = node.Models.Count > 0 ? string.Join(", ", node.Models) : "no models";
+                var kindShort = node.TunnelKind == "cloudflare-named" ? "stable" : "ephemeral";
+                var modelSuffix = node.Models.Count > 0
+                    ? $"({node.Models[0]}{(node.Models.Count > 1 ? $"+{node.Models.Count - 1}" : "")})"
+                    : "";
+                <span class="@Badge(node.Name, node.Enabled)"
+                      title="@node.Name · @modelList · @kindShort · queue: @node.QueueDepth">
+                    <span class="@Dot(node.Enabled)"></span>
+                    @node.Name
+                    @if (modelSuffix.Length > 0)
+                    {
+                        <span class="opacity-60">@modelSuffix</span>
+                    }
+                </span>
+            }
+        }
+    </div>
 </div>

@@ -2151,6 +2151,35 @@ public class StyloBotDashboardMiddleware
         var llmConnected = llm is not null && llm.GetType().Name != "NullLlmClassificationService";
         var llmProvider = llmConnected ? llm!.GetType().Name.Replace("LlmClassificationService", "").Replace("Classification", "") : null;
 
+        // Check LLM tunnel nodes
+        var tunnelNodes = new List<TunnelNodeStatus>();
+        var registryType = Type.GetType(
+            "Mostlylucid.BotDetection.Llm.Tunnel.ILlmNodeRegistry, Mostlylucid.BotDetection.Llm.Tunnel");
+        if (registryType is not null)
+        {
+            var registry = context.RequestServices.GetService(registryType);
+            if (registry is not null)
+            {
+                var getAllMethod = registryType.GetMethod("GetAll");
+                if (getAllMethod?.Invoke(registry, null) is System.Collections.IEnumerable nodes)
+                {
+                    foreach (var node in nodes)
+                    {
+                        var t = node.GetType();
+                        var nodeId   = t.GetProperty("NodeId")?.GetValue(node) as string ?? "";
+                        var name     = t.GetProperty("Name")?.GetValue(node) as string ?? nodeId;
+                        var enabled  = t.GetProperty("Enabled")?.GetValue(node) is bool b && b;
+                        var models   = (t.GetProperty("Models")?.GetValue(node) as System.Collections.IEnumerable)?
+                                           .Cast<object>().Select(m => m.ToString() ?? "").ToList()
+                                       ?? [];
+                        var queue    = t.GetProperty("QueueDepth")?.GetValue(node) is int q ? q : 0;
+                        var kind     = t.GetProperty("TunnelKind")?.GetValue(node) as string ?? "unknown";
+                        tunnelNodes.Add(new TunnelNodeStatus(nodeId, name, enabled, models, queue, kind));
+                    }
+                }
+            }
+        }
+
         // Check guardians (commercial only)
         var guardianCount = 0;
         var guardianAlerts = 0;
@@ -2171,7 +2200,8 @@ public class StyloBotDashboardMiddleware
             GuardianAlerts = guardianAlerts,
             LlmConnected = llmConnected,
             LlmProvider = llmProvider,
-            IsCommercial = isCommercial
+            IsCommercial = isCommercial,
+            TunnelNodes = tunnelNodes
         };
     }
 
