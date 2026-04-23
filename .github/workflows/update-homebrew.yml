@@ -1,6 +1,8 @@
 name: Update Homebrew Formula
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -9,6 +11,12 @@ on:
 
 jobs:
   update-formula:
+    # Only run on console-v* releases, skip prereleases (betas don't go to Homebrew)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' &&
+       startsWith(github.event.release.tag_name, 'console-v') &&
+       github.event.release.prerelease == false)
     runs-on: ubuntu-latest
     steps:
     - name: Find version
@@ -16,14 +24,18 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         INPUT_VERSION: ${{ inputs.version }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
       run: |
         if [ -n "$INPUT_VERSION" ]; then
           TAG="console-v${INPUT_VERSION}"
           VERSION="$INPUT_VERSION"
+        elif [ -n "$RELEASE_TAG" ]; then
+          TAG="$RELEASE_TAG"
+          VERSION="${TAG#console-v}"
         else
-          # Find latest console release
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName \
-            | jq -r '[.[] | select(.tagName | startswith("console-v"))][0].tagName')
+          # Find latest stable console release
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName,isPrerelease \
+            | jq -r '[.[] | select(.tagName | startswith("console-v")) | select(.isPrerelease == false)][0].tagName')
           VERSION="${TAG#console-v}"
         fi
         echo "tag=$TAG" >> "$GITHUB_OUTPUT"

@@ -1,6 +1,8 @@
 name: Publish to Chocolatey
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -9,6 +11,12 @@ on:
 
 jobs:
   publish:
+    # Only run on console-v* releases, skip prereleases (betas don't go to Chocolatey)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' &&
+       startsWith(github.event.release.tag_name, 'console-v') &&
+       github.event.release.prerelease == false)
     runs-on: windows-latest
     steps:
     - name: Checkout
@@ -19,13 +27,16 @@ jobs:
       env:
         INPUT_VERSION: ${{ inputs.version }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
       shell: bash
       run: |
         if [ -n "$INPUT_VERSION" ]; then
           VERSION="$INPUT_VERSION"
+        elif [ -n "$RELEASE_TAG" ]; then
+          VERSION="${RELEASE_TAG#console-v}"
         else
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName \
-            | jq -r '[.[] | select(.tagName | startswith("console-v"))][0].tagName')
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName,isPrerelease \
+            | jq -r '[.[] | select(.tagName | startswith("console-v")) | select(.isPrerelease == false)][0].tagName')
           VERSION="${TAG#console-v}"
         fi
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
