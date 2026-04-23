@@ -328,8 +328,9 @@ public class ContentSequenceContributorTests : IDisposable
     public async Task MachineSpeedRequest_SubTwentyMs_WritesDivergedTrue()
     {
         const string sig = "sig-machine-speed";
-        // Seed with last request very recent (5ms ago) — triggers machine-speed path
-        SeedDocumentContext(sig, lastRequest: DateTimeOffset.UtcNow.AddMilliseconds(-5));
+        // Seed context first, then stamp LastRequest immediately before ContributeAsync
+        // to keep the gap well within the 20ms machine-speed threshold on slow CI.
+        SeedDocumentContext(sig);
 
         var contributor = CreateContributor();
         var state = CreateState(
@@ -339,6 +340,11 @@ public class ContentSequenceContributorTests : IDisposable
                 ctx.Request.Path = "/api/data";
                 ctx.Request.Headers["Sec-Fetch-Mode"] = "cors";
             });
+
+        // Stamp right before the call — minimises elapsed time between seed and detect.
+        var existing = _contextStore.TryGet(sig);
+        if (existing != null)
+            _contextStore.Update(sig, existing with { LastRequest = DateTimeOffset.UtcNow.AddMilliseconds(-2) });
 
         await contributor.ContributeAsync(state, CancellationToken.None);
 
