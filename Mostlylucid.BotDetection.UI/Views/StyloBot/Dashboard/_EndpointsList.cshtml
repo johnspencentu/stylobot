@@ -61,10 +61,18 @@
                                 <td class="py-1 text-right text-xs hidden md:table-cell">@endpoint.AvgProcessingTimeMs.ToString("F0")</td>
                                 <td class="py-1 text-right text-xs hidden md:table-cell">@endpoint.AvgThreatScore.ToString("F1")</td>
                                 <td class="py-1 hidden lg:table-cell">
-                                    @if (!string.IsNullOrEmpty(endpoint.ActivePolicyName))
-                                    {
-                                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-base-300 text-base-content/60 font-medium">@endpoint.ActivePolicyName</span>
-                                    }
+                                    <div class="flex items-center gap-1">
+                                        @if (!string.IsNullOrEmpty(endpoint.ActivePolicyName))
+                                        {
+                                            <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-base-300 text-base-content/60 font-medium">@endpoint.ActivePolicyName</span>
+                                        }
+                                        <button type="button"
+                                                title="Apply policy to this endpoint"
+                                                class="btn btn-ghost btn-xs p-0.5 min-h-0 h-auto"
+                                                onclick="sbOpenPolicyModal(event, '@Html.Raw(endpoint.Method.Replace("'", "\\'"))', '@Html.Raw(Uri.EscapeDataString(endpoint.Path))', '@Html.Raw((endpoint.ActivePolicyName ?? string.Empty).Replace("'", "\\'"))')">
+                                            <i class="bx bx-shield-alt text-[11px] text-base-content/30 hover:text-base-content/70"></i>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td class="py-1">
                                     <div class="flex h-2 rounded-full overflow-hidden bg-base-300" style="min-width:60px">

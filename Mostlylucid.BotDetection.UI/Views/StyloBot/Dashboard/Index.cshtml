@@ -184,62 +184,85 @@
 
         @if (tab == "overview")
         {
-            <!-- LIVE FIRST: Recent Activity (prominent) + Traffic Chart -->
+            var highRiskEndpoints = Model.Endpoints.Endpoints.Count(e => e.BotRate > 0.5 && e.TotalCount >= 5);
+            var botPct = Model.Summary.Summary.BotPercentage;
+            var activeBotCount = Model.TopBots.TotalCount;
+
+            @if (highRiskEndpoints > 0 || botPct > 30 || activeBotCount > 0)
+            {
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 mb-4 rounded-xl text-xs"
+                     style="background: color-mix(in oklab, var(--sb-signal-danger) 10%, var(--sb-card-bg)); border: 1px solid color-mix(in oklab, var(--sb-signal-danger) 25%, transparent);">
+                    <i class="bx bx-shield-x text-error text-base shrink-0"></i>
+                    @if (highRiskEndpoints > 0)
+                    {
+                        <span><span class="font-bold text-error">@highRiskEndpoints</span> endpoint@(highRiskEndpoints != 1 ? "s" : "") under high bot pressure</span>
+                        <span class="text-base-content/20">|</span>
+                    }
+                    @if (activeBotCount > 0)
+                    {
+                        <span><span class="font-bold">@activeBotCount</span> bot signature@(activeBotCount != 1 ? "s" : "") active</span>
+                    }
+                    @if (botPct > 10)
+                    {
+                        <span class="text-base-content/20">|</span>
+                        <span class="@(botPct > 30 ? "text-error font-bold" : "")">@botPct.ToString("F0")% bot traffic</span>
+                    }
+                    <a href="@TabUrl("threats")" class="ml-auto text-base-content/50 hover:text-base-content">Threats →</a>
+                </div>
+            }
+
+            <!-- Primary ops view: Endpoints by bot pressure + Active bots -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-                <!-- RECENT ACTIVITY: 2/3 width - the live pulse of your site -->
+                <!-- ENDPOINTS BY BOT PRESSURE: 2/3 width -->
                 <div class="lg:col-span-2">
-                    @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_RecentActivity.cshtml", Model.Visitors)
+                    <div id="overview-endpoints"
+                         hx-get="@bp/partials/endpoints?pageSize=10&excludeStatic=true&sort=botrate&dir=desc"
+                         hx-trigger="load, every 15s"
+                         hx-swap="innerHTML"
+                         class="rounded-xl border overflow-hidden"
+                         style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+                        <div class="flex items-center justify-between px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-semibold text-base-content/70">ENDPOINTS BY BOT PRESSURE</span>
+                                <span class="text-[9px] px-1 py-0.5 rounded bg-error/20 text-error font-medium">LIVE</span>
+                            </div>
+                            <a href="@TabUrl("endpoints")" class="text-[9px] text-base-content/40 hover:text-base-content/60">All endpoints →</a>
+                        </div>
+                        <div class="p-2 text-xs text-base-content/40 text-center py-4">Loading...</div>
+                    </div>
                 </div>
 
-                <!-- TRAFFIC CHART + TOP BOTS: 1/3 width sidebar -->
-                <div class="flex flex-col gap-4">
-                    <div class="rounded-xl border overflow-hidden" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
-                        <div class="flex items-center justify-between px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
-                            <div class="flex items-center gap-1">
-                                <span class="text-[10px] font-semibold text-base-content/70">TRAFFIC OVER TIME</span>
-                                @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "traffic-chart")
-                            </div>
-                            <span class="text-[9px] text-base-content/40">Last 6 hours</span>
-                        </div>
-                        <div class="p-2">
-                            <div id="time-chart" style="height: 160px;"></div>
-                        </div>
-                    </div>
+                <!-- ACTIVE BOTS: 1/3 width -->
+                <div>
                     @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_TopBotsList.cshtml", Model.TopBots)
                 </div>
             </div>
 
-            <!-- Active Endpoints + World Map -->
+            <!-- Traffic chart + World map -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
 
-                <!-- ACTIVE ENDPOINTS: live view of which pages/APIs are being hit -->
-                <div id="live-endpoints"
-                     hx-get="@bp/partials/endpoints?pageSize=10&excludeStatic=true"
-                     hx-trigger="load, every 5s"
-                     hx-swap="innerHTML"
-                     class="rounded-xl border overflow-hidden"
-                     style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
+                <div class="rounded-xl border overflow-hidden" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
                     <div class="flex items-center justify-between px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-semibold text-base-content/70">ACTIVE ENDPOINTS</span>
-                            <span class="text-[9px] px-1 py-0.5 rounded status-badge-danger font-medium">LIVE</span>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[10px] font-semibold text-base-content/70">TRAFFIC OVER TIME</span>
+                            @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "traffic-chart")
                         </div>
-                        <span class="text-[9px] text-base-content/40">Excluding static resources</span>
+                        <span class="text-[9px] text-base-content/40">Last 6 hours</span>
                     </div>
-                    <div class="p-2 text-xs text-base-content/40 text-center py-4">Loading...</div>
+                    <div class="p-2">
+                        <div id="time-chart" style="height: 140px;"></div>
+                    </div>
                 </div>
 
-                <!-- WORLD MAP -->
                 <div class="rounded-xl border overflow-hidden command-map-container" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
                     <div class="flex items-center justify-between px-3 py-1.5 border-b" style="border-color: var(--sb-card-divider);">
                         <div class="flex items-center gap-2">
                             <span class="text-[10px] font-semibold text-base-content/70">GLOBAL THREAT MAP</span>
                             @await Html.PartialAsync("~/Views/StyloBot/Dashboard/_HelpIcon.cshtml", "world-map")
-                            <span class="text-[9px] px-1 py-0.5 rounded status-badge-danger font-medium">LIVE</span>
                         </div>
                     </div>
-                    <div id="command-map" class="relative" style="height: 320px;"></div>
+                    <div id="command-map" class="relative" style="height: 280px;"></div>
                 </div>
             </div>
         }
@@ -321,6 +344,68 @@
         }
 
     </main>
+
+    <!-- Policy modal: FOSS config snippet (globally available, triggered from endpoint rows and detail panel) -->
+    <dialog id="sb-policy-modal" class="modal">
+        <div class="modal-box max-w-2xl" style="background: var(--sb-card-bg); border: 1px solid var(--sb-card-border);">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-sm">Apply Bot Policy</h3>
+                    <div class="text-xs text-base-content/50 mt-1 flex items-center gap-1.5">
+                        <span class="font-mono text-[10px] px-1.5 py-0.5 rounded font-bold" style="background: var(--sb-card-subtle); color: var(--sb-brand-strong);" id="pm-method">GET</span>
+                        <span class="font-mono text-xs truncate max-w-[380px]" id="pm-path">/path</span>
+                    </div>
+                </div>
+                <form method="dialog">
+                    <button class="btn btn-ghost btn-xs btn-circle"><i class="bx bx-x text-base"></i></button>
+                </form>
+            </div>
+
+            <div class="flex flex-wrap gap-3 mb-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="text-[10px] font-semibold text-base-content/60 uppercase tracking-wider mb-1 block">Policy</label>
+                    <select id="pm-policy" class="select select-sm select-bordered w-full" onchange="sbUpdatePolicySnippet()">
+                        <option value="block">block - HTTP 403 Forbidden</option>
+                        <option value="throttle-stealth">throttle-stealth - Silent delay</option>
+                        <option value="challenge">challenge - CAPTCHA / proof-of-work</option>
+                        <option value="redirect-honeypot">redirect-honeypot - Trap redirect</option>
+                        <option value="logonly">logonly - Shadow mode (no action)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-semibold text-base-content/60 uppercase tracking-wider mb-1 block">Block Threshold</label>
+                    <select id="pm-threshold" class="select select-sm select-bordered" onchange="sbUpdatePolicySnippet()">
+                        <option value="0.5">50% - Aggressive</option>
+                        <option value="0.7" selected>70% - Standard</option>
+                        <option value="0.85">85% - Conservative</option>
+                        <option value="0.95">95% - High confidence only</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex gap-0 mb-3 text-xs bg-base-300 rounded-lg p-0.5 w-fit" id="pm-tabs">
+                <button type="button" class="px-3 py-1 rounded-md text-xs font-medium transition-all bg-base-100 shadow-sm" onclick="sbShowSnippetTab('attribute')">C# Attribute</button>
+                <button type="button" class="px-3 py-1 rounded-md text-xs font-medium transition-all text-base-content/50 hover:text-base-content/70" onclick="sbShowSnippetTab('appsettings')">appsettings.json</button>
+            </div>
+
+            <div id="pm-snippet-attribute">
+                <pre id="pm-code-attribute" class="text-[11px] leading-relaxed rounded-lg p-3 overflow-x-auto" style="background: var(--sb-surface); border: 1px solid var(--sb-card-divider);"></pre>
+            </div>
+            <div id="pm-snippet-appsettings" style="display:none">
+                <pre id="pm-code-appsettings" class="text-[11px] leading-relaxed rounded-lg p-3 overflow-x-auto" style="background: var(--sb-surface); border: 1px solid var(--sb-card-divider);"></pre>
+            </div>
+
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-base-300/40">
+                <span class="text-[10px] text-base-content/40">
+                    <i class="bx bx-info-circle mr-0.5"></i>FOSS: restart required after config changes
+                </span>
+                <button type="button" class="btn btn-sm btn-ghost gap-1.5" onclick="sbCopyPolicySnippet(this)">
+                    <i class="bx bx-copy text-sm"></i>Copy
+                </button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
 
     <!-- Footer with version -->
     <footer class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between text-xs" style="color: var(--sb-brand-muted);">
@@ -539,6 +624,122 @@
         }
 
         initTimeChart();
+    })();
+    </script>
+
+    <!-- Policy modal JS (available globally for HTMX-loaded endpoint rows) -->
+    <script nonce="@Model.CspNonce">
+    (function() {
+        'use strict';
+
+        var _pmActiveTab = 'attribute';
+
+        window.sbOpenPolicyModal = function(event, method, path, currentPolicy) {
+            if (event) event.stopPropagation();
+            var modal = document.getElementById('sb-policy-modal');
+            if (!modal) return;
+
+            var decodedPath = decodeURIComponent(path);
+            var decodedMethod = decodeURIComponent(method);
+
+            document.getElementById('pm-method').textContent = decodedMethod;
+            document.getElementById('pm-path').textContent = decodedPath;
+            modal.dataset.path = decodedPath;
+            modal.dataset.method = decodedMethod;
+
+            if (currentPolicy) {
+                var sel = document.getElementById('pm-policy');
+                for (var i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value === currentPolicy) { sel.selectedIndex = i; break; }
+                }
+            }
+
+            sbUpdatePolicySnippet();
+            modal.showModal();
+        };
+
+        window.sbUpdatePolicySnippet = function() {
+            var modal = document.getElementById('sb-policy-modal');
+            if (!modal) return;
+
+            var path = modal.dataset.path || '/your/endpoint';
+            var method = (modal.dataset.method || 'GET');
+            var policy = document.getElementById('pm-policy').value;
+            var threshold = document.getElementById('pm-threshold').value;
+            var mt = method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
+
+            var attrCode = [
+                '// Controller action:',
+                '[BotPolicy(ActionPolicy = "' + policy + '", BlockThreshold = ' + threshold + ')]',
+                '[Http' + mt + '("' + path + '")]',
+                'public IActionResult YourAction() { ... }',
+                '',
+                '// Minimal API:',
+                'app.Map' + mt + '("' + path + '", handler)',
+                '   .BotPolicy("' + policy + '", blockThreshold: ' + threshold + ');'
+            ].join('\n');
+
+            var settingsCode = [
+                '{',
+                '  "BotDetection": {',
+                '    "DefaultActionPolicyName": "' + policy + '",',
+                '    "BotThreshold": ' + threshold,
+                '  }',
+                '}',
+                '',
+                '// Sets the GLOBAL default policy (all endpoints).',
+                '// Restart required. For per-endpoint control use [BotPolicy].'
+            ].join('\n');
+
+            var codeAttr = document.getElementById('pm-code-attribute');
+            var codeSettings = document.getElementById('pm-code-appsettings');
+            if (codeAttr) codeAttr.textContent = attrCode;
+            if (codeSettings) codeSettings.textContent = settingsCode;
+        };
+
+        window.sbShowSnippetTab = function(tabName) {
+            _pmActiveTab = tabName;
+            var tabs = document.querySelectorAll('#pm-tabs button');
+            tabs.forEach(function(t, i) {
+                var isActive = (i === 0 && tabName === 'attribute') || (i === 1 && tabName === 'appsettings');
+                t.className = isActive
+                    ? 'px-3 py-1 rounded-md text-xs font-medium transition-all bg-base-100 shadow-sm'
+                    : 'px-3 py-1 rounded-md text-xs font-medium transition-all text-base-content/50 hover:text-base-content/70';
+            });
+            var attrDiv = document.getElementById('pm-snippet-attribute');
+            var appDiv  = document.getElementById('pm-snippet-appsettings');
+            if (attrDiv) attrDiv.style.display = tabName === 'attribute' ? '' : 'none';
+            if (appDiv)  appDiv.style.display  = tabName === 'appsettings' ? '' : 'none';
+        };
+
+        window.sbCopyPolicySnippet = function(btn) {
+            var elId = _pmActiveTab === 'attribute' ? 'pm-code-attribute' : 'pm-code-appsettings';
+            var codeEl = document.getElementById(elId);
+            if (!codeEl) return;
+            var text = codeEl.textContent;
+
+            function flashBtn(ok) {
+                if (!btn) return;
+                var icon = btn.querySelector('i');
+                if (icon) icon.className = ok ? 'bx bx-check text-sm text-success' : 'bx bx-copy text-sm';
+                setTimeout(function() { if (icon) icon.className = 'bx bx-copy text-sm'; }, 1500);
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() { flashBtn(true); }).catch(function() { sbFbCopy(codeEl); flashBtn(true); });
+            } else {
+                sbFbCopy(codeEl); flashBtn(true);
+            }
+        };
+
+        function sbFbCopy(el) {
+            var r = document.createRange();
+            r.selectNode(el);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(r);
+            try { document.execCommand('copy'); } catch(e) {}
+            window.getSelection().removeAllRanges();
+        }
     })();
     </script>
 </body>

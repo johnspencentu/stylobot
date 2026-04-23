@@ -62,5 +62,19 @@
                 }
             }
         </div>
+
+        <div class="mt-4 pt-3 border-t border-base-300/40">
+            <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-base-content/70">Bot Policy</span>
+                <button type="button"
+                        class="btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-base-content"
+                        onclick="sbOpenPolicyModal(event, '@Html.Raw(Model.Method.Replace("'", "\\'"))', '@Html.Raw(Uri.EscapeDataString(Model.Path))', '')">
+                    <i class="bx bx-shield-alt text-sm"></i>Apply Policy
+                </button>
+            </div>
+            <div class="text-[10px] text-base-content/40 mt-1">
+                Configure how bots are handled on this endpoint
+            </div>
+        </div>
     }
 </div>
