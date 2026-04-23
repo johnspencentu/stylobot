@@ -5,6 +5,54 @@ All notable changes to StyloBot are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.1-beta1] - 2026-04-23
+
+### Added
+
+#### Content Sequence Detection
+- **`ContentSequenceContributor`** (Priority 4, Wave 0) — tracks each fingerprint's position in its page-load request sequence and writes `sequence.*` signals consumed by deferred detectors
+  - Document requests (Sec-Fetch-Mode: navigate, Accept: text/html, or `transport.protocol_class=document`) reset the sequence at position 0
+  - Continuation requests advance position and perform set-based phase-window divergence scoring across four phases: critical (0-500ms), mid (500ms-2s), late (2s-30s), settled (30s+)
+  - Prefetch requests (Purpose/Sec-Purpose: prefetch) are tracked but excluded from divergence scoring
+  - Fingerprints with no prior document request write no signals; deferred detectors fall back via SignalNotExistsTrigger
+  - All thresholds configurable via `contentsequence.detector.yaml` / appsettings.json
+- **`SequenceContextStore`** — per-fingerprint sequence state (ConcurrentDictionary, 30-min session gap, 5-min TTL sweep); loss on restart is acceptable
+  - `SequenceContext` record: position, expected chain, observed state set (ImmutableHashSet), window timing, divergence count, cache-warm flag, content path
+- **`CentroidSequenceStore`** — SQLite-backed expected request chains per cluster (Tier 2) with global fallback chain (Tier 1); rebuilt after each clustering run
+  - `MarkEndpointStale` / `IsEndpointStale` / `ClearEndpointStale` — staleness window (1h) suppresses divergence scoring during content changes
+- **`EndpointDivergenceTracker`** — rolling 1-hour per-path divergence rate tracking; marks centroid stale when ≥40% of sessions in window diverge (minimum 10 sessions); thread-safe via `ConcurrentDictionary.AddOrUpdate`
+- **`AssetHashStore`** — ETag-first / Last-Modified+Content-Length fallback fingerprinting for static assets; SQLite-backed `asset_hashes` table; 24h in-memory change index with hourly eviction sweep
+- **`AssetHashMiddleware`** — response-side middleware registered before detection; reads ETag/Last-Modified after `_next` returns and calls `AssetHashStore.RecordHashAsync` for static extensions (css, js, woff, woff2, png, jpg, svg, ico, and 6 others)
+- **`CentroidSequenceRebuildHostedService`** — wires `BotClusterService.ClustersUpdated` → `CentroidSequenceStore.RebuildAsync`; initialises SQLite table on startup; errors from async rebuild are logged (not silently swallowed)
+- **`AssetHashInitHostedService`** — creates `asset_hashes` table and loads recent change timestamps on startup
+- **`SequenceGuardTrigger.Default`** — shared `AnyOfTrigger` extracted from 5 deferred detectors; run when: no sequence active, on_track=false, diverged=true, or position ≥ 3
+- **3 new trigger types** in `IContributingDetector`:
+  - `SignalNotExistsTrigger` — inverse of SignalExistsTrigger
+  - `SignalValueTrigger<T>` — equality check on signal value
+  - `SignalPredicateTrigger<T>` — predicate check on signal value
+- **10 new signal keys** (`sequence.position`, `sequence.on_track`, `sequence.diverged`, `sequence.divergence_score`, `sequence.chain_id`, `sequence.centroid_type`, `sequence.content_path`, `sequence.signalr_expected`, `sequence.prefetch_detected`, `sequence.cache_warm`)
+- **2 new signal keys** for centroid freshness: `sequence.centroid_stale`, `asset.content_changed`
+- **4 BDF scenarios** — `sequence-human-browser`, `sequence-machine-speed-bot`, `sequence-api-only-bot`, `sequence-cache-warm`
+- **`scripts/soak/run-sequence-bdf.sh`** — replays content-sequence scenarios against the running test site and reports per-request bot probability
+
+#### Test Site Cleanup
+- Removed 8 outdated Razor pages and static HTML files (BotTest, ComponentDemo, TagHelperDemo pages; proxy.html, test-client-side.html)
+- `index.html` replaced with a minimal landing page clarifying this is a test/API-simulator site
+
+### Changed
+
+- **5 deferred detectors** (SessionVector, Periodicity, BehavioralWaveform, ResourceWaterfall, CacheBehavior) now use `SequenceGuardTrigger.Default` — skip early on-track sequences to avoid false positives before enough request data exists
+- **`StreamAbuseContributor`** skips when `sequence.signalr_expected` is present, preventing false-positive flagging of expected SignalR upgrades on human-centroid chains
+- **`ContentSequenceContributor.ComputeDivergenceScore`** — machine-speed threshold, score components, and request-count threshold moved from hardcoded values to YAML params (`machine_speed_threshold_ms`, `machine_speed_score`, `unexpected_state_score`, `high_request_count_score`, `high_request_count_threshold`)
+- **`SequenceContext.ObservedStateSet`** changed from `HashSet<RequestState>` (mutable) to `ImmutableHashSet<RequestState>`
+
+### Fixed
+
+- **`SequenceContext.ContentPath`** — continuation requests now read the content path from `ctx.ContentPath` (populated during document request) instead of the per-request blackboard, which was always empty on non-document requests; divergence tracking and centroid staleness marking now function correctly
+- **`CentroidSequenceRebuildHostedService`** — rebuild exceptions are now caught and logged via `ILogger.LogError` instead of silently swallowed in fire-and-forget
+
+---
+
 ## [6.0.0-beta1] - 2026-04-22
 
 ### Added
