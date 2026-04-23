@@ -78,19 +78,16 @@ On detection:
 #### Requests 2-N — Continuation
 
 1. Look up `SequenceContext` by signature
-2. If `similarity.top_cluster_id` signal is now set (written by `SimilarityContributor` on the
-   previous request's pipeline run and now available in the blackboard), swap Tier 1 → Tier 2 chain
-3. Classify this request into a `MarkovState` using the same path/header heuristics as
-   `MarkovTracker.ClassifyRequest()` — extract this logic into a shared static helper so both
-   components stay in sync: `RequestMarkovClassifier.Classify(HttpContext)`
-4. Compare actual `MarkovState` against `ExpectedStates[position]` and timing against
-   `TypicalGapsMs[position] ± GapToleranceMs[position]`
+2. If the signature now has a known cluster ID, swap Tier 1 → Tier 2 chain via `BotClusterService.FindCluster(signature)`
+3. Classify this request into a `MarkovState` using `RequestMarkovClassifier.Classify(HttpContext)` — the shared static helper extracted from `SessionVectorContributor`
+4. **Set-based divergence** (see Page→Resource Chain Model below): check whether the actual `MarkovState` falls in the *expected state set* for the current time window; compare timing against `TypicalGapsMs ± GapToleranceMs`
 5. Write:
    - `sequence.position = N`
    - `sequence.on_track = true/false`
    - `sequence.divergence_score = 0.0-1.0`
    - `sequence.centroid_type = Human/Bot/Unknown` (refined once centroid known)
    - `sequence.signalr_expected = true` (when SignalR is the expected next state)
+   - `sequence.prefetch_detected = true` (when `Purpose: prefetch` or `Sec-Fetch-Mode: no-cors` + idle priority signals prefetch/preload)
 6. If diverged, additionally write:
    - `sequence.diverged = true`
    - `sequence.divergence_at_position = N`
@@ -103,6 +100,105 @@ boundaries).
 
 ---
 
+### Page→Resource Chain Model
+
+A real browser doesn't make requests in strict sequential order. The divergence scorer must model
+the actual page load structure to avoid false positives on healthy traffic.
+
+#### The complete browser request sequence
+
+```
+T+0ms       Document (Sec-Fetch-Mode: navigate, Sec-Fetch-Dest: document)
+T+50-200ms  Critical asset burst (HTTP/2 multiplexed, parallel):
+              CSS   (Sec-Fetch-Mode: no-cors, Sec-Fetch-Dest: style)
+              JS    (Sec-Fetch-Mode: no-cors, Sec-Fetch-Dest: script)
+              Fonts (Sec-Fetch-Mode: no-cors, Sec-Fetch-Dest: font)
+              [<link rel="preload"> assets arrive in this same window]
+T+200-500ms Lazy assets (as viewport renders):
+              Images (Sec-Fetch-Dest: image)
+              Below-fold scripts
+T+500ms+    Prefetched resources (<link rel="prefetch">):
+              Purpose: prefetch header (Chromium/Firefox)
+              Low priority, idle-time
+T+any       API calls (Sec-Fetch-Mode: cors, Sec-Fetch-Site: same-origin)
+T+any       SignalR negotiate + WebSocket upgrade
+[missing]   Cache hits → NO request emitted (warm cache = expected assets absent)
+```
+
+#### Why position-based matching fails
+
+If a browser has a warm cache, the critical asset burst (positions 1-N) won't appear because
+the browser serves them from cache without making network requests. A position-indexed scorer
+would see `ApiCall` at position 1 instead of `StaticAsset` and flag divergence — but this is
+correct human behavior.
+
+Similarly, prefetched resources can arrive in a burst at any point during page render, and
+preloaded resources share the critical asset window. Sequential bots, by contrast, make requests
+one at a time in strict order.
+
+#### Set-based divergence model
+
+Instead of `actual[N] == expected[N]`, divergence is measured across a **time window**:
+
+```
+IsOnTrack(window) = true  when:
+  - The set of Markov states observed in the window is a subset of ExpectedStateSet
+  - OR the window contains at least one StaticAsset (cache misses expected, cache hits OK)
+  - AND timing is not machine-speed (<20ms between any two requests)
+  - AND the total request count in the window is plausible (not 100× the expected count)
+```
+
+The `SequenceContext` accumulates:
+- `ObservedStateSet` — the `HashSet<RequestState>` of all states seen in the current window
+- `WindowStartTime` — when the current window opened
+- `RequestCountInWindow` — total requests in window
+
+Windows are defined by time breaks (200ms, 500ms, 2s, 5s, 30s) that correspond to the natural
+phases of page load. When the time since the last observed request exceeds the phase threshold,
+the window closes, divergence is assessed, and a new window opens.
+
+#### Prefetch detection
+
+A request is classified as `RequestCategory.Prefetch` (annotated on the `MarkovState`) when:
+1. `Purpose: prefetch` header is present (Chromium ≥ 80, Firefox ≥ 110)
+2. OR `Sec-Fetch-Mode: no-cors` + `Sec-Fetch-Dest: document` with idle-priority signals
+3. OR path matches a `<link rel="prefetch">` hint observed in the document response headers
+   (this requires the document response to have been inspected — not available in Wave 0)
+
+Prefetch requests are **never** counted as divergence regardless of their Markov state, because
+they represent browser speculation, not user intent.
+
+`sequence.prefetch_detected` is written to the blackboard when any prefetch request is observed.
+Downstream detectors (StreamAbuse, BehavioralWaveform) can use this as a trust signal.
+
+#### Bot vs Human distinguishing factors
+
+| Factor | Human | Bot |
+|--------|-------|-----|
+| Asset requests after document | Yes (critical burst) | Often absent |
+| Request parallelism | HTTP/2 burst (5-20 parallel) | Sequential (1 at a time) |
+| Inter-request timing | 50-2000ms with variance | <20ms OR machine-regular |
+| Sec-Fetch-* headers | Present, consistent | Often missing or wrong |
+| Prefetch requests | Follow page hints | Don't (no JS execution) |
+| Cache behavior | Mix of hits/misses | All misses (no cookie jar) |
+| Paths after document | Assets then API | API only, or ghost paths |
+| SignalR/WebSocket | After assets + API | Never, or immediately |
+
+**Ghost paths** — URLs only discoverable via JavaScript execution (e.g., paths loaded via
+dynamic `import()`, paths in inline JS). A request to a ghost path proves JS ran, which is
+strong human signal. Bot requests to ghost paths prove JS execution capability (headless) and
+are suspicious when not preceded by the expected asset load.
+
+#### Cache tolerance rule
+
+`SequenceContext` tracks whether the expected critical-asset burst was observed. If no
+`StaticAsset` requests appear in the 50-500ms window after the document but the sequence
+otherwise looks healthy (API calls at reasonable timing, no machine-speed gaps), this is
+treated as a **cache-warm hit**, not divergence. `sequence.cache_warm = true` is written to
+signal that asset requests are expected to be absent.
+
+---
+
 ### 2. `SequenceContextStore`
 
 **File:** `Services/SequenceContextStore.cs`  
@@ -112,13 +208,19 @@ boundaries).
 record SequenceContext {
     string ChainId;
     string Signature;
-    string CentroidId;           // Empty until similarity resolves
-    CentroidType CentroidType;   // Unknown → Human/Bot once resolved
+    string CentroidId;                    // Empty until cluster resolves
+    CentroidType CentroidType;            // Unknown → Human/Bot once resolved
     int Position;
-    CentroidSequence ActiveChain; // Tier 1 initially, Tier 2 once centroid known
+    RequestState[] ExpectedChain;         // Active chain (Tier 1 or Tier 2)
+    double[] TypicalGapsMs;
+    double[] GapToleranceMs;
+    HashSet<RequestState> ObservedStateSet; // States seen in the current time window
+    DateTimeOffset WindowStartTime;       // When the current window opened
+    int RequestCountInWindow;             // Requests in current window
     DateTimeOffset LastRequest;
     bool HasDiverged;
     int DivergenceCount;
+    bool CacheWarm;                       // True when no static assets seen in critical window
 }
 ```
 
@@ -255,6 +357,8 @@ public const string SequenceChainId = "sequence.chain_id";
 public const string SequenceCentroidType = "sequence.centroid_type";
 public const string SequenceContentPath = "sequence.content_path";
 public const string SequenceSignalRExpected = "sequence.signalr_expected";
+public const string SequencePrefetchDetected = "sequence.prefetch_detected";
+public const string SequenceCacheWarm = "sequence.cache_warm";
 ```
 
 ---

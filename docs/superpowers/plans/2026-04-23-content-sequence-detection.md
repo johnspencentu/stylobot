@@ -22,6 +22,7 @@
 | Modify | `Mostlylucid.BotDetection/Models/DetectionContext.cs` |
 | Create | `Mostlylucid.BotDetection/Services/SequenceContextStore.cs` |
 | Create | `Mostlylucid.BotDetection/Services/CentroidSequenceStore.cs` |
+| Create | `Mostlylucid.BotDetection/Services/CentroidSequenceRebuildHostedService.cs` |
 | Create | `Mostlylucid.BotDetection/Orchestration/ContributingDetectors/ContentSequenceContributor.cs` |
 | Create | `Mostlylucid.BotDetection/Orchestration/Manifests/detectors/contentsequence.detector.yaml` |
 | Modify | `Mostlylucid.BotDetection/Orchestration/ContributingDetectors/SessionVectorContributor.cs` |
@@ -344,6 +345,12 @@ public const string SequenceContentPath = "sequence.content_path";
 
 /// <summary>Bool: true when SignalR is the expected next Markov state and centroid is not Bot.</summary>
 public const string SequenceSignalRExpected = "sequence.signalr_expected";
+
+/// <summary>Bool: true when a prefetch request (Purpose: prefetch) is observed in the sequence.</summary>
+public const string SequencePrefetchDetected = "sequence.prefetch_detected";
+
+/// <summary>Bool: true when no static assets appeared in the critical window — cache warm hit.</summary>
+public const string SequenceCacheWarm = "sequence.cache_warm";
 ```
 
 - [ ] **Step 2: Build to verify no typos**
@@ -502,6 +509,11 @@ public sealed record SequenceContext
     public DateTimeOffset LastRequest { get; init; } = DateTimeOffset.UtcNow;
     public bool HasDiverged { get; init; }
     public int DivergenceCount { get; init; }
+    // Set-based divergence tracking (Task 6.5)
+    public HashSet<RequestState> ObservedStateSet { get; init; } = [];
+    public DateTimeOffset WindowStartTime { get; init; } = DateTimeOffset.UtcNow;
+    public int RequestCountInWindow { get; init; }
+    public bool CacheWarm { get; init; }
 }
 
 /// <summary>
@@ -1277,6 +1289,346 @@ Expected: Build succeeded, 0 errors.
 git add Mostlylucid.BotDetection/Orchestration/ContributingDetectors/ContentSequenceContributor.cs \
         Mostlylucid.BotDetection/Orchestration/Manifests/detectors/contentsequence.detector.yaml
 git commit -m "feat: add ContentSequenceContributor for sequence-aware detection"
+```
+
+---
+
+## Task 6.5: Set-Based Divergence + Prefetch/Cache Tolerance
+
+**Files:**
+- Modify: `Mostlylucid.BotDetection/Orchestration/ContributingDetectors/ContentSequenceContributor.cs`
+- Modify: `Mostlylucid.BotDetection/Services/SequenceContextStore.cs`
+
+The naive `ComputeDivergenceScore` from Task 6 compares `actualState == expectedChain[position]` one-to-one. This misclassifies:
+- **Cache-warm browsers** that skip the static asset burst (assets served from cache → no request)
+- **HTTP/2 parallel bursts** where assets arrive in any order, not sequentially
+- **Prefetch requests** (`Purpose: prefetch`) that appear at any point in the sequence
+
+Replace the position-indexed divergence check with a time-window set-based model.
+
+**Phase windows (hardcoded thresholds, configurable from YAML `parameters`):**
+
+| Phase | Time after doc | Expected state set |
+|-------|---------------|-------------------|
+| Critical | 0–500ms | `{StaticAsset}` (may be absent if cache warm) |
+| Mid | 500ms–2s | `{StaticAsset, ApiCall, PageView}` |
+| Late | 2s–30s | `{ApiCall, SignalR, WebSocket, ServerSentEvent}` |
+| Settled | 30s+ | `{ApiCall, SignalR, ServerSentEvent}` |
+
+**Prefetch detection:** A request is prefetch if `Purpose: prefetch` header is present, OR `Sec-Fetch-Mode: no-cors` + `Sec-Fetch-Dest: document`. Prefetch requests never contribute to divergence.
+
+**Cache warm detection:** If the critical window (0–500ms) closes with zero `StaticAsset` requests AND the subsequent requests look normal (no machine-speed timing, no ghost paths), classify as cache warm. Write `sequence.cache_warm = true`.
+
+- [ ] **Step 1: Write failing tests for set-based divergence**
+
+Add to `Mostlylucid.BotDetection.Test/Orchestration/ContentSequenceContributorTests.cs`:
+
+```csharp
+[Fact]
+public async Task Cache_warm_browser_skipping_assets_does_not_diverge()
+{
+    // A browser that skips the static asset burst (cache warm) should NOT be flagged
+    // as diverged just because no StaticAsset appeared in the critical window.
+    var store = new SequenceContextStore();
+    var contributor = CreateContributor(store);
+    var sig = "sig-cache-warm";
+
+    // Request 1: document
+    var state1 = BuildDocumentState(sig);
+    await contributor.ContributeAsync(state1);
+
+    // Jump forward 600ms (past the 500ms critical window) — assets came from cache
+    store.Update(sig, store.TryGet(sig)! with
+    {
+        Position = 0,
+        LastRequest = DateTimeOffset.UtcNow.AddMilliseconds(-600),
+        WindowStartTime = DateTimeOffset.UtcNow.AddMilliseconds(-600),
+        ObservedStateSet = [] // no StaticAsset seen
+    });
+
+    // Request 2: API call (reasonable post-cache timing)
+    var state2 = BuildApiState(sig);
+    await contributor.ContributeAsync(state2);
+
+    var diverged = state2.GetSignal<bool?>(SignalKeys.SequenceDiverged);
+    var cacheWarm = state2.GetSignal<bool?>(SignalKeys.SequenceCacheWarm);
+    Assert.Null(diverged);        // not diverged
+    Assert.True(cacheWarm);       // recognized as cache warm
+}
+
+[Fact]
+public async Task Prefetch_request_does_not_cause_divergence()
+{
+    var store = new SequenceContextStore();
+    var contributor = CreateContributor(store);
+    var sig = "sig-prefetch";
+
+    // Request 1: document
+    var state1 = BuildDocumentState(sig);
+    await contributor.ContributeAsync(state1);
+    store.Update(sig, store.TryGet(sig)! with { Position = 0, LastRequest = DateTimeOffset.UtcNow.AddMilliseconds(-300) });
+
+    // Request 2: prefetch (Purpose: prefetch header)
+    var ctx2 = new DefaultHttpContext();
+    ctx2.Request.Method = "GET";
+    ctx2.Request.Path = "/next-page";
+    ctx2.Request.Headers["Purpose"] = "prefetch";
+    ctx2.Request.Headers["Sec-Fetch-Mode"] = "no-cors";
+    var signals2 = new ConcurrentDictionary<string, object> { [SignalKeys.PrimarySignature] = sig };
+    var state2 = new BlackboardState
+    {
+        HttpContext = ctx2, Signals = signals2, SignalWriter = signals2,
+        CurrentRiskScore = 0, CompletedDetectors = ImmutableHashSet<string>.Empty,
+        FailedDetectors = ImmutableHashSet<string>.Empty,
+        Contributions = ImmutableList<DetectionContribution>.Empty,
+        RequestId = "req2", Elapsed = TimeSpan.Zero
+    };
+    await contributor.ContributeAsync(state2);
+
+    var diverged = state2.GetSignal<bool?>(SignalKeys.SequenceDiverged);
+    var prefetchDetected = state2.GetSignal<bool?>(SignalKeys.SequencePrefetchDetected);
+    Assert.Null(diverged);
+    Assert.True(prefetchDetected);
+}
+
+[Fact]
+public async Task Http2_parallel_assets_in_any_order_do_not_diverge()
+{
+    // Multiple StaticAsset requests arriving within the critical window in any order
+    // should NOT cause divergence even if they don't match ExpectedChain[N] exactly
+    var store = new SequenceContextStore();
+    var contributor = CreateContributor(store);
+    var sig = "sig-parallel";
+
+    var state1 = BuildDocumentState(sig);
+    await contributor.ContributeAsync(state1);
+
+    // Simulate first static asset (150ms after doc, within critical window)
+    store.Update(sig, store.TryGet(sig)! with { Position = 0, LastRequest = DateTimeOffset.UtcNow.AddMilliseconds(-150) });
+    var stateAsset1 = BuildStaticAssetState(sig);
+    await contributor.ContributeAsync(stateAsset1);
+
+    // Simulate second static asset (50ms after first, still within critical window)
+    var ctx = store.TryGet(sig)!;
+    store.Update(sig, ctx with { LastRequest = DateTimeOffset.UtcNow.AddMilliseconds(-50) });
+    var stateAsset2 = BuildStaticAssetState(sig);
+    await contributor.ContributeAsync(stateAsset2);
+
+    var diverged = stateAsset2.GetSignal<bool?>(SignalKeys.SequenceDiverged);
+    Assert.Null(diverged); // parallel asset burst is healthy
+}
+
+// Helper: Build a static asset request state
+private static BlackboardState BuildStaticAssetState(string signature = "test-sig")
+{
+    var ctx = new DefaultHttpContext();
+    ctx.Request.Method = "GET";
+    ctx.Request.Path = "/styles.css";
+    ctx.Request.Headers["Sec-Fetch-Dest"] = "style";
+    ctx.Request.Headers["Sec-Fetch-Mode"] = "no-cors";
+    var signals = new ConcurrentDictionary<string, object>
+    {
+        [SignalKeys.PrimarySignature] = signature,
+        [SignalKeys.TransportProtocolClass] = "static"
+    };
+    return new BlackboardState
+    {
+        HttpContext = ctx, Signals = signals, SignalWriter = signals,
+        CurrentRiskScore = 0, CompletedDetectors = ImmutableHashSet<string>.Empty,
+        FailedDetectors = ImmutableHashSet<string>.Empty,
+        Contributions = ImmutableList<DetectionContribution>.Empty,
+        RequestId = "req-asset", Elapsed = TimeSpan.Zero
+    };
+}
+```
+
+- [ ] **Step 2: Run tests — expect them to fail**
+
+```bash
+dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~ContentSequenceContributorTests" 2>&1 | tail -20
+```
+
+Expected: 3 new tests FAIL (set-based logic not yet implemented).
+
+- [ ] **Step 3: Add prefetch/preload detection helper to `RequestMarkovClassifier.cs`**
+
+Add a new static method after `Classify`:
+
+```csharp
+/// <summary>
+///     Returns true if this request is a browser prefetch/preload resource hint.
+///     Prefetch requests never count toward divergence regardless of their Markov state.
+/// </summary>
+public static bool IsPrefetchRequest(HttpRequest request)
+{
+    // Chromium/Firefox: Purpose: prefetch header
+    var purpose = request.Headers["Purpose"].FirstOrDefault();
+    if (string.Equals(purpose, "prefetch", StringComparison.OrdinalIgnoreCase))
+        return true;
+
+    // Sec-Fetch-Mode: no-cors + Sec-Fetch-Dest: document = browser-initiated prefetch
+    var secFetchMode = request.Headers["Sec-Fetch-Mode"].FirstOrDefault();
+    var secFetchDest = request.Headers["Sec-Fetch-Dest"].FirstOrDefault();
+    if (string.Equals(secFetchMode, "no-cors", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(secFetchDest, "document", StringComparison.OrdinalIgnoreCase))
+        return true;
+
+    return false;
+}
+```
+
+- [ ] **Step 4: Replace `ComputeDivergenceScore` in `ContentSequenceContributor.cs` with set-based logic**
+
+Replace the existing `ComputeDivergenceScore` and `HandleContinuation` methods with the set-based version:
+
+```csharp
+// Phase window boundaries (ms since document hit or last window open)
+private static readonly double[] PhaseThresholdsMs = [500, 2000, 30_000];
+
+// Expected state sets per phase — index matches PhaseThresholdsMs
+private static readonly RequestState[][] PhaseExpectedSets =
+[
+    // Critical (0-500ms): static assets + page views (preload)
+    [RequestState.StaticAsset, RequestState.PageView],
+    // Mid (500ms-2s): api calls also expected, assets tail off
+    [RequestState.StaticAsset, RequestState.ApiCall, RequestState.PageView],
+    // Late (2s-30s): API + streaming transports
+    [RequestState.ApiCall, RequestState.SignalR, RequestState.WebSocket, RequestState.ServerSentEvent],
+    // Settled (30s+): only long-running connections expected
+    [RequestState.ApiCall, RequestState.SignalR, RequestState.ServerSentEvent]
+];
+
+private SequenceContext HandleContinuation(
+    BlackboardState state,
+    string signature,
+    SequenceContext ctx)
+{
+    // Upgrade to Tier 2 if cluster is now known
+    if (ctx.CentroidType == CentroidType.Unknown && _clusterService != null)
+    {
+        var cluster = _clusterService.FindCluster(signature);
+        if (cluster != null)
+        {
+            var tier2 = _centroidStore.TryGetCentroidChain(cluster.ClusterId, MinCentroidSampleSize);
+            if (tier2 != null)
+            {
+                ctx = ctx with
+                {
+                    CentroidId = cluster.ClusterId,
+                    CentroidType = tier2.Type,
+                    ExpectedChain = tier2.ExpectedStates,
+                    TypicalGapsMs = tier2.TypicalGapsMs,
+                    GapToleranceMs = tier2.GapToleranceMs
+                };
+            }
+        }
+    }
+
+    var request = state.HttpContext.Request;
+    var gapMs = (DateTimeOffset.UtcNow - ctx.LastRequest).TotalMilliseconds;
+    var totalMsFromWindow = (DateTimeOffset.UtcNow - ctx.WindowStartTime).TotalMilliseconds;
+
+    // Prefetch: never counts as divergence
+    var isPrefetch = RequestMarkovClassifier.IsPrefetchRequest(request);
+    if (isPrefetch)
+    {
+        var updatedCtx = ctx with
+        {
+            Position = ctx.Position + 1,
+            LastRequest = DateTimeOffset.UtcNow,
+            RequestCountInWindow = ctx.RequestCountInWindow + 1
+        };
+        _contextStore.Update(signature, updatedCtx);
+        state.WriteSignal(SignalKeys.SequencePrefetchDetected, true);
+        WriteSignals(state, updatedCtx);
+        return updatedCtx;
+    }
+
+    var actualState = RequestMarkovClassifier.Classify(state);
+    var phaseIndex = GetPhaseIndex(totalMsFromWindow);
+    var expectedSet = PhaseExpectedSets[phaseIndex];
+
+    // Machine-speed timing check (< 20ms is almost certainly automated)
+    var machineSpeed = gapMs < 20;
+
+    // Set-based divergence: is the actual state in the expected set for this phase?
+    var stateInSet = expectedSet.Contains(actualState);
+
+    // Cache-warm detection: critical window closed with no static assets
+    var cacheWarm = ctx.CacheWarm;
+    if (!cacheWarm && phaseIndex > 0 && !ctx.ObservedStateSet.Contains(RequestState.StaticAsset))
+    {
+        // Critical window has passed, no static assets seen — likely cache warm
+        cacheWarm = true;
+    }
+
+    // Update the observed state set
+    var newObservedSet = new HashSet<RequestState>(ctx.ObservedStateSet) { actualState };
+
+    // Compute divergence score
+    double divergenceScore = 0.0;
+    if (machineSpeed)
+        divergenceScore += 0.4;
+    if (!stateInSet && !(cacheWarm && actualState == RequestState.ApiCall))
+        divergenceScore += 0.5; // unexpected state for this phase
+    if (ctx.RequestCountInWindow > 50) // bot-volume burst
+        divergenceScore += 0.3;
+
+    divergenceScore = Math.Min(1.0, divergenceScore);
+    var diverged = divergenceScore >= DivergenceThreshold;
+
+    return ctx with
+    {
+        Position = ctx.Position + 1,
+        LastRequest = DateTimeOffset.UtcNow,
+        ObservedStateSet = newObservedSet,
+        RequestCountInWindow = ctx.RequestCountInWindow + 1,
+        CacheWarm = cacheWarm,
+        HasDiverged = ctx.HasDiverged || diverged,
+        DivergenceCount = ctx.DivergenceCount + (diverged ? 1 : 0)
+    };
+}
+
+private static int GetPhaseIndex(double msSinceWindowStart)
+{
+    for (var i = 0; i < PhaseThresholdsMs.Length; i++)
+        if (msSinceWindowStart <= PhaseThresholdsMs[i])
+            return i;
+    return PhaseThresholdsMs.Length; // settled phase
+}
+```
+
+Also update `WriteSignals` to emit the new signals:
+
+```csharp
+if (ctx.CacheWarm)
+    state.WriteSignal(SignalKeys.SequenceCacheWarm, true);
+```
+
+- [ ] **Step 5: Run tests — expect all to pass**
+
+```bash
+dotnet test Mostlylucid.BotDetection.Test/ --filter "FullyQualifiedName~ContentSequenceContributorTests" -v
+```
+
+Expected: All 12 tests PASS (original 9 + 3 new set-based tests).
+
+- [ ] **Step 6: Build full solution**
+
+```bash
+dotnet build mostlylucid.stylobot.sln
+```
+
+Expected: Build succeeded, 0 errors.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add Mostlylucid.BotDetection/Orchestration/ContributingDetectors/ContentSequenceContributor.cs \
+        Mostlylucid.BotDetection/Markov/RequestMarkovClassifier.cs \
+        Mostlylucid.BotDetection/Services/SequenceContextStore.cs \
+        Mostlylucid.BotDetection.Test/Orchestration/ContentSequenceContributorTests.cs
+git commit -m "feat: set-based divergence scoring with prefetch and cache-warm tolerance"
 ```
 
 ---
