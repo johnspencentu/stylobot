@@ -287,7 +287,8 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to deserialize HNSW graph, rebuilding");
+                        _logger.LogWarning("Failed to deserialize HNSW graph (stale format), rebuilding. Error: {Message}", ex.Message);
+                        try { File.Delete(graphPath); } catch { /* best-effort */ }
                     }
                 }
 
