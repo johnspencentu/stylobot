@@ -76,6 +76,8 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
     // Config-driven parameters
+    // Consumed by deferred detectors' AnyOfTrigger sequence guards (Task 8), not used here.
+    // Declared here so all sequence configuration lives in one YAML section.
     private int DeferredDetectorMinPosition => GetParam("deferred_detector_min_position", 3);
     private double DivergenceThreshold => GetParam("divergence_threshold", 0.4);
     private double TimingToleranceMultiplier => GetParam("timing_tolerance_multiplier", 3.0);
@@ -105,9 +107,10 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             return Task.FromResult(HandleDocumentRequest(state, signature, request, ctx));
 
         // Not a document request — only continue if we have an active sequence context
-        if (ctx.Position == 0 && string.IsNullOrEmpty(ctx.ChainId))
+        // No active sequence: fresh context with empty chain + not a document → write nothing
+        // Deferred detectors will run via SignalNotExistsTrigger fallback
+        if (!isDocumentRequest && ctx.ExpectedChain.Length == 0)
         {
-            // No active sequence — first request was not a document, write nothing
             _logger.LogDebug("ContentSequence: no active sequence for {Signature}, non-document first request", signature);
             return Task.FromResult<IReadOnlyList<DetectionContribution>>(Array.Empty<DetectionContribution>());
         }

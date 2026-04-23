@@ -21,6 +21,7 @@ input:
   required_signals: []
   optional_signals:
     - detection.primary_signature
+    - similarity.cluster_id
 
 output:
   signals:
