@@ -91,23 +91,36 @@ public class PeriodicityContributor : ConfiguredContributorBase
         foreach (var (key, value) in signals)
             state.WriteSignal(key, value);
 
+        // Read sequence signals - ContentSequenceContributor (Priority 4) runs before this (Priority 25).
+        var sequenceOnTrack = state.GetSignal<bool?>(SignalKeys.SequenceOnTrack) ?? false;
+        var sequenceDiverged = state.GetSignal<bool?>(SignalKeys.SequenceDiverged) ?? false;
+
         // === Scoring ===
 
-        // Very regular intervals (low CV) = bot-like polling
-        if (cv < 0.15 && intervals.Count >= MinRequestsForAnalysis)
+        // Very regular intervals (low CV) = bot-like polling.
+        // Suppress if sequence is on-track: legitimate apps poll APIs at fixed intervals
+        // after a valid page load (notification checks, heartbeats, presence signals).
+        if (cv < 0.15 && intervals.Count >= MinRequestsForAnalysis && !sequenceOnTrack)
         {
+            var confidence = sequenceDiverged
+                ? RegularityBotConfidence * 1.25 * (1.0 - cv / 0.15)
+                : RegularityBotConfidence * (1.0 - cv / 0.15);
+
             contributions.Add(BotContribution(
                 "PeriodicPolling",
-                $"Fixed-interval polling detected: mean={meanInterval:F1}s, CV={cv:F3}",
-                confidenceOverride: RegularityBotConfidence * (1.0 - cv / 0.15),
+                sequenceDiverged
+                    ? $"Fixed-interval polling confirmed by content-sequence divergence: mean={meanInterval:F1}s, CV={cv:F3}"
+                    : $"Fixed-interval polling detected: mean={meanInterval:F1}s, CV={cv:F3}",
+                confidenceOverride: confidence,
                 botType: BotType.Scraper.ToString()));
 
             _logger.LogDebug("Periodic polling: {Sig} mean={Mean:F1}s CV={CV:F3}",
                 signature[..Math.Min(8, signature.Length)], meanInterval, cv);
         }
 
-        // Strong autocorrelation peak = cron-like schedule
-        if (peakStrength > 0.5 && dominantPeriod > 1)
+        // Strong autocorrelation peak = cron-like schedule.
+        // Suppress if on-track: legitimate apps can have periodic interaction patterns.
+        if (peakStrength > 0.5 && dominantPeriod > 1 && !sequenceOnTrack)
         {
             contributions.Add(BotContribution(
                 "CronSchedule",

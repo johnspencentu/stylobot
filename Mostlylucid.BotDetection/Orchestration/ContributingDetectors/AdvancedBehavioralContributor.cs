@@ -93,6 +93,12 @@ public class AdvancedBehavioralContributor : ConfiguredContributorBase
             // Record this request for pattern analysis
             _analyzer.RecordRequest(clientIp, currentPath, currentTime);
 
+            // Read sequence signals from ContentSequenceContributor (Priority 4, runs before this at Priority 25).
+            // sequenceDiverged = confirmed bot-like content pattern; sequenceOnTrack = confirmed human-like pattern.
+            var sequenceDiverged = state.GetSignal<bool?>(SignalKeys.SequenceDiverged) ?? false;
+            var sequenceOnTrack = state.GetSignal<bool?>(SignalKeys.SequenceOnTrack) ?? false;
+            var centroidStale = state.GetSignal<bool?>(SignalKeys.SequenceCentroidStale) ?? false;
+
             // Read transport classification from TransportProtocolContributor (Priority 5, runs first).
             // Falls back to local header detection if the signal hasn't been written yet.
             var isStreaming = state.GetSignal<bool?>(SignalKeys.TransportIsStreaming) ?? false;
@@ -125,15 +131,26 @@ public class AdvancedBehavioralContributor : ConfiguredContributorBase
                     // Very low entropy (<0.5) = too repetitive (bot)
                     if (pathEntropy > PathEntropyHigh)
                     {
-                        state.WriteSignals([new("PathEntropy", pathEntropy), new("PathEntropyHigh", true)]);
-                        contributions.Add(new DetectionContribution
+                        // Suppress if sequence is on-track: high-entropy navigation after a valid page-load
+                        // sequence is legitimate user exploration (e.g., browsing many product pages).
+                        if (!sequenceOnTrack)
                         {
-                            DetectorName = Name,
-                            Category = "AdvancedBehavioral",
-                            ConfidenceDelta = PathEntropyHighConfidence,
-                            Weight = PathEntropyHighWeight,
-                            Reason = "Visiting many random URLs in no logical order (random scanning pattern)"
-                        });
+                            state.WriteSignals([new("PathEntropy", pathEntropy), new("PathEntropyHigh", true)]);
+                            // Boost confidence when sequence divergence independently confirmed scanning.
+                            var confidence = sequenceDiverged
+                                ? PathEntropyHighConfidence * 1.3
+                                : PathEntropyHighConfidence;
+                            contributions.Add(new DetectionContribution
+                            {
+                                DetectorName = Name,
+                                Category = "AdvancedBehavioral",
+                                ConfidenceDelta = confidence,
+                                Weight = PathEntropyHighWeight,
+                                Reason = sequenceDiverged
+                                    ? "Random URL scanning confirmed by content-sequence divergence"
+                                    : "Visiting many random URLs in no logical order (random scanning pattern)"
+                            });
+                        }
                     }
                     else if (pathEntropy < PathEntropyLow)
                     {
@@ -156,15 +173,26 @@ public class AdvancedBehavioralContributor : ConfiguredContributorBase
                 // Very low timing entropy (<0.3) = too regular (bot)
                 if (timingEntropy < TimingEntropyLow)
                 {
-                    state.WriteSignals([new("TimingEntropy", timingEntropy), new("TimingTooRegular", true)]);
-                    contributions.Add(new DetectionContribution
+                    // Suppress if sequence is on-track: regular-interval API polling after a valid page
+                    // load is normal (notification checks, heartbeats).
+                    if (!sequenceOnTrack)
                     {
-                        DetectorName = Name,
-                        Category = "AdvancedBehavioral",
-                        ConfidenceDelta = TimingEntropyConfidence,
-                        Weight = TimingEntropyWeight,
-                        Reason = "Requests arrive at suspiciously regular intervals (machine-like timing)"
-                    });
+                        state.WriteSignals([new("TimingEntropy", timingEntropy), new("TimingTooRegular", true)]);
+                        // Boost when sequence divergence confirms machine-speed pattern.
+                        var confidence = sequenceDiverged
+                            ? TimingEntropyConfidence * 1.3
+                            : TimingEntropyConfidence;
+                        contributions.Add(new DetectionContribution
+                        {
+                            DetectorName = Name,
+                            Category = "AdvancedBehavioral",
+                            ConfidenceDelta = confidence,
+                            Weight = TimingEntropyWeight,
+                            Reason = sequenceDiverged
+                                ? "Machine-like timing confirmed by content-sequence divergence"
+                                : "Requests arrive at suspiciously regular intervals (machine-like timing)"
+                        });
+                    }
                 }
 
             // 3. Timing Anomaly Detection - still applies to streaming
@@ -186,15 +214,20 @@ public class AdvancedBehavioralContributor : ConfiguredContributorBase
             var (isTooRegular, cv, cvDesc) = _analyzer.DetectRegularPattern(clientIp);
             if (isTooRegular)
             {
-                state.WriteSignals([new("CoefficientOfVariation", cv), new("PatternTooRegular", true)]);
-                contributions.Add(new DetectionContribution
+                // Suppress if on-track: regular polling after a valid page-load sequence is normal.
+                // Centroid stale also suppresses: deploy traffic causes uniform timing patterns.
+                if (!sequenceOnTrack && !centroidStale)
                 {
-                    DetectorName = Name,
-                    Category = "AdvancedBehavioral",
-                    ConfidenceDelta = RegularPatternConfidence,
-                    Weight = RegularPatternWeight,
-                    Reason = cvDesc
-                });
+                    state.WriteSignals([new("CoefficientOfVariation", cv), new("PatternTooRegular", true)]);
+                    contributions.Add(new DetectionContribution
+                    {
+                        DetectorName = Name,
+                        Category = "AdvancedBehavioral",
+                        ConfidenceDelta = RegularPatternConfidence,
+                        Weight = RegularPatternWeight,
+                        Reason = cvDesc
+                    });
+                }
             }
 
             // 5. Navigation Pattern Analysis (Markov) - skip for streaming
@@ -240,7 +273,8 @@ public class AdvancedBehavioralContributor : ConfiguredContributorBase
             }
 
             // 7. Positive signal: Good patterns detected
-            if (contributions.Count == 0 && pathEntropy > NaturalEntropyMin && pathEntropy < NaturalEntropyMax && cv > NaturalCvMin)
+            // Skip if sequence diverged - we know the content pattern was bot-like, don't emit human signal.
+            if (contributions.Count == 0 && pathEntropy > NaturalEntropyMin && pathEntropy < NaturalEntropyMax && cv > NaturalCvMin && !sequenceDiverged)
             {
                 state.WriteSignal("NaturalPatterns", true);
                 contributions.Add(new DetectionContribution

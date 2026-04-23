@@ -158,15 +158,28 @@ public partial class BehavioralWaveformContributor : ConfiguredContributorBase
             new(SignalKeys.WaveformTimingRegularity, cv)
         ]);
 
-        // Very low CV = too regular = likely bot
-        if (cv < GetParam("timing_cv_too_regular", 0.15) && intervals.Count >= GetParam("timing_min_intervals", 5))
+        // Read sequence signals - ContentSequenceContributor (Priority 4) runs before this via SequenceGuardTrigger.
+        var sequenceOnTrack = state.GetSignal<bool?>(SignalKeys.SequenceOnTrack) ?? false;
+        var sequenceDiverged = state.GetSignal<bool?>(SignalKeys.SequenceDiverged) ?? false;
+        var centroidStale = state.GetSignal<bool?>(SignalKeys.SequenceCentroidStale) ?? false;
+
+        // Very low CV = too regular = likely bot.
+        // Suppress if sequence is on-track: API polling at fixed intervals after a valid page load is normal.
+        if (cv < GetParam("timing_cv_too_regular", 0.15) && intervals.Count >= GetParam("timing_min_intervals", 5) && !sequenceOnTrack)
+        {
+            var confidence = sequenceDiverged
+                ? GetParam("timing_regular_confidence", 0.7) * 1.2
+                : GetParam("timing_regular_confidence", 0.7);
             contributions.Add(DetectionContribution.Bot(
-                Name, "Waveform", GetParam("timing_regular_confidence", 0.7),
-                $"Requests arrive at almost identical intervals (typical automated behavior)",
+                Name, "Waveform", confidence,
+                sequenceDiverged
+                    ? "Machine-speed timing confirmed by content-sequence divergence"
+                    : "Requests arrive at almost identical intervals (typical automated behavior)",
                 weight: GetParam("timing_regular_weight", 1.6),
                 botType: BotType.Scraper.ToString()));
-        // Moderate CV = human-like
-        else if (cv >= GetParam("timing_cv_human_low", 0.3) && cv <= GetParam("timing_cv_human_high", 2.0))
+        }
+        // Moderate CV = human-like (suppress if sequence diverged - we know the pattern was wrong)
+        else if (cv >= GetParam("timing_cv_human_low", 0.3) && cv <= GetParam("timing_cv_human_high", 2.0) && !sequenceDiverged)
             contributions.Add(new DetectionContribution
             {
                 DetectorName = Name,
@@ -185,7 +198,9 @@ public partial class BehavioralWaveformContributor : ConfiguredContributorBase
         var recentSse = history.Count(r => r.Timestamp > recentCutoff && r.ContentClass == ContentClass.SSE);
         var recentSignalR = history.Count(r => r.Timestamp > recentCutoff && r.ContentClass == ContentClass.SignalR);
         var recentRequests = recentNonStreaming;
-        if (recentRequests >= GetParam("burst_threshold", 10))
+        // Suppress burst scoring when centroid is stale: a deploy causes all real users to reload
+        // simultaneously, producing burst patterns that look like bot activity.
+        if (recentRequests >= GetParam("burst_threshold", 10) && !centroidStale)
         {
             state.WriteSignals([
                 new(SignalKeys.WaveformBurstDetected, true),
