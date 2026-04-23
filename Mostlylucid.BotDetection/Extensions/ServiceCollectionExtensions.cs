@@ -585,6 +585,17 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<SignatureConvergenceService>();
         services.AddHostedService(sp => sp.GetRequiredService<SignatureConvergenceService>());
         services.AddSingleton<IContributingDetector, ClusterContributor>();
+
+        // Content sequence detection — Priority 4, runs before all other detectors
+        services.TryAddSingleton<SequenceContextStore>();
+        services.AddSingleton(sp =>
+        {
+            var sessionStore = (Data.SqliteSessionStore)sp.GetRequiredService<Data.ISessionStore>();
+            var logger = sp.GetRequiredService<ILogger<CentroidSequenceStore>>();
+            return new CentroidSequenceStore(sessionStore.ConnectionString, logger);
+        });
+        services.AddSingleton<IContributingDetector, ContentSequenceContributor>();
+        services.AddHostedService<CentroidSequenceRebuildHostedService>();
         // Constrained LLM description coordinator (KeyedSequentialAtom, 50% CPU concurrency)
         services.AddSingleton<LlmDescriptionCoordinator>();
         // LLM-based cluster descriptions (background, never in request pipeline)
