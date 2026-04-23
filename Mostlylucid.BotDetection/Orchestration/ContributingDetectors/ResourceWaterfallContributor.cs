@@ -50,17 +50,10 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
     public override string Name => "ResourceWaterfall";
     public override int Priority => 22; // After behavioral (20), before periodicity (25)
 
-    private static readonly AnyOfTrigger SequenceGuard = new([
-        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
-        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
-    ]);
-
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
         new SignalExistsTrigger(SignalKeys.TransportProtocolClass),
-        SequenceGuard
+        SequenceGuardTrigger.Default
     ];
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(

@@ -83,12 +83,16 @@ defaults:
     can_escalate: false
 
   parameters:
-    deferred_detector_min_position: 3
     divergence_threshold: 0.4
     timing_tolerance_multiplier: 3.0
     min_centroid_sample_size: 20
     session_gap_minutes: 30
     max_tracked_positions: 20
+    machine_speed_threshold_ms: 20.0
+    machine_speed_score: 0.4
+    unexpected_state_score: 0.5
+    high_request_count_score: 0.3
+    high_request_count_threshold: 50
 
 tags:
   - fast-path

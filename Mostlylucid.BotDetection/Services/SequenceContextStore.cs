@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Mostlylucid.BotDetection.Analysis;
 
 namespace Mostlylucid.BotDetection.Services;
@@ -20,7 +21,7 @@ public sealed record SequenceContext
     public RequestState[] ExpectedChain { get; init; } = Array.Empty<RequestState>();
     public double[] TypicalGapsMs { get; init; } = Array.Empty<double>();
     public double[] GapToleranceMs { get; init; } = Array.Empty<double>();
-    public HashSet<RequestState> ObservedStateSet { get; init; } = [];
+    public ImmutableHashSet<RequestState> ObservedStateSet { get; init; } = ImmutableHashSet<RequestState>.Empty;
     public DateTimeOffset WindowStartTime { get; init; } = DateTimeOffset.UtcNow;
     public int RequestCountInWindow { get; init; }
     public DateTimeOffset LastRequest { get; init; } = DateTimeOffset.UtcNow;

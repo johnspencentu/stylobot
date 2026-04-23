@@ -46,17 +46,10 @@ public class PeriodicityContributor : ConfiguredContributorBase
     public override string Name => "Periodicity";
     public override int Priority => 25; // After behavioral waveform (3), before session vector (30)
 
-    private static readonly AnyOfTrigger SequenceGuard = new([
-        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
-        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
-    ]);
-
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
         new SignalExistsTrigger(SignalKeys.PrimarySignature),
-        SequenceGuard
+        SequenceGuardTrigger.Default
     ];
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(

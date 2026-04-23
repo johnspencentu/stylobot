@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Analysis;
@@ -82,14 +83,16 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     public override IReadOnlyList<TriggerCondition> TriggerConditions => Array.Empty<TriggerCondition>();
 
     // Config-driven parameters
-    // Consumed by deferred detectors' AnyOfTrigger sequence guards (Task 8), not used here.
-    // Declared here so all sequence configuration lives in one YAML section.
-    private int DeferredDetectorMinPosition => GetParam("deferred_detector_min_position", 3);
     private double DivergenceThreshold => GetParam("divergence_threshold", 0.4);
     private double TimingToleranceMultiplier => GetParam("timing_tolerance_multiplier", 3.0);
     private int MinCentroidSampleSize => GetParam("min_centroid_sample_size", 20);
     private int SessionGapMinutes => GetParam("session_gap_minutes", 30);
     private int MaxTrackedPositions => GetParam("max_tracked_positions", 20);
+    private double MachineSpeedThresholdMs => GetParam("machine_speed_threshold_ms", 20.0);
+    private double MachineSpeedScore => GetParam("machine_speed_score", 0.4);
+    private double UnexpectedStateScore => GetParam("unexpected_state_score", 0.5);
+    private double HighRequestCountScore => GetParam("high_request_count_score", 0.3);
+    private int HighRequestCountThreshold => GetParam("high_request_count_threshold", 50);
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
         BlackboardState state,
@@ -180,7 +183,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             WindowStartTime = DateTimeOffset.UtcNow,
             RequestCountInWindow = 1,
             LastRequest = DateTimeOffset.UtcNow,
-            ObservedStateSet = [],
+            ObservedStateSet = ImmutableHashSet<RequestState>.Empty,
             HasDiverged = false,
             DivergenceCount = 0,
             CacheWarm = false,
@@ -231,7 +234,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         var position = Math.Min(ctx.Position + 1, MaxTrackedPositions);
 
         // Track observed states (prefetch requests are recorded but not used for divergence scoring)
-        var observedSet = new HashSet<RequestState>(ctx.ObservedStateSet) { requestState };
+        var observedSet = ctx.ObservedStateSet.Add(requestState);
 
         // Phase window detection
         var phaseIndex = GetPhaseIndex(elapsedMs);
@@ -345,10 +348,10 @@ public class ContentSequenceContributor : ConfiguredContributorBase
     {
         double score = 0.0;
 
-        // Machine-speed timing: sub-20ms between requests is bot-like
+        // Machine-speed timing: sub-threshold ms between requests is bot-like
         var msSinceLastRequest = (DateTimeOffset.UtcNow - ctx.LastRequest).TotalMilliseconds;
-        if (msSinceLastRequest < 20.0)
-            score += 0.4;
+        if (msSinceLastRequest < MachineSpeedThresholdMs)
+            score += MachineSpeedScore;
 
         // State not in expected set for this phase
         // Exception: if cache-warm and ApiCall in critical window, don't penalise
@@ -357,12 +360,12 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         {
             var isCacheWarmException = cacheWarm && requestState == RequestState.ApiCall;
             if (!isCacheWarmException)
-                score += 0.5;
+                score += UnexpectedStateScore;
         }
 
         // High request volume in window
-        if (ctx.RequestCountInWindow > 50)
-            score += 0.3;
+        if (ctx.RequestCountInWindow > HighRequestCountThreshold)
+            score += HighRequestCountScore;
 
         return Math.Min(score, 1.0);
     }

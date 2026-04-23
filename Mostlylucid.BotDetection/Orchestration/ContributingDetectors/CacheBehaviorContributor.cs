@@ -59,19 +59,12 @@ public class CacheBehaviorContributor : ConfiguredContributorBase
     private double GoodCacheConfidence => GetParam("good_cache_confidence", -0.15);
     private double GoodCacheWeight => GetParam("good_cache_weight", 1.0);
 
-    private static readonly AnyOfTrigger SequenceGuard = new([
-        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
-        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
-        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
-    ]);
-
     // Triggered by TransportProtocol signal - moves to Wave 1 so we can read streaming classification
     // SequenceGuard: skip when on-track at positions 0-2 (not enough data for meaningful cache signal).
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
     {
         new SignalExistsTrigger(SignalKeys.TransportProtocol),
-        SequenceGuard
+        SequenceGuardTrigger.Default
     };
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(

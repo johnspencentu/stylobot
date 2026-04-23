@@ -25,6 +25,7 @@ public sealed class AssetHashStore : IAsyncDisposable
     // Populated from DB on startup; updated in-memory immediately on change.
     private readonly ConcurrentDictionary<string, DateTimeOffset> _recentChanges = new();
     private static readonly TimeSpan RecentChangeWindow = TimeSpan.FromHours(24);
+    private readonly Timer _evictionTimer;
 
     public AssetHashStore(
         string connectionString,
@@ -34,6 +35,8 @@ public sealed class AssetHashStore : IAsyncDisposable
         _connectionString = connectionString;
         _centroidStore = centroidStore;
         _logger = logger;
+        _evictionTimer = new Timer(_ => EvictExpiredChanges(), null,
+            TimeSpan.FromHours(1), TimeSpan.FromHours(1));
     }
 
     /// <summary>Create the asset_hashes table and load recent change timestamps into memory.</summary>
@@ -143,8 +146,19 @@ public sealed class AssetHashStore : IAsyncDisposable
         _logger.LogDebug("AssetHashStore loaded {Count} recent changes from DB", _recentChanges.Count);
     }
 
+    private void EvictExpiredChanges()
+    {
+        var cutoff = DateTimeOffset.UtcNow - RecentChangeWindow;
+        foreach (var key in _recentChanges.Keys)
+        {
+            if (_recentChanges.TryGetValue(key, out var changedAt) && changedAt < cutoff)
+                _recentChanges.TryRemove(key, out _);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
+        _evictionTimer.Dispose();
         _writeLock.Dispose();
         if (_anchor is not null)
             await _anchor.DisposeAsync();
