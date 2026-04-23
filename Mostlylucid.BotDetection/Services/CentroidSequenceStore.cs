@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
@@ -46,6 +47,11 @@ public sealed class CentroidSequenceStore
     private volatile FrozenDictionary<string, CentroidSequence> _centroidChains =
         FrozenDictionary<string, CentroidSequence>.Empty;
 
+    // Paths where divergence spiked or asset hash changed — suppress divergence scoring.
+    // Value is the time staleness was declared; expires after StalenessWindowHours.
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _staleEndpoints = new();
+    private const int StalenessWindowHours = 1;
+
     private static readonly RequestState[] TypicalHumanChain =
     [
         RequestState.StaticAsset, RequestState.StaticAsset, RequestState.StaticAsset,
@@ -72,6 +78,24 @@ public sealed class CentroidSequenceStore
     public CentroidSequence GlobalChain => _globalChain;
 
     public void SetGlobalChain(CentroidSequence chain) => _globalChain = chain;
+
+    /// <summary>
+    ///     Mark an endpoint path as stale. ContentSequenceContributor will suppress divergence scoring
+    ///     until the staleness window expires or the centroid is rebuilt.
+    /// </summary>
+    public void MarkEndpointStale(string path)
+        => _staleEndpoints[path] = DateTimeOffset.UtcNow;
+
+    /// <summary>Returns true when the path was marked stale within the last <see cref="StalenessWindowHours"/> hour(s).</summary>
+    public bool IsEndpointStale(string path)
+    {
+        if (!_staleEndpoints.TryGetValue(path, out var markedAt))
+            return false;
+        return DateTimeOffset.UtcNow - markedAt < TimeSpan.FromHours(StalenessWindowHours);
+    }
+
+    /// <summary>Clear staleness for a path — call after a successful centroid rebuild for this path.</summary>
+    public void ClearEndpointStale(string path) => _staleEndpoints.TryRemove(path, out _);
 
     /// <summary>
     ///     Look up a centroid chain by cluster ID. Returns null when the chain has insufficient
