@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Analysis;
+using Mostlylucid.BotDetection.Markov;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
@@ -422,60 +423,11 @@ public class SessionVectorContributor : ConfiguredContributorBase
 
     /// <summary>
     ///     Maps the current request into a Markov state based on transport, path, and response signals.
+    ///     Delegates to <see cref="RequestMarkovClassifier.Classify"/> so <c>ContentSequenceContributor</c>
+    ///     can share the same logic without duplication.
     /// </summary>
     private static RequestState ClassifyRequestState(BlackboardState state)
-    {
-        var context = state.HttpContext;
-        var request = context.Request;
-
-        // Transport-level classification (highest priority)
-        var isStreaming = state.GetSignal<bool?>(SignalKeys.TransportIsStreaming) ?? false;
-        var isSignalR = state.GetSignal<bool?>(SignalKeys.TransportIsSignalR) ?? false;
-        var isUpgrade = state.GetSignal<bool?>(SignalKeys.TransportIsUpgrade) ?? false;
-
-        if (isSignalR) return RequestState.SignalR;
-        if (isUpgrade) return RequestState.WebSocket;
-
-        var acceptHeader = request.Headers.Accept.ToString();
-        if (acceptHeader.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase))
-            return RequestState.ServerSentEvent;
-
-        // Response-based classification
-        var statusCode = context.Response.StatusCode;
-        if (statusCode == 401 || statusCode == 403)
-            return RequestState.AuthAttempt;
-        if (statusCode == 404)
-            return RequestState.NotFound;
-
-        // Content-type classification
-        var protocolClass = state.GetSignal<string>(SignalKeys.TransportProtocolClass);
-        if (protocolClass == "api") return RequestState.ApiCall;
-        if (protocolClass == "static") return RequestState.StaticAsset;
-
-        // Method + content heuristics
-        if (HttpMethods.IsPost(request.Method) || HttpMethods.IsPut(request.Method))
-        {
-            var contentType = request.ContentType ?? "";
-            if (contentType.Contains("form", StringComparison.OrdinalIgnoreCase))
-                return RequestState.FormSubmit;
-            if (contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
-                return RequestState.ApiCall;
-        }
-
-        // Path heuristics
-        var path = request.Path.Value ?? "";
-        if (path.Contains("/search", StringComparison.OrdinalIgnoreCase) ||
-            path.Contains("/find", StringComparison.OrdinalIgnoreCase) ||
-            request.QueryString.Value?.Contains("q=", StringComparison.OrdinalIgnoreCase) == true)
-            return RequestState.Search;
-
-        // Sec-Fetch-Dest for page vs asset
-        var secFetchDest = request.Headers["Sec-Fetch-Dest"].FirstOrDefault();
-        if (secFetchDest is "script" or "style" or "image" or "font")
-            return RequestState.StaticAsset;
-
-        return RequestState.PageView;
-    }
+        => RequestMarkovClassifier.Classify(state);
 
     /// <summary>
     ///     Simplifies paths for Markov state comparison: /users/123/posts → /users/{id}/posts
