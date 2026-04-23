@@ -1,5 +1,4 @@
-using System.Net.Http.Json;
-using System.Text.Json.Serialization;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace Mostlylucid.BotDetection.Llm.Tunnel;
@@ -41,10 +40,10 @@ public sealed class LocalLlmProviderProbe(
             client.BaseAddress ??= new Uri(ollamaBaseUrl.TrimEnd('/') + "/");
         }
 
-        OllamaTagsResponse? tags;
+        string rawJson;
         try
         {
-            tags = await client.GetFromJsonAsync<OllamaTagsResponse>("api/tags", ct);
+            rawJson = await client.GetStringAsync("api/tags", ct);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
@@ -52,7 +51,11 @@ public sealed class LocalLlmProviderProbe(
             return LlmProbeResult.Unready("Ollama unavailable: " + ex.Message);
         }
 
-        if (tags?.Models is null or { Count: 0 })
+        // Parse manually so we don't need reflection-based JSON serialization (AOT-safe)
+        using var doc = JsonDocument.Parse(rawJson);
+        if (!doc.RootElement.TryGetProperty("models", out var modelsElement)
+            || modelsElement.ValueKind != JsonValueKind.Array
+            || modelsElement.GetArrayLength() == 0)
         {
             logger.LogWarning("Ollama at {Url} returned no models.", ollamaBaseUrl);
             return LlmProbeResult.Empty();
@@ -62,19 +65,32 @@ public sealed class LocalLlmProviderProbe(
             ? new HashSet<string>(allowedModels, StringComparer.OrdinalIgnoreCase)
             : null;
 
-        var models = tags.Models
-            .Where(m => allowSet is null || allowSet.Contains(m.Name))
-            .Select(m => new LlmNodeModelInfo
+        var models = new List<LlmNodeModelInfo>();
+        foreach (var m in modelsElement.EnumerateArray())
+        {
+            var name = m.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+            if (string.IsNullOrEmpty(name)) continue;
+            if (allowSet is not null && !allowSet.Contains(name)) continue;
+
+            string? family = null, parameterSize = null, quantizationLevel = null;
+            if (m.TryGetProperty("details", out var detailsEl))
             {
-                Id = m.Name,
-                Family = m.Details?.Family,
-                ParameterSize = m.Details?.ParameterSize,
-                Quantization = m.Details?.QuantizationLevel,
-                ContextLength = Math.Min(maxContextTokens, GuessContextLength(m.Details?.ParameterSize)),
+                family = detailsEl.TryGetProperty("family", out var f) ? f.GetString() : null;
+                parameterSize = detailsEl.TryGetProperty("parameter_size", out var ps) ? ps.GetString() : null;
+                quantizationLevel = detailsEl.TryGetProperty("quantization_level", out var ql) ? ql.GetString() : null;
+            }
+
+            models.Add(new LlmNodeModelInfo
+            {
+                Id = name,
+                Family = family,
+                ParameterSize = parameterSize,
+                Quantization = quantizationLevel,
+                ContextLength = Math.Min(maxContextTokens, GuessContextLength(parameterSize)),
                 Allowed = true,
                 SupportsStreaming = true
-            })
-            .ToList();
+            });
+        }
 
         return new LlmProbeResult
         {
@@ -101,34 +117,6 @@ public sealed class LocalLlmProviderProbe(
         };
     }
 
-    // ── Ollama JSON models (private, not exposed) ──────────────────────────
-
-    private sealed class OllamaTagsResponse
-    {
-        [JsonPropertyName("models")]
-        public List<OllamaModelEntry>? Models { get; set; }
-    }
-
-    private sealed class OllamaModelEntry
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = "";
-
-        [JsonPropertyName("details")]
-        public OllamaModelDetails? Details { get; set; }
-    }
-
-    private sealed class OllamaModelDetails
-    {
-        [JsonPropertyName("family")]
-        public string? Family { get; set; }
-
-        [JsonPropertyName("parameter_size")]
-        public string? ParameterSize { get; set; }
-
-        [JsonPropertyName("quantization_level")]
-        public string? QuantizationLevel { get; set; }
-    }
 }
 
 /// <summary>Result of probing the local LLM provider.</summary>

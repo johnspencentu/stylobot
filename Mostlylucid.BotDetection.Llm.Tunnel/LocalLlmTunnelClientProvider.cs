@@ -97,7 +97,8 @@ public sealed class LocalLlmTunnelClientProvider : ILlmProvider
         LlmSignedInferenceResponse? response;
         try
         {
-            var httpResp = await client.PostAsJsonAsync(completeUrl, signedReq, ct);
+            var httpResp = await client.PostAsJsonAsync(completeUrl, signedReq,
+                TunnelJsonContext.Default.LlmSignedInferenceRequest, ct);
             if (!httpResp.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Tunnel agent returned {StatusCode} for node {NodeId}.",
@@ -106,7 +107,8 @@ public sealed class LocalLlmTunnelClientProvider : ILlmProvider
                 return string.Empty;
             }
 
-            response = await httpResp.Content.ReadFromJsonAsync<LlmSignedInferenceResponse>(
+            response = await httpResp.Content.ReadFromJsonAsync(
+                TunnelJsonContext.Default.LlmSignedInferenceResponse,
                 cancellationToken: ct);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)

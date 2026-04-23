@@ -15,6 +15,7 @@ using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Llm.Cloud.Extensions;
 using Mostlylucid.BotDetection.Llm.LlamaSharp.Extensions;
 using Mostlylucid.BotDetection.Llm.Ollama.Extensions;
+using Mostlylucid.BotDetection.Llm.Tunnel.Extensions;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Telemetry;
@@ -470,9 +471,16 @@ try
                 llmUrl ?? LlmDefaults.DefaultEndpoint,
                 llmModel ?? LlmDefaults.DefaultModel);
         }
+        else if (llmProvider.Equals("localtunnel", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddLocalLlmTunnelClient(opts =>
+            {
+                if (llmKey != null) opts.ConnectionKey = llmKey;
+                if (llmModel != null) opts.DefaultModel = llmModel;
+            });
+        }
         else
         {
-
             if (llmProvider.Equals("llamasharp", StringComparison.OrdinalIgnoreCase))
             {
                 builder.Services.AddStylobotLlamaSharp(opts =>

@@ -129,6 +129,9 @@ public static class LlmTunnelCommand
             builder.WebHost.ConfigureKestrel(k => k.Listen(System.Net.IPAddress.Loopback, agentPort));
         else
             builder.WebHost.ConfigureKestrel(k => k.Listen(System.Net.IPAddress.Loopback, 0));
+        // Register our AOT-safe source-gen context so Results.Ok() and body deserialization work
+        builder.Services.ConfigureHttpJsonOptions(opts =>
+            opts.SerializerOptions.TypeInfoResolverChain.Insert(0, TunnelJsonContext.Default));
         builder.Services.AddLocalLlmTunnelAgent(agentContext);
 
         // Register OllamaLlmProvider (already referenced by console project) via DI

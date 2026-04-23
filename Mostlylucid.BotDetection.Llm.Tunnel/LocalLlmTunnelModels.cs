@@ -31,7 +31,7 @@ public sealed class LlmTunnelConnectionKey
 
     public string Encode()
     {
-        var json = JsonSerializer.Serialize(Payload);
+        var json = JsonSerializer.Serialize(Payload, TunnelJsonContext.Default.LlmTunnelConnectionPayload);
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         return Prefix + Convert.ToBase64String(bytes)
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
@@ -48,7 +48,7 @@ public sealed class LlmTunnelConnectionKey
         if (rem != 0) padded += new string('=', 4 - rem);
         var bytes = Convert.FromBase64String(padded);
         var json = System.Text.Encoding.UTF8.GetString(bytes);
-        var payload = JsonSerializer.Deserialize<LlmTunnelConnectionPayload>(json)
+        var payload = JsonSerializer.Deserialize(json, TunnelJsonContext.Default.LlmTunnelConnectionPayload)
             ?? throw new FormatException("Failed to deserialize connection key payload.");
         return new LlmTunnelConnectionKey { Payload = payload };
     }

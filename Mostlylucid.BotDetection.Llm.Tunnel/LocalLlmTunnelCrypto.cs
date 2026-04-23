@@ -37,7 +37,7 @@ public sealed class LocalLlmTunnelCrypto : IDisposable
     private static string BuildCanonicalRequest(LlmSignedInferenceRequest req)
     {
         // Canonical form: fixed set of fields joined with \n, payload as compact JSON
-        var payloadJson = JsonSerializer.Serialize(req.Payload);
+        var payloadJson = JsonSerializer.Serialize(req.Payload, TunnelJsonContext.Default.LlmTunnelCompletionRequest);
         return string.Join("\n",
             req.RequestId,
             req.NodeId,
