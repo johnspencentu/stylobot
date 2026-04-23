@@ -78,7 +78,7 @@ public class SessionVectorContributor : ConfiguredContributorBase
             }
 
             // Classify the current request into a Markov state
-            var requestState = ClassifyRequestState(state);
+            var requestState = RequestMarkovClassifier.Classify(state);
             var statusCode = state.HttpContext.Response.StatusCode;
             var path = TemplatizePath(state.HttpContext.Request.Path.Value ?? "/");
 
@@ -420,14 +420,6 @@ public class SessionVectorContributor : ConfiguredContributorBase
             IsDatacenter = isDatacenter ? 1f : 0f
         };
     }
-
-    /// <summary>
-    ///     Maps the current request into a Markov state based on transport, path, and response signals.
-    ///     Delegates to <see cref="RequestMarkovClassifier.Classify"/> so <c>ContentSequenceContributor</c>
-    ///     can share the same logic without duplication.
-    /// </summary>
-    private static RequestState ClassifyRequestState(BlackboardState state)
-        => RequestMarkovClassifier.Classify(state);
 
     /// <summary>
     ///     Simplifies paths for Markov state comparison: /users/123/posts → /users/{id}/posts

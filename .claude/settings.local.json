@@ -327,7 +327,18 @@
       "Bash(sips -z 256 256 Mostlylucid.BotDetection/icon.png)",
       "Bash(git check-ignore:*)",
       "Bash(npm test:*)",
-      "Skill(commit-commands:commit)"
+      "Skill(commit-commands:commit)",
+      "Bash(~/.dotnet/tools/jb help:*)",
+      "Bash(~/.dotnet/tools/jb)",
+      "Bash(/tmp/analyze_projects.sh)",
+      "Bash(~/.dotnet/tools/jb inspectcode:*)",
+      "Bash(/tmp/check_references.sh)",
+      "Bash(/tmp/find_test_projects.sh)",
+      "Bash(/tmp/final_analysis.sh)",
+      "Bash(/tmp/dead_code_analysis.sh)",
+      "Bash(/tmp/comprehensive_summary.sh)",
+      "Bash(git merge feature/compliance-packs --no-ff -m ':*)",
+      "Bash(ruby:*)"
     ]
   }
 }

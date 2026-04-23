@@ -21,7 +21,6 @@ public static class RequestMarkovClassifier
         var request = context.Request;
 
         // Transport-level classification (highest priority)
-        var isStreaming = state.GetSignal<bool?>(SignalKeys.TransportIsStreaming) ?? false;
         var isSignalR = state.GetSignal<bool?>(SignalKeys.TransportIsSignalR) ?? false;
         var isUpgrade = state.GetSignal<bool?>(SignalKeys.TransportIsUpgrade) ?? false;
 
@@ -75,9 +74,14 @@ public static class RequestMarkovClassifier
     /// </summary>
     public static bool IsPrefetchRequest(HttpRequest request)
     {
-        // Chromium/Firefox: Purpose: prefetch header
+        // Chromium/Firefox: Purpose: prefetch header (older)
         var purpose = request.Headers["Purpose"].FirstOrDefault();
         if (string.Equals(purpose, "prefetch", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Chrome 112+: Sec-Purpose: prefetch (Fetch Metadata equivalent)
+        var secPurpose = request.Headers["Sec-Purpose"].FirstOrDefault();
+        if (string.Equals(secPurpose, "prefetch", StringComparison.OrdinalIgnoreCase))
             return true;
 
         // Sec-Fetch-Mode: no-cors + Sec-Fetch-Dest: document = browser-initiated prefetch

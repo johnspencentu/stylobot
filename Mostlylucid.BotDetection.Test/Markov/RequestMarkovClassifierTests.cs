@@ -164,6 +164,14 @@ public class RequestMarkovClassifierTests
     }
 
     [Fact]
+    public void IsPrefetchRequest_sec_purpose_header_returns_true()
+    {
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Sec-Purpose"] = "prefetch";
+        Assert.True(RequestMarkovClassifier.IsPrefetchRequest(ctx.Request));
+    }
+
+    [Fact]
     public void IsPrefetchRequest_no_cors_document_returns_true()
     {
         var ctx = new DefaultHttpContext();
