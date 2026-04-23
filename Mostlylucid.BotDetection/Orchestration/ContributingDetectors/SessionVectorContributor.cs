@@ -41,11 +41,20 @@ public class SessionVectorContributor : ConfiguredContributorBase
     public override string Name => "SessionVector";
     public override int Priority => Manifest?.Priority ?? 30;
 
+    private static readonly AnyOfTrigger SequenceGuard = new([
+        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
+        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
+        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
+        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
+    ]);
+
     // Requires the unified HMAC primary signature.
-    public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
-    {
-        new SignalExistsTrigger(SignalKeys.PrimarySignature)
-    };
+    // SequenceGuard: skip when on-track at positions 0-2 (not enough data for meaningful signal).
+    public override IReadOnlyList<TriggerCondition> TriggerConditions =>
+    [
+        new SignalExistsTrigger(SignalKeys.PrimarySignature),
+        SequenceGuard
+    ];
 
     // Config-driven thresholds
     private int MinSessionRequests => GetParam("min_session_requests", 5);

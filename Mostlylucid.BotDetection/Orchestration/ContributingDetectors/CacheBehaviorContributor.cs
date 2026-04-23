@@ -59,10 +59,19 @@ public class CacheBehaviorContributor : ConfiguredContributorBase
     private double GoodCacheConfidence => GetParam("good_cache_confidence", -0.15);
     private double GoodCacheWeight => GetParam("good_cache_weight", 1.0);
 
+    private static readonly AnyOfTrigger SequenceGuard = new([
+        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
+        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
+        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
+        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
+    ]);
+
     // Triggered by TransportProtocol signal - moves to Wave 1 so we can read streaming classification
+    // SequenceGuard: skip when on-track at positions 0-2 (not enough data for meaningful cache signal).
     public override IReadOnlyList<TriggerCondition> TriggerConditions => new TriggerCondition[]
     {
-        new SignalExistsTrigger(SignalKeys.TransportProtocol)
+        new SignalExistsTrigger(SignalKeys.TransportProtocol),
+        SequenceGuard
     };
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
@@ -87,6 +96,23 @@ public class CacheBehaviorContributor : ConfiguredContributorBase
                 ConfidenceDelta = 0.0,
                 Weight = 1.0,
                 Reason = "Cache analysis skipped for streaming transport (non-cacheable by design)"
+            });
+            return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
+        }
+
+        // Skip cache validation checks when sequence.cache_warm — browsers with warm CDN caches
+        // make no static asset requests and never send If-None-Match on first visit.
+        var cacheWarm = state.Signals.TryGetValue(SignalKeys.SequenceCacheWarm, out var cwObj) && cwObj is bool cw && cw;
+        if (cacheWarm)
+        {
+            state.WriteSignal("cache.skipped_cache_warm", true);
+            contributions.Add(new DetectionContribution
+            {
+                DetectorName = Name,
+                Category = "CacheBehavior",
+                ConfidenceDelta = 0.0,
+                Weight = 1.0,
+                Reason = "Cache analysis skipped: sequence indicates browser cache warm (no static requests expected)"
             });
             return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
         }

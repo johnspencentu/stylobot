@@ -50,9 +50,17 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
     public override string Name => "ResourceWaterfall";
     public override int Priority => 22; // After behavioral (20), before periodicity (25)
 
+    private static readonly AnyOfTrigger SequenceGuard = new([
+        new SignalNotExistsTrigger(SignalKeys.SequencePosition),
+        new SignalValueTrigger<bool>(SignalKeys.SequenceOnTrack, false),
+        new SignalValueTrigger<bool>(SignalKeys.SequenceDiverged, true),
+        new SignalPredicateTrigger<int>(SignalKeys.SequencePosition, pos => pos >= 3, "position >= 3")
+    ]);
+
     public override IReadOnlyList<TriggerCondition> TriggerConditions =>
     [
-        new SignalExistsTrigger(SignalKeys.TransportProtocolClass)
+        new SignalExistsTrigger(SignalKeys.TransportProtocolClass),
+        SequenceGuard
     ];
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
@@ -108,7 +116,9 @@ public class ResourceWaterfallContributor : ConfiguredContributorBase
         }
 
         // Strong bot signal: multiple documents, zero assets (no rendering at all)
-        if (tracker.AssetCount == 0)
+        // Skip if sequence.cache_warm — browser has warm CDN cache, no static asset requests expected
+        var cacheWarm = state.Signals.TryGetValue(SignalKeys.SequenceCacheWarm, out var cwObj) && cwObj is bool cw && cw;
+        if (tracker.AssetCount == 0 && !cacheWarm)
         {
             contributions.Add(BotContribution(
                 "NoAssets",
