@@ -92,6 +92,20 @@ public sealed record SignalExistsTrigger(string SignalKey) : TriggerCondition
 }
 
 /// <summary>
+///     Trigger when a specific signal key does NOT exist.
+///     Use to skip a detector when a controlling signal has been written.
+/// </summary>
+public sealed record SignalNotExistsTrigger(string SignalKey) : TriggerCondition
+{
+    public override string Description => $"Signal '{SignalKey}' does not exist";
+
+    public override bool IsSatisfied(IReadOnlyDictionary<string, object> signals)
+    {
+        return !signals.ContainsKey(SignalKey);
+    }
+}
+
+/// <summary>
 ///     Trigger when a signal has a specific value
 /// </summary>
 public sealed record SignalValueTrigger<T>(string SignalKey, T ExpectedValue) : TriggerCondition
