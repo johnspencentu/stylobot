@@ -166,6 +166,8 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         // Resolve the best available chain for this fingerprint
         var (chain, centroidId) = ResolveChain(signature);
 
+        var contentPath = request.Path.Value ?? "/";
+
         // Build fresh context at position 0
         var newCtx = ctx with
         {
@@ -181,11 +183,10 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             ObservedStateSet = [],
             HasDiverged = false,
             DivergenceCount = 0,
-            CacheWarm = false
+            CacheWarm = false,
+            ContentPath = contentPath
         };
         _contextStore.Update(signature, newCtx);
-
-        var contentPath = request.Path.Value ?? "/";
 
         // Track session for divergence rate analysis
         _divergenceTracker.RecordSession(contentPath);
@@ -252,7 +253,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
         // On divergence: record for staleness tracking; if rate exceeds threshold, mark centroid stale
         if (hasDiverged)
         {
-            var contentPath = state.GetSignal<string>(SignalKeys.SequenceContentPath) ?? string.Empty;
+            var contentPath = ctx.ContentPath;
             if (!string.IsNullOrEmpty(contentPath))
             {
                 _divergenceTracker.RecordDivergence(contentPath);
@@ -297,8 +298,7 @@ public class ContentSequenceContributor : ConfiguredContributorBase
             new(SignalKeys.SequenceChainId, ctx.ChainId),
             new(SignalKeys.SequenceCentroidType, ctx.CentroidType.ToString()),
             new(SignalKeys.SequenceCacheWarm, cacheWarm),
-            new(SignalKeys.SequenceCentroidStale, _centroidStore.IsEndpointStale(
-                state.GetSignal<string>(SignalKeys.SequenceContentPath) ?? string.Empty))
+            new(SignalKeys.SequenceCentroidStale, _centroidStore.IsEndpointStale(ctx.ContentPath))
         ]);
 
         if (isPrefetch)

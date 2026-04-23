@@ -27,6 +27,7 @@ public sealed record SequenceContext
     public bool HasDiverged { get; init; }
     public int DivergenceCount { get; init; }
     public bool CacheWarm { get; init; }
+    public string ContentPath { get; init; } = string.Empty;
 }
 
 /// <summary>
