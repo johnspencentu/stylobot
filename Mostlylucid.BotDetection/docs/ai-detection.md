@@ -469,29 +469,40 @@ flowchart LR
         L4[Full reasoning, GPU]
     end
 
+    subgraph Tunnel["Local LLM Tunnel"]
+        T1[Moderate: 50-500ms + tunnel]
+        T2[Remote GPU via Cloudflare]
+        T3[None on server]
+        T4[Full reasoning, remote GPU]
+    end
+
     Request([Request]) --> Decision{Choose Provider}
     Decision -->|Default| Heuristic
     Decision -->|"LLM (prod)"| LlamaSharp
-    Decision -->|"LLM (GPU)"| Ollama
+    Decision -->|"LLM (GPU, local)"| Ollama
+    Decision -->|"LLM (GPU, remote)"| Tunnel
 ```
 
-| Feature          | Heuristic                       | LlamaSharp               | Ollama                |
-|------------------|---------------------------------|--------------------------|-----------------------|
-| **Latency**      | <1ms                            | 50-200ms                 | 50-500ms              |
-| **Accuracy**     | Good (pattern-based + learning) | Best (full reasoning)    | Best (full reasoning) |
-| **Resources**    | ~10KB memory                    | 500MB-1GB RAM            | 1-4GB RAM             |
-| **Dependencies** | None (in-process)               | None (in-process)        | Ollama server         |
-| **GPU Support**  | N/A                             | No (CPU only)            | Yes                   |
-| **Offline**      | Yes                             | Yes                      | Yes (local)           |
-| **Learning**     | Continuous                      | Static                   | Static                |
-| **Use Cases**    | Inline detection                | Classification, naming, narratives | Classification, naming, narratives |
+| Feature          | Heuristic                       | LlamaSharp               | Ollama                | Local LLM Tunnel               |
+|------------------|---------------------------------|--------------------------|-----------------------|--------------------------------|
+| **Latency**      | <1ms                            | 50-200ms                 | 50-500ms              | 50-500ms + tunnel overhead     |
+| **Accuracy**     | Good (pattern-based + learning) | Best (full reasoning)    | Best (full reasoning) | Best (full reasoning)          |
+| **Resources**    | ~10KB memory                    | 500MB-1GB RAM            | 1-4GB RAM             | None on server                 |
+| **Dependencies** | None (in-process)               | None (in-process)        | Ollama server         | cloudflared + remote Ollama    |
+| **GPU Support**  | N/A                             | No (CPU only)            | Yes                   | Yes (on local machine)         |
+| **Offline**      | Yes                             | Yes                      | Yes (local)           | No (requires tunnel)           |
+| **Learning**     | Continuous                      | Static                   | Static                | Static                         |
+| **Use Cases**    | Inline detection                | Classification, naming, narratives | Classification, naming, narratives | GPU inference from GPU-less VPS |
+
+See [local-llm-tunnel.md](local-llm-tunnel.md) for full setup instructions.
 
 ### Recommendation
 
 1. **Start with Heuristic only** -- Fast, low overhead, continuously learns
 2. **Add LlamaSharp for LLM features** -- Zero external deps, good for production
-3. **Use Ollama when GPU is available** -- Faster inference on GPU hardware
-4. **Enable learning** -- Continuous improvement of heuristic weights
+3. **Use Ollama when GPU is available on the same machine** -- Faster inference on GPU hardware
+4. **Use Local LLM Tunnel when GPU is on a different machine** -- Route inference to a local GPU from a cloud VPS
+5. **Enable learning** -- Continuous improvement of heuristic weights
 
 ```json
 {
