@@ -539,12 +539,48 @@ public class StyloBotDashboardMiddleware
             ? _aggregateCache.Current.UserAgents
             : await ComputeUserAgentsFallbackAsync();
 
-        InvestigationViewModel? investigationVm = null;
+        ShapeInvestigationViewModel? investigationVm = null;
         if (tab.Equals("investigate", StringComparison.OrdinalIgnoreCase))
         {
-            var invFilter = ParseInvestigationFilter(context);
-            var invResult = await _eventStore.GetInvestigationAsync(invFilter);
-            investigationVm = BuildInvestigationViewModel(invFilter, invResult, context);
+            var shapeFilter = ParseShapeSearchFilter(context);
+            InvestigationResult invResult;
+            var shapeStore = context.RequestServices.GetService<IShapeSearchStore>();
+            if (shapeFilter.TargetShape is not null && shapeStore is not null)
+            {
+                invResult = await shapeStore.SearchByShapeAsync(shapeFilter);
+            }
+            else
+            {
+                var invFilter = new InvestigationFilter
+                {
+                    EntityType = context.Request.Query["type"].FirstOrDefault() ?? "signature",
+                    EntityValue = context.Request.Query["value"].FirstOrDefault() ?? "",
+                    Start = shapeFilter.Start,
+                    End = shapeFilter.End,
+                    Tab = shapeFilter.Tab,
+                    Offset = shapeFilter.Offset
+                };
+                invResult = await _eventStore.GetInvestigationAsync(invFilter);
+            }
+
+            var invPresets = shapeStore is not null
+                ? await shapeStore.GetPresetsAsync()
+                : Array.Empty<InvestigationPreset>();
+            var invHasCommercial = IsCommercialMode(context);
+            var invTabs = new List<string> { "detections", "signatures", "endpoints", "geo", "signaltrace" };
+            if (invHasCommercial) invTabs.Insert(invTabs.Count - 1, "fingerprints");
+
+            investigationVm = new ShapeInvestigationViewModel
+            {
+                Filter = shapeFilter,
+                Result = invResult,
+                BasePath = _options.BasePath,
+                FilterGroups = ShapeFilterGroups,
+                Presets = invPresets.ToList(),
+                AvailableTabs = invTabs,
+                HasShapeSearch = shapeStore is not null,
+                IsPaid = invHasCommercial
+            };
         }
 
         var model = new DashboardShellModel
