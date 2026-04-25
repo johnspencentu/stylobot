@@ -123,6 +123,13 @@ patterns:
       - "*.applebot.apple.com"
 
   # === AI Search Bots (user-initiated queries, lower risk) ===
+  - pattern: Amazonbot
+    bot_name: Amazonbot
+    bot_type: GoodBot
+    vendor: Amazon
+    ai_category: Search
+    verified_domains:
+      - "*.amazonbot.amazon.com"
   - pattern: OAI-SearchBot
     bot_name: OAI-SearchBot
     bot_type: GoodBot
