@@ -429,11 +429,16 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
 
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT signature, bot_name, bot_type, bot_probability, hit_count, last_seen,
-                   threat_score, threat_band, action, narrative
-            FROM signatures
-            WHERE is_bot = 1
-            ORDER BY hit_count DESC
+            SELECT s.signature, s.bot_name, s.bot_type, s.bot_probability, s.hit_count, s.last_seen,
+                   s.threat_score, s.threat_band, s.action, s.narrative, s.top_reasons_json, s.country_code,
+                   (SELECT json_extract(ses.paths_json, '$[0]')
+                    FROM sessions ses
+                    WHERE ses.signature = s.signature AND ses.paths_json IS NOT NULL AND ses.is_bot = 1
+                    ORDER BY ses.ended_at DESC
+                    LIMIT 1) AS last_path
+            FROM signatures s
+            WHERE s.is_bot = 1
+            ORDER BY s.hit_count DESC
             LIMIT @count
             """;
         cmd.Parameters.AddWithValue("@count", count);
@@ -442,6 +447,12 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
+            List<string>? topReasons = null;
+            if (!reader.IsDBNull(10))
+            {
+                try { topReasons = System.Text.Json.JsonSerializer.Deserialize<List<string>>(reader.GetString(10)); }
+                catch { /* ignore malformed json */ }
+            }
             results.Add(new DashboardTopBotEntry
             {
                 PrimarySignature = reader.GetString(0),
@@ -453,7 +464,10 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 ThreatScore = reader.IsDBNull(6) ? 0 : reader.GetDouble(6),
                 ThreatBand = reader.IsDBNull(7) ? null : reader.GetString(7),
                 Action = reader.IsDBNull(8) ? null : reader.GetString(8),
-                Narrative = reader.IsDBNull(9) ? null : reader.GetString(9)
+                Narrative = reader.IsDBNull(9) ? null : reader.GetString(9),
+                TopReasons = topReasons,
+                CountryCode = reader.IsDBNull(11) ? null : reader.GetString(11),
+                LastPath = reader.IsDBNull(12) ? null : reader.GetString(12)
             });
         }
         return results;

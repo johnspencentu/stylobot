@@ -61,25 +61,8 @@ public sealed class EntityResolutionService : BackgroundService
 
     private async Task AnalyzeEntitiesAsync(CancellationToken ct)
     {
-        // Get entities with enough sessions for analysis
-        // For now, iterate all entities - optimize with a "needs_analysis" flag later
-        await using var conn = new Microsoft.Data.Sqlite.SqliteConnection(
-            ((SqliteSessionStore)_store).ConnectionString);
-        await conn.OpenAsync(ct);
-
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            SELECT DISTINCT e.entity_id FROM entities e
-            INNER JOIN entity_edges ee ON e.entity_id = ee.entity_id AND ee.reverted_at IS NULL
-            WHERE e.updated_at >= @cutoff
-            ORDER BY e.updated_at DESC LIMIT 100
-        """;
-        cmd.Parameters.AddWithValue("@cutoff", DateTime.UtcNow.AddHours(-24).ToString("O"));
-
-        var entityIds = new List<string>();
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-            entityIds.Add(reader.GetString(0));
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        var entityIds = await _store.GetActiveEntityIdsAsync(cutoff, 100, ct);
 
         // Per-entity analysis: velocity, oscillation, rotation, confidence
         foreach (var entityId in entityIds)

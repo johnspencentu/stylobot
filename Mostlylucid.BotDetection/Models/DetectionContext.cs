@@ -993,6 +993,24 @@ public static class SignalKeys
     /// <summary>Float[]: velocity vector between last two completed sessions</summary>
     public const string SessionVelocityVector = "session.velocity_vector";
 
+    /// <summary>Float: gap-normalized velocity magnitude (magnitude / sqrt(gap_hours + 1)). High = fast rotation.</summary>
+    public const string SessionVelocityGapNormalized = "session.velocity_gap_normalized";
+
+    /// <summary>Float: L2 magnitude of the Markov-only component of the velocity vector (dims [0..N²])</summary>
+    public const string SessionVelocityMarkovMagnitude = "session.velocity_markov_magnitude";
+
+    /// <summary>Float: L2 magnitude of the temporal component of velocity (timing-only shift)</summary>
+    public const string SessionVelocityTemporalMagnitude = "session.velocity_temporal_magnitude";
+
+    /// <summary>Float: L2 magnitude of the fingerprint component of velocity (TLS/HTTP2/TCP shift = rotation trail)</summary>
+    public const string SessionVelocityFingerprintMagnitude = "session.velocity_fingerprint_magnitude";
+
+    /// <summary>Float: L2 magnitude of the acceleration vector (velocity between velocities). Zero = constant rotation rate.</summary>
+    public const string SessionVelocityAcceleration = "session.velocity_acceleration";
+
+    /// <summary>Boolean: fingerprint dims dominate the velocity vector (rotation trail pattern)</summary>
+    public const string SessionVelocityIsFingerprintRotation = "session.velocity_is_fingerprint_rotation";
+
     /// <summary>String: name of the matched behavioral archetype from partial chain early detection</summary>
     public const string SessionPartialChainMatch = "session.partial_chain_match";
 

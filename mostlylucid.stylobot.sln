@@ -29,8 +29,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.BotDetection.Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.BotDetection.Test", "Mostlylucid.BotDetection.Test\Mostlylucid.BotDetection.Test.csproj", "{82146812-BD70-49F2-BDB6-47E4D4496DB0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.BotDetection.UI.PostgreSQL", "Mostlylucid.BotDetection.UI.PostgreSQL\Mostlylucid.BotDetection.UI.PostgreSQL.csproj", "{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mostlylucid.GeoDetection.Test", "Mostlylucid.GeoDetection.Test\Mostlylucid.GeoDetection.Test.csproj", "{A37A239F-4888-4C1F-A899-258F60F165EA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stylobot.Gateway", "Stylobot.Gateway\Stylobot.Gateway.csproj", "{AA9CFA0B-F877-49CF-B634-79743075460A}"
@@ -256,18 +254,6 @@ Global
 		{82146812-BD70-49F2-BDB6-47E4D4496DB0}.Release|x64.Build.0 = Release|Any CPU
 		{82146812-BD70-49F2-BDB6-47E4D4496DB0}.Release|x86.ActiveCfg = Release|Any CPU
 		{82146812-BD70-49F2-BDB6-47E4D4496DB0}.Release|x86.Build.0 = Release|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Debug|x64.Build.0 = Debug|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Debug|x86.Build.0 = Debug|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Release|x64.ActiveCfg = Release|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Release|x64.Build.0 = Release|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Release|x86.ActiveCfg = Release|Any CPU
-		{143FC368-9CC5-4573-97D9-2A49D9A0B5C5}.Release|x86.Build.0 = Release|Any CPU
 		{A37A239F-4888-4C1F-A899-258F60F165EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A37A239F-4888-4C1F-A899-258F60F165EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A37A239F-4888-4C1F-A899-258F60F165EA}.Debug|x64.ActiveCfg = Debug|Any CPU

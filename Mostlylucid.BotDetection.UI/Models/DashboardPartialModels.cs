@@ -17,6 +17,8 @@ public sealed class VisitorListModel
     public required int PageSize { get; init; }
     public required int TotalCount { get; init; }
     public required string BasePath { get; init; }
+    public string NavBasePath { get; init; } = "";
+    public string ResolvedNavBasePath => string.IsNullOrEmpty(NavBasePath) ? BasePath : NavBasePath;
     public int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalCount / PageSize));
 }
 
@@ -197,6 +199,9 @@ public sealed class TopBotsListModel
     public required string SortField { get; init; }
     public string SortDir { get; init; } = "desc";
     public required string BasePath { get; init; }
+    /// <summary>Base path for user-facing navigation links (investigate, signature detail). Defaults to BasePath.</summary>
+    public string NavBasePath { get; init; } = "";
+    public string ResolvedNavBasePath => string.IsNullOrEmpty(NavBasePath) ? BasePath : NavBasePath;
     public int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalCount / PageSize));
 }
 

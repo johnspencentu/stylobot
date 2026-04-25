@@ -62,6 +62,12 @@ public sealed record DashboardDetectionEvent
     /// </summary>
     public string? UserAgentRaw { get; init; }
 
+    /// <summary>
+    ///     16-dimensional radar shape vector for visual fingerprint display.
+    ///     Derived from detector contributions and signal dimensions at detection time.
+    /// </summary>
+    public float[]? RadarShape { get; init; }
+
     // Sparkline history removed from SignalR broadcasts to reduce payload bloat.
     // Clients fetch sparkline data on-demand via the dashboard API endpoints.
 }

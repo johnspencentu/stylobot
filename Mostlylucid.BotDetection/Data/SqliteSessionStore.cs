@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Similarity;
 
 namespace Mostlylucid.BotDetection.Data;
 
@@ -18,16 +19,18 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
 {
     private readonly string _connectionString;
 
-    /// <summary>Connection string for direct access by background services.</summary>
-    internal string ConnectionString => _connectionString;
+    public string? PersistenceConnectionString => _connectionString;
     private readonly ILogger<SqliteSessionStore> _logger;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private bool _initialized;
+    private ISessionVectorSearch? _vectorSearch;
 
     public SqliteSessionStore(
         ILogger<SqliteSessionStore> logger,
-        IOptions<BotDetectionOptions> options)
+        IOptions<BotDetectionOptions> options,
+        ISessionVectorSearch? vectorSearch = null)
     {
+        _vectorSearch = vectorSearch;
         _logger = logger;
         var basePath = Path.GetDirectoryName(
             options.Value.DatabasePath ?? Path.Combine(AppContext.BaseDirectory, "botdetection.db"))
@@ -219,6 +222,14 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             await cmd.ExecuteNonQueryAsync(ct);
         }
         finally { _writeLock.Release(); }
+
+        // Feed session vector into the HNSW index (non-blocking, fire-and-forget on the Task)
+        if (_vectorSearch != null && session.Vector is { Length: > 0 })
+        {
+            var vector = DeserializeVector(session.Vector);
+            if (vector != null)
+                _ = AddToVectorSearchAsync(vector, session.Signature, session.IsBot, session.AvgBotProbability);
+        }
     }
 
     public async Task UpsertSignatureAsync(PersistedSignature signature, CancellationToken ct = default)
@@ -491,13 +502,33 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     public async Task<List<(PersistedSession Session, float Similarity)>> FindSimilarSessionsAsync(
         float[] queryVector, int topK = 10, float minSimilarity = 0.7f, CancellationToken ct = default)
     {
-        // Brute-force cosine similarity - adequate for <100K sessions.
-        // Commercial PostgreSQL + pgvector provides native HNSW for larger deployments.
         await EnsureInitializedAsync(ct);
+
+        // Fast path: HNSW ANN index (O(log n), sub-millisecond)
+        if (_vectorSearch != null)
+        {
+            var matches = await _vectorSearch.FindSimilarAsync(queryVector, topK, minSimilarity);
+            var results = new List<(PersistedSession, float)>(matches.Count);
+            foreach (var match in matches)
+            {
+                var sessions = await GetSessionsAsync(match.Signature, 1, ct);
+                if (sessions.Count > 0)
+                    results.Add((sessions[0], match.Similarity));
+            }
+            return results;
+        }
+
+        // Fallback: brute-force cosine scan (used when HNSW index is not registered,
+        // e.g. during testing or if AddBotDetection() is called without AddSimilaritySearch())
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM sessions WHERE vector IS NOT NULL ORDER BY ended_at DESC LIMIT 10000";
+        cmd.CommandText = """
+            SELECT * FROM sessions
+            WHERE vector IS NOT NULL AND maturity >= 0.3
+            ORDER BY ended_at DESC
+            LIMIT 5000
+        """;
 
         var candidates = new List<(PersistedSession session, float similarity)>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -519,6 +550,29 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     }
 
     // === Entity Resolution ===
+
+    public async Task<List<string>> GetActiveEntityIdsAsync(DateTime cutoff, int limit = 100, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT DISTINCT e.entity_id FROM entities e
+            INNER JOIN entity_edges ee ON e.entity_id = ee.entity_id AND ee.reverted_at IS NULL
+            WHERE e.updated_at >= @cutoff
+            ORDER BY e.updated_at DESC LIMIT @limit
+        """;
+        cmd.Parameters.AddWithValue("@cutoff", cutoff.ToString("O"));
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var entityIds = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            entityIds.Add(reader.GetString(0));
+        return entityIds;
+    }
 
     /// <summary>Cosine similarity threshold for merging a new signature into an existing entity.</summary>
     private const float MergeSimilarityThreshold = 0.85f;
@@ -809,6 +863,223 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         RevertedAt = reader.IsDBNull(reader.GetOrdinal("reverted_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("reverted_at")))
     };
 
+    public async Task PruneBucketsAsync(TimeSpan retention, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        var cutoff = DateTime.UtcNow.Subtract(retention).ToString("O");
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM buckets WHERE bucket_time < @cutoff";
+            cmd.Parameters.AddWithValue("@cutoff", cutoff);
+            var deleted = await cmd.ExecuteNonQueryAsync(ct);
+            if (deleted > 0)
+                _logger.LogInformation("Pruned {Count} bucket rows older than {Retention}", deleted, retention);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task<List<(string Signature, int SessionCount)>> GetOverflowingSignaturesAsync(
+        int maxPerSignature, int limit = 500, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT signature, COUNT(*) as cnt
+            FROM sessions
+            GROUP BY signature
+            HAVING cnt > @max
+            ORDER BY cnt DESC
+            LIMIT @limit
+        """;
+        cmd.Parameters.AddWithValue("@max", maxPerSignature);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var results = new List<(string, int)>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            results.Add((reader.GetString(0), reader.GetInt32(1)));
+        return results;
+    }
+
+    public async Task<CompactionResult> CompactSignatureSessionsAsync(
+        string signature, int keepCount, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct);
+
+        // Read all sessions for this signature, ordered oldest-first for velocity delta computation
+        await using var readConn = new SqliteConnection(_connectionString);
+        await readConn.OpenAsync(ct);
+        await using var readCmd = readConn.CreateCommand();
+        readCmd.CommandText = """
+            SELECT id, vector, maturity, ended_at FROM sessions
+            WHERE signature = @sig AND vector IS NOT NULL
+            ORDER BY ended_at ASC
+        """;
+        readCmd.Parameters.AddWithValue("@sig", signature);
+
+        var rows = new List<(long Id, byte[] Vector, float Maturity, DateTime EndedAt)>();
+        await using var reader = await readCmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            if (!reader.IsDBNull(1))
+                rows.Add((reader.GetInt64(0), (byte[])reader[1], reader.GetFloat(2),
+                    DateTime.Parse(reader.GetString(3))));
+        }
+
+        if (rows.Count <= keepCount)
+            return new CompactionResult { Signature = signature, CompactedCount = 0 };
+
+        // Rows to compact: all except the most recent keepCount
+        var toCompact = rows[..^keepCount];
+        var keepIds = rows[^keepCount..].Select(r => r.Id).ToHashSet();
+
+        // Deserialize vectors for compaction
+        var vecs = new List<(float[] Vector, float Maturity)>(toCompact.Count);
+        foreach (var (_, rawVec, maturity, _) in toCompact)
+        {
+            var v = DeserializeVector(rawVec);
+            if (v != null) vecs.Add((v, maturity));
+        }
+
+        if (vecs.Count == 0)
+            return new CompactionResult { Signature = signature, CompactedCount = 0 };
+
+        // Maturity-weighted behavioral centroid
+        var dims = vecs[0].Vector.Length;
+        var centroid = new float[dims];
+        double totalWeight = 0;
+        foreach (var (vec, mat) in vecs)
+        {
+            totalWeight += mat;
+            for (var i = 0; i < dims; i++)
+                centroid[i] += vec[i] * mat;
+        }
+        if (totalWeight > 0)
+            for (var i = 0; i < dims; i++)
+                centroid[i] /= (float)totalWeight;
+
+        // Velocity centroid: average of consecutive session deltas (preserves drift direction)
+        float[]? velocityCentroid = null;
+        if (vecs.Count >= 2)
+        {
+            var velSum = new float[dims];
+            var velCount = 0;
+            for (var i = 1; i < vecs.Count; i++)
+            {
+                var delta = Analysis.SessionVectorizer.ComputeVelocity(vecs[i].Vector, vecs[i - 1].Vector);
+                for (var d = 0; d < dims; d++)
+                    velSum[d] += delta[d];
+                velCount++;
+            }
+            velocityCentroid = new float[dims];
+            for (var d = 0; d < dims; d++)
+                velocityCentroid[d] = velSum[d] / velCount;
+        }
+
+        var avgMaturity = (float)(totalWeight / vecs.Count);
+        var compactedCentroidBytes = SerializeVector(centroid);
+
+        // Update signature root_vector with the compacted centroid, delete old session rows
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+
+            // Update root_vector on signature
+            await using var updateCmd = conn.CreateCommand();
+            updateCmd.CommandText = """
+                UPDATE signatures
+                SET root_vector = @vec, root_vector_maturity = @mat
+                WHERE signature_id = @sig
+            """;
+            updateCmd.Parameters.AddWithValue("@vec", compactedCentroidBytes);
+            updateCmd.Parameters.AddWithValue("@mat", avgMaturity);
+            updateCmd.Parameters.AddWithValue("@sig", signature);
+            await updateCmd.ExecuteNonQueryAsync(ct);
+
+            // Delete compacted session rows (keep most recent keepCount)
+            var idsToDelete = toCompact.Select(r => r.Id).ToList();
+            if (idsToDelete.Count > 0)
+            {
+                await using var delCmd = conn.CreateCommand();
+                delCmd.CommandText = $"""
+                    DELETE FROM sessions WHERE id IN ({string.Join(",", idsToDelete)})
+                """;
+                await delCmd.ExecuteNonQueryAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+        }
+        finally { _writeLock.Release(); }
+
+        _logger.LogDebug(
+            "Compacted {Count} sessions for signature {Sig} (kept {Keep} full-resolution)",
+            toCompact.Count, signature[..Math.Min(8, signature.Length)], keepCount);
+
+        return new CompactionResult
+        {
+            Signature = signature,
+            BehavioralCentroid = centroid,
+            VelocityCentroid = velocityCentroid,
+            CompactedCount = toCompact.Count,
+            CentroidMaturity = avgMaturity
+        };
+    }
+
+    public async Task<List<CompactionSignatureInfo>> GetSignaturePriorityInfoAsync(
+        List<string> signatures, CancellationToken ct = default)
+    {
+        if (signatures.Count == 0) return [];
+        await EnsureInitializedAsync(ct);
+
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+
+        // Parameterized IN clause
+        var paramNames = signatures.Select((_, i) => $"@p{i}").ToList();
+        cmd.CommandText = $"""
+            SELECT s.signature_id, COUNT(se.id) as session_count,
+                   s.bot_probability, s.risk_band, s.is_bot, s.last_seen,
+                   CASE WHEN EXISTS(
+                       SELECT 1 FROM entity_edges ee
+                       WHERE ee.signature = s.signature_id AND ee.reverted_at IS NULL
+                   ) THEN 1 ELSE 0 END as has_entity
+            FROM signatures s
+            LEFT JOIN sessions se ON se.signature = s.signature_id
+            WHERE s.signature_id IN ({string.Join(",", paramNames)})
+            GROUP BY s.signature_id
+        """;
+        for (var i = 0; i < signatures.Count; i++)
+            cmd.Parameters.AddWithValue(paramNames[i], signatures[i]);
+
+        var results = new List<CompactionSignatureInfo>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new CompactionSignatureInfo
+            {
+                Signature = reader.GetString(0),
+                SessionCount = reader.GetInt32(1),
+                BotProbability = reader.GetDouble(2),
+                RiskBand = reader.GetString(3),
+                IsBot = reader.GetInt32(4) == 1,
+                LastSeen = DateTime.Parse(reader.GetString(5)),
+                HasEntityMapping = reader.GetInt32(6) == 1
+            });
+        }
+        return results;
+    }
+
     public async Task PruneAsync(TimeSpan retention, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct);
@@ -837,6 +1108,44 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     }
 
     // === Helpers ===
+
+    /// <summary>
+    ///     Looks up the previous session vector for this signature, computes the velocity delta,
+    ///     then adds to the HNSW index with velocity metadata.
+    ///     Runs off the write path; failures are silently swallowed.
+    /// </summary>
+    private async Task AddToVectorSearchAsync(float[] vector, string signature, bool isBot, double botProbability)
+    {
+        try
+        {
+            float[]? velocityVector = null;
+
+            // Quick lookup of the most recent prior session vector (index-backed: O(log n))
+            await using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT vector FROM sessions
+                WHERE signature = @sig AND vector IS NOT NULL
+                ORDER BY ended_at DESC
+                LIMIT 1 OFFSET 1
+            """;
+            cmd.Parameters.AddWithValue("@sig", signature);
+            var raw = await cmd.ExecuteScalarAsync() as byte[];
+            if (raw is { Length: > 0 })
+            {
+                var prevVector = DeserializeVector(raw);
+                if (prevVector != null && prevVector.Length == vector.Length)
+                    velocityVector = Analysis.SessionVectorizer.ComputeVelocity(vector, prevVector);
+            }
+
+            await _vectorSearch!.AddAsync(vector, signature, isBot, botProbability, velocityVector);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to add session vector to HNSW index (non-fatal)");
+        }
+    }
 
     private async Task EnsureInitializedAsync(CancellationToken ct)
     {

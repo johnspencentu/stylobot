@@ -434,20 +434,10 @@ public class BotDetectionOptions
 
     /// <summary>
     ///     Storage provider for bot patterns and IP ranges.
-    ///     - PostgreSQL: Recommended for production when connection string is provided
-    ///     - Sqlite: Fast, good for single-node deployments (default fallback)
+    ///     - Sqlite: Fast, good for single-node deployments (default)
     ///     - Json: Simple file-based, useful for debugging
-    ///     NOTE: When PostgreSQLConnectionString is set, PostgreSQL is used automatically.
     /// </summary>
     public StorageProvider StorageProvider { get; set; } = StorageProvider.Sqlite;
-
-    /// <summary>
-    ///     PostgreSQL connection string for bot detection data storage.
-    ///     When set, automatically enables PostgreSQL as the storage provider.
-    ///     Takes precedence over SQLite - PostgreSQL is always preferred when available.
-    ///     Example: "Host=localhost;Database=botdetection;Username=user;Password=pass"
-    /// </summary>
-    public string? PostgreSQLConnectionString { get; set; }
 
     /// <summary>
     ///     Path to the storage file (SQLite database or JSON file).
@@ -468,6 +458,13 @@ public class BotDetectionOptions
     ///     Recommended for production.
     /// </summary>
     public bool EnableDatabaseWalMode { get; set; } = true;
+
+    /// <summary>
+    ///     Data retention policy. Controls how long each type of data is kept
+    ///     and the maximum size of in-memory/on-disk indexes.
+    ///     DataRetentionService runs the cleanup nightly at the configured time.
+    /// </summary>
+    public RetentionOptions Retention { get; set; } = new();
 
     /// <summary>
     ///     Maximum number of weight entries to cache in memory (LRU cache).
@@ -2320,13 +2317,6 @@ public class AnomalySaverOptions
 /// </summary>
 public enum StorageProvider
 {
-    /// <summary>
-    ///     PostgreSQL database storage (recommended for production).
-    ///     Scalable, supports clustering, and integrates with TimescaleDB.
-    ///     Requires PostgreSQL connection string.
-    /// </summary>
-    PostgreSQL,
-
     /// <summary>
     ///     SQLite database storage.
     ///     Fast indexed queries, good for single-node deployments.

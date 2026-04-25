@@ -274,6 +274,64 @@ public static class SessionVectorizer
         return MathF.Sqrt(sum);
     }
 
+    /// <summary>
+    ///     Gap-normalized velocity magnitude: magnitude / sqrt(gapHours + 1).
+    ///     Bots rotate fast (high normalized velocity); human drift is slow and gap-proportional.
+    ///     Adding 1 prevents divide-by-zero for same-minute sessions.
+    /// </summary>
+    public static float GapNormalizedMagnitude(float[] velocity, TimeSpan gap)
+    {
+        var mag = VelocityMagnitude(velocity);
+        var gapHours = (float)gap.TotalHours;
+        return mag / MathF.Sqrt(gapHours + 1f);
+    }
+
+    /// <summary>
+    ///     Decomposes a velocity vector into per-axis magnitudes.
+    ///     Each component reveals which behavioral dimension is shifting:
+    ///     - MarkovMagnitude: state transition pattern change (scripted path rotation)
+    ///     - StationaryMagnitude: dwell-time shift (role change: scraper vs crawler)
+    ///     - TemporalMagnitude: timing change (fingerprint randomizers adjust timing only)
+    ///     - FingerprintMagnitude: TLS/HTTP2/TCP/headless change (rotation trail)
+    ///     - TransitionTimingMagnitude: inter-state timing anomaly shift
+    /// </summary>
+    public static VelocityDecomposition DecomposeVelocity(float[] velocity)
+    {
+        var stateCount = Enum.GetValues<RequestState>().Length;
+        var markovEnd = stateCount * stateCount;
+        var stationaryEnd = markovEnd + stateCount;
+        var temporalEnd = stationaryEnd + 8;
+        var fingerprintEnd = temporalEnd + 8;
+
+        return new VelocityDecomposition(
+            L2Slice(velocity, 0, markovEnd),
+            L2Slice(velocity, markovEnd, stationaryEnd),
+            L2Slice(velocity, stationaryEnd, temporalEnd),
+            L2Slice(velocity, temporalEnd, Math.Min(fingerprintEnd, velocity.Length)),
+            L2Slice(velocity, Math.Min(fingerprintEnd, velocity.Length), velocity.Length));
+    }
+
+    /// <summary>
+    ///     Computes the acceleration vector: the velocity between two consecutive velocity vectors.
+    ///     Zero acceleration = constant rotation rate (scripted bot state machine).
+    ///     High acceleration = escalating or decelerating behavior change.
+    /// </summary>
+    public static float[] ComputeAcceleration(float[] laterVelocity, float[] earlierVelocity)
+    {
+        var acc = new float[laterVelocity.Length];
+        for (var i = 0; i < laterVelocity.Length; i++)
+            acc[i] = laterVelocity[i] - earlierVelocity[i];
+        return acc;
+    }
+
+    private static float L2Slice(float[] v, int start, int end)
+    {
+        float sum = 0;
+        for (var i = start; i < end && i < v.Length; i++)
+            sum += v[i] * v[i];
+        return MathF.Sqrt(sum);
+    }
+
     private static void EncodeTemporalFeatures(
         IReadOnlyList<SessionRequest> requests, float[] vector, int offset)
     {
@@ -829,4 +887,51 @@ public static class MarkovArchetypes
             IsHuman = isHuman
         };
     }
+}
+
+/// <summary>
+///     Per-axis breakdown of a session velocity vector.
+///     Pinpoints which behavioral dimension is shifting between sessions.
+/// </summary>
+public record VelocityDecomposition(
+    float MarkovMagnitude,
+    float StationaryMagnitude,
+    float TemporalMagnitude,
+    float FingerprintMagnitude,
+    float TransitionTimingMagnitude)
+{
+    /// <summary>Total L2 magnitude across all dimensions.</summary>
+    public float TotalMagnitude =>
+        MathF.Sqrt(MarkovMagnitude * MarkovMagnitude
+                   + StationaryMagnitude * StationaryMagnitude
+                   + TemporalMagnitude * TemporalMagnitude
+                   + FingerprintMagnitude * FingerprintMagnitude
+                   + TransitionTimingMagnitude * TransitionTimingMagnitude);
+
+    /// <summary>
+    ///     True when fingerprint dims dominate: the behavioral shape is stable but
+    ///     TLS/HTTP2/TCP/headless features changed. Classic rotation trail indicator.
+    /// </summary>
+    public bool IsFingerprintDominant =>
+        FingerprintMagnitude > 0.01f &&
+        FingerprintMagnitude > MarkovMagnitude * 1.5f &&
+        FingerprintMagnitude > TemporalMagnitude * 1.5f;
+
+    /// <summary>
+    ///     True when Markov dims dominate: the path/state transition pattern shifted.
+    ///     Bots rotating between task roles (crawler → form-submitter) show this.
+    /// </summary>
+    public bool IsMarkovDominant =>
+        MarkovMagnitude > 0.01f &&
+        MarkovMagnitude > FingerprintMagnitude * 1.5f &&
+        MarkovMagnitude > TemporalMagnitude * 1.5f;
+
+    /// <summary>
+    ///     True when temporal dims dominate: timing changed but path/fingerprint stable.
+    ///     Fingerprint randomizers that only adjust timing show this pattern.
+    /// </summary>
+    public bool IsTemporalDominant =>
+        TemporalMagnitude > 0.01f &&
+        TemporalMagnitude > MarkovMagnitude * 1.5f &&
+        TemporalMagnitude > FingerprintMagnitude * 1.5f;
 }

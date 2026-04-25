@@ -568,7 +568,12 @@ public static class ServiceCollectionExtensions
         // Periodicity detection - temporal pattern analysis for identity resolution
         services.AddSingleton<IContributingDetector, PeriodicityContributor>();
         // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
-        services.TryAddSingleton<Data.ISessionStore, Data.SqliteSessionStore>();
+        // Factory registration so ISessionVectorSearch (registered later) can be injected optionally.
+        services.TryAddSingleton<Data.ISessionStore>(sp =>
+            new Data.SqliteSessionStore(
+                sp.GetRequiredService<ILogger<Data.SqliteSessionStore>>(),
+                sp.GetRequiredService<IOptions<BotDetectionOptions>>(),
+                sp.GetService<ISessionVectorSearch>()));
         services.AddHostedService<Data.SessionPersistenceService>();
         // Entity resolution - background service for merge/split/rewind analysis
         services.AddHostedService<Services.EntityResolutionService>();
@@ -590,17 +595,19 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<SequenceContextStore>();
         services.AddSingleton(sp =>
         {
-            var sessionStore = (Data.SqliteSessionStore)sp.GetRequiredService<Data.ISessionStore>();
+            var connStr = sp.GetRequiredService<Data.ISessionStore>().PersistenceConnectionString;
+            if (connStr == null) return null!; // commercial replaces this registration
             var logger = sp.GetRequiredService<ILogger<CentroidSequenceStore>>();
-            return new CentroidSequenceStore(sessionStore.ConnectionString, logger);
+            return new CentroidSequenceStore(connStr, logger);
         });
         services.TryAddSingleton<EndpointDivergenceTracker>();
         services.AddSingleton(sp =>
         {
-            var sessionStore = (Data.SqliteSessionStore)sp.GetRequiredService<Data.ISessionStore>();
+            var connStr = sp.GetRequiredService<Data.ISessionStore>().PersistenceConnectionString;
+            if (connStr == null) return null!; // commercial replaces this registration
             var centroidStore = sp.GetRequiredService<CentroidSequenceStore>();
             var logger = sp.GetRequiredService<ILogger<AssetHashStore>>();
-            return new AssetHashStore(sessionStore.ConnectionString, centroidStore, logger);
+            return new AssetHashStore(connStr, centroidStore, logger);
         });
         services.AddSingleton<IContributingDetector, ContentSequenceContributor>();
         services.AddHostedService<CentroidSequenceRebuildHostedService>();
@@ -695,6 +702,15 @@ public static class ServiceCollectionExtensions
             // Fallback: file-backed HNSW (current behavior)
             return sp.GetRequiredService<HnswFileSimilaritySearch>();
         });
+
+        // Session vector HNSW index (129-dim Markov/fingerprint vectors, file-backed)
+        // Commercial can replace ISessionVectorSearch with a Qdrant or pgvector implementation.
+        services.TryAddSingleton<HnswSessionVectorSearch>();
+        services.TryAddSingleton<ISessionVectorSearch>(sp => sp.GetRequiredService<HnswSessionVectorSearch>());
+        // Warmup: seeds the index from SQLite on first startup (skipped if graph file exists)
+        services.AddHostedService<Services.SessionVectorWarmupService>();
+        // Nightly compaction: SQLite session compaction + HNSW LOD compression
+        services.AddHostedService<Services.VectorCompactionService>();
 
         // Learning handler that feeds high-confidence detections into the similarity index
         services.AddSingleton<ILearningEventHandler, SimilarityLearningHandler>();

@@ -265,8 +265,49 @@ public interface ISessionStore
     /// <summary>Delete sessions older than retention period.</summary>
     Task PruneAsync(TimeSpan retention, CancellationToken ct = default);
 
+    /// <summary>Delete time-series buckets older than the given retention period.</summary>
+    Task PruneBucketsAsync(TimeSpan retention, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Get signatures that have more than <paramref name="maxPerSignature"/> session rows.
+    ///     Returns (signature, sessionCount) pairs ordered by session count descending.
+    /// </summary>
+    Task<List<(string Signature, int SessionCount)>> GetOverflowingSignaturesAsync(
+        int maxPerSignature, int limit = 500, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Compact old sessions for a signature into its root_vector (maturity-weighted centroid).
+    ///     Keeps the most recent <paramref name="keepCount"/> sessions at full resolution.
+    ///     Also computes and stores the velocity centroid (average drift direction) across compacted sessions.
+    ///     Returns the new behavioral centroid and velocity centroid for HNSW update.
+    /// </summary>
+    Task<CompactionResult> CompactSignatureSessionsAsync(
+        string signature, int keepCount, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Get priority metadata for a set of signatures.
+    ///     Used by VectorCompactionService to decide compaction order.
+    /// </summary>
+    Task<List<CompactionSignatureInfo>> GetSignaturePriorityInfoAsync(
+        List<string> signatures, CancellationToken ct = default);
+
     /// <summary>Initialize schema (create tables if needed).</summary>
     Task InitializeAsync(CancellationToken ct = default);
+
+    // === Persistence metadata ===
+
+    /// <summary>
+    ///     Connection string for this persistence backend, used by stores that open
+    ///     a direct connection (e.g., CentroidSequenceStore, AssetHashStore).
+    ///     Returns null for implementations that do not expose a connection string.
+    /// </summary>
+    string? PersistenceConnectionString { get; }
+
+    /// <summary>
+    ///     Get entity IDs that have active edges and were updated since <paramref name="cutoff"/>.
+    ///     Used by EntityResolutionService for periodic analysis.
+    /// </summary>
+    Task<List<string>> GetActiveEntityIdsAsync(DateTime cutoff, int limit = 100, CancellationToken ct = default);
 }
 
 /// <summary>Summary stats for the session-based dashboard.</summary>
@@ -279,6 +320,59 @@ public sealed record DashboardSessionSummary
     public int TotalRequests { get; init; }
     public double AvgProcessingTimeMs { get; init; }
     public DateTime? LastActivityAt { get; init; }
+}
+
+/// <summary>Result of compacting a signature's sessions into a behavioral centroid.</summary>
+public sealed record CompactionResult
+{
+    /// <summary>The compacted signature.</summary>
+    public required string Signature { get; init; }
+
+    /// <summary>Maturity-weighted behavioral centroid of all compacted sessions.</summary>
+    public float[]? BehavioralCentroid { get; init; }
+
+    /// <summary>Average velocity vector across consecutive session pairs (drift direction).</summary>
+    public float[]? VelocityCentroid { get; init; }
+
+    /// <summary>Number of sessions that were compacted.</summary>
+    public int CompactedCount { get; init; }
+
+    /// <summary>Weighted average maturity of the compacted sessions.</summary>
+    public float CentroidMaturity { get; init; }
+
+    /// <summary>Whether compaction produced a valid centroid.</summary>
+    public bool HasCentroid => BehavioralCentroid is { Length: > 0 };
+}
+
+/// <summary>Priority metadata for a signature, used by VectorCompactionService.</summary>
+public sealed record CompactionSignatureInfo
+{
+    public required string Signature { get; init; }
+    public required int SessionCount { get; init; }
+    public required double BotProbability { get; init; }
+    public required string RiskBand { get; init; }
+    public required bool IsBot { get; init; }
+    public required bool HasEntityMapping { get; init; }
+    public required DateTime LastSeen { get; init; }
+
+    /// <summary>
+    ///     Priority score: risk × recency_decay × bot_probability × entity_bonus.
+    ///     High priority = keep at full resolution. Low priority = compact first.
+    /// </summary>
+    public double Priority =>
+        RiskScore(RiskBand)
+        * Math.Exp(-(DateTime.UtcNow - LastSeen).TotalDays / 30.0)
+        * Math.Max(BotProbability, 0.1)
+        * (HasEntityMapping ? 1.0 : 0.5);
+
+    private static double RiskScore(string band) => band switch
+    {
+        "Critical" => 1.0,
+        "High" => 0.8,
+        "Medium" => 0.5,
+        "Low" => 0.2,
+        _ => 0.1
+    };
 }
 
 /// <summary>Country-level stats aggregated from sessions.</summary>

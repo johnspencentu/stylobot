@@ -16,7 +16,7 @@ Cloud-based bot services work until your attacker adapts. When a sophisticated s
 StyloBot runs in your process. It knows what a real page-load sequence looks like on *your* site: document, then asset burst in 80-500ms, then API calls, then optionally SignalR. It knows the timing signatures of your real users' sessions compressed into 129-dimensional Markov chain vectors. It tracks identity across rotation attempts using cosine similarity walks across fingerprint neighbours. All of this runs in ~150µs per request on commodity hardware, with no network call and no PII leaving your server.
 
 ---
-
+claude
 ## Quick start
 
 ```bash

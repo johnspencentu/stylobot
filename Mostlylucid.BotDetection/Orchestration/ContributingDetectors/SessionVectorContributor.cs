@@ -53,8 +53,14 @@ public class SessionVectorContributor : ConfiguredContributorBase
     private int MinSessionRequests => GetParam("min_session_requests", 5);
     private float MinMaturityForScoring => (float)GetParam("min_maturity_for_scoring", 0.3);
     private float VelocityAnomalyThreshold => (float)GetParam("velocity_anomaly_threshold", 0.6);
+    private float GapNormalizedVelocityThreshold => (float)GetParam("gap_normalized_velocity_threshold", 0.4);
+    private float FingerprintRotationThreshold => (float)GetParam("fingerprint_rotation_threshold", 0.15);
+    private float AccelerationThreshold => (float)GetParam("acceleration_threshold", 0.25);
     private float DissimilarityBotThreshold => (float)GetParam("dissimilarity_bot_threshold", 0.3);
     private double HighVelocityConfidence => GetParam("high_velocity_confidence", 0.5);
+    private double GapNormalizedVelocityConfidence => GetParam("gap_normalized_velocity_confidence", 0.45);
+    private double FingerprintRotationConfidence => GetParam("fingerprint_rotation_confidence", 0.55);
+    private double AccelerationConfidence => GetParam("acceleration_confidence", 0.35);
     private double DissimilarSessionConfidence => GetParam("dissimilar_session_confidence", 0.4);
     private double ConsistentSessionHumanConfidence => GetParam("consistent_session_human_confidence", -0.2);
     private double StableVelocityHumanConfidence => GetParam("stable_velocity_human_confidence", -0.15);
@@ -212,39 +218,87 @@ public class SessionVectorContributor : ConfiguredContributorBase
     /// <summary>
     ///     Detects anomalous velocity between recent sessions.
     ///     Human sessions drift gradually; bots show binary state switches.
+    ///     Emits dimensional decomposition, gap-normalized velocity, and acceleration signals.
     /// </summary>
     private void AnalyzeInterSessionVelocity(
         BlackboardState state,
         IReadOnlyList<SessionSnapshot> history,
         List<DetectionContribution> contributions)
     {
-        // Compare the two most recent completed sessions
+        // Use up to 3 most recent mature sessions for acceleration analysis
         var recent = history
             .Where(h => h.Maturity >= MinMaturityForScoring)
             .OrderByDescending(h => h.EndedAt)
-            .Take(2)
+            .Take(3)
             .ToList();
 
         if (recent.Count < 2) return;
 
-        var velocity = SessionVectorizer.ComputeVelocity(recent[0].Vector, recent[1].Vector);
-        var magnitude = SessionVectorizer.VelocityMagnitude(velocity);
+        // Primary velocity: most recent pair
+        var v1 = SessionVectorizer.ComputeVelocity(recent[0].Vector, recent[1].Vector);
+        var magnitude = SessionVectorizer.VelocityMagnitude(v1);
+        var decomp = SessionVectorizer.DecomposeVelocity(v1);
+
+        // Gap-normalized velocity: bots rotate quickly relative to elapsed time
+        var gap = recent[0].EndedAt - recent[1].EndedAt;
+        var gapNormMag = SessionVectorizer.GapNormalizedMagnitude(v1, gap);
 
         state.WriteSignals([
             new(SignalKeys.SessionVelocityMagnitude, magnitude),
-            new(SignalKeys.SessionVelocityVector, velocity)
+            new(SignalKeys.SessionVelocityVector, v1),
+            new(SignalKeys.SessionVelocityGapNormalized, gapNormMag),
+            new(SignalKeys.SessionVelocityMarkovMagnitude, decomp.MarkovMagnitude),
+            new(SignalKeys.SessionVelocityTemporalMagnitude, decomp.TemporalMagnitude),
+            new(SignalKeys.SessionVelocityFingerprintMagnitude, decomp.FingerprintMagnitude),
+            new(SignalKeys.SessionVelocityIsFingerprintRotation, decomp.IsFingerprintDominant)
         ]);
 
-        // High velocity = sudden behavioral shift
-        if (magnitude > VelocityAnomalyThreshold)
+        // === Acceleration: change in velocity across 3 sessions ===
+        if (recent.Count == 3)
+        {
+            var v2 = SessionVectorizer.ComputeVelocity(recent[1].Vector, recent[2].Vector);
+            var acceleration = SessionVectorizer.ComputeAcceleration(v1, v2);
+            var accMag = SessionVectorizer.VelocityMagnitude(acceleration);
+            state.WriteSignal(SignalKeys.SessionVelocityAcceleration, accMag);
+
+            // Near-zero acceleration with non-trivial velocity = constant rotation rate (bot state machine)
+            if (magnitude > 0.15f && accMag < AccelerationThreshold * magnitude)
+            {
+                contributions.Add(BotContribution(
+                    AccelerationConfidence,
+                    $"Constant rotation rate across 3 sessions (velocity={magnitude:F2}, accel={accMag:F2})",
+                    BotType.Scraper));
+            }
+        }
+
+        // === Fingerprint rotation: behavioral shape stable, fingerprint changed ===
+        if (decomp.IsFingerprintDominant && decomp.FingerprintMagnitude > FingerprintRotationThreshold)
+        {
+            contributions.Add(BotContribution(
+                FingerprintRotationConfidence,
+                $"Fingerprint rotation trail: behavior stable but transport fingerprint shifted (fp_delta={decomp.FingerprintMagnitude:F2})",
+                BotType.Scraper));
+        }
+
+        // === Gap-normalized velocity: fast rotation ===
+        if (gapNormMag > GapNormalizedVelocityThreshold)
+        {
+            contributions.Add(BotContribution(
+                GapNormalizedVelocityConfidence,
+                $"Fast behavioral rotation (gap-normalized velocity={gapNormMag:F2}, gap={gap.TotalMinutes:F0}m)",
+                BotType.Scraper));
+        }
+        // Raw high velocity (unchanged for backward compat with existing signals)
+        else if (magnitude > VelocityAnomalyThreshold)
         {
             contributions.Add(BotContribution(
                 HighVelocityConfidence,
                 $"Sudden behavioral shift between sessions (velocity={magnitude:F2})",
                 BotType.Scraper));
         }
+
         // Low velocity across multiple sessions = stable human behavior
-        else if (magnitude < 0.15f && history.Count >= 3)
+        if (magnitude < 0.15f && history.Count >= 3)
         {
             contributions.Add(HumanContribution(
                 Math.Abs(StableVelocityHumanConfidence),

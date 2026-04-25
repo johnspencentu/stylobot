@@ -1471,6 +1471,15 @@ public class StyloBotDashboardMiddleware
     /// </summary>
     private async Task ServeSignatureSessionsApiAsync(HttpContext context, string signature)
     {
+        // If an ISessionDataSource is registered (e.g. GatewayApiSessionDataSource for API-only
+        // deployments), delegate entirely to it and skip local session store logic.
+        var dataSource = context.RequestServices.GetService<Mostlylucid.BotDetection.UI.Adapters.ISessionDataSource>();
+        if (dataSource != null)
+        {
+            await dataSource.ServeAsync(context, signature, context.RequestAborted);
+            return;
+        }
+
         var sessionStore = context.RequestServices.GetService<Mostlylucid.BotDetection.Data.ISessionStore>();
         if (sessionStore == null)
         {
@@ -3888,7 +3897,7 @@ public class StyloBotDashboardMiddleware
         _ => "#6b7280"
     };
 
-    private static readonly IReadOnlyList<FilterGroup> ShapeFilterGroups = new List<FilterGroup>
+    public static readonly IReadOnlyList<FilterGroup> ShapeFilterGroups = new List<FilterGroup>
     {
         new()
         {
