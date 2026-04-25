@@ -282,6 +282,24 @@ public class IntentContributor : ConfiguredContributorBase
         features["stream:reconnect_rate"] = (float)Math.Min(reconnectRate / 20.0, 1.0);
         features["stream:concurrent_streams"] = Math.Min(concurrentStreams / 5.0f, 1.0f);
 
+        // Session analytics signals: void detection, periodicity, trajectory, drift
+        var isVoid = state.GetSignal<bool?>(SignalKeys.SessionIsVoid) ?? false;
+        var topSimilarity = state.GetSignal<float?>(SignalKeys.SessionTopSimilarity) ?? 1.0f;
+        var periodicityScore = state.GetSignal<float?>(SignalKeys.SessionFrequencyPeriodicityScore) ?? 0.0f;
+        var inAttackCluster = state.GetSignal<bool?>(SignalKeys.SessionTrajectoryInAttackCluster) ?? false;
+        var trajSimilarity = state.GetSignal<float?>(SignalKeys.SessionTrajectoryClusterSimilarity) ?? 0.0f;
+        var driftVec = state.GetSignal<float[]?>(SignalKeys.SessionDriftVector);
+        var driftMagnitude = driftVec != null
+            ? MathF.Sqrt(driftVec.Sum(v => v * v))
+            : 0.0f;
+
+        features["session:is_void"] = isVoid ? 1.0f : 0.0f;
+        features["session:novelty"] = isVoid ? 1.0f : Math.Max(0.0f, 1.0f - topSimilarity);
+        features["session:periodicity"] = periodicityScore;
+        features["session:trajectory_in_attack"] = inAttackCluster ? 1.0f : 0.0f;
+        features["session:trajectory_similarity"] = trajSimilarity;
+        features["session:drift_magnitude"] = Math.Min(driftMagnitude / 2.0f, 1.0f); // Normalize; large drift = bot rotation
+
         // Path classification based on current request path
         ClassifyPath(state.Path, features);
 

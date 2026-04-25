@@ -127,7 +127,9 @@ public sealed class HnswSessionVectorSearch : ISessionVectorSearch, IDisposable
     }
 
     public Task AddAsync(float[] vector, string signature, bool isBot, double botProbability,
-        float[]? velocityVector = null)
+        float[]? velocityVector = null,
+        float[]? frequencyFingerprint = null,
+        float[]? driftVector = null)
     {
         if (vector.Length != ExpectedDimensions)
         {
@@ -146,7 +148,9 @@ public sealed class HnswSessionVectorSearch : ISessionVectorSearch, IDisposable
             VelocityVector = velocityVector,
             VelocityMagnitude = velocityVector != null
                 ? Analysis.SessionVectorizer.VelocityMagnitude(velocityVector)
-                : 0f
+                : 0f,
+            FrequencyFingerprint = frequencyFingerprint,
+            DriftVector = driftVector
         };
 
         lock (_writeLock)
@@ -300,6 +304,50 @@ public sealed class HnswSessionVectorSearch : ISessionVectorSearch, IDisposable
         {
             _logger.LogWarning(ex, "Failed to load session HNSW index from {Path}", _databasePath);
         }
+    }
+
+    public async Task<IReadOnlyList<SessionVectorMatch>> FindSimilarMahalanobisAsync(
+        float[] vector, int topK = 10, float maxDistance = 5.0f)
+    {
+        await _loadTask.ConfigureAwait(false);
+
+        List<(float[] Vector, SessionVectorMetadata Metadata)> allEntries;
+        lock (_writeLock)
+        {
+            allEntries = new List<(float[], SessionVectorMetadata)>(_graphVectors.Count + _pendingVectors.Count);
+            for (var i = 0; i < _graphVectors.Count; i++) allEntries.Add((_graphVectors[i], _metadata[i]));
+            for (var i = 0; i < _pendingVectors.Count; i++) allEntries.Add((_pendingVectors[i], _pendingMetadata[i]));
+        }
+
+        // Score each entry: use Mahalanobis for centroid entries (CompressionLevel >= 1 with variance),
+        // cosine similarity converted to distance for L0 entries.
+        var scored = new List<(float Distance, string Signature)>(allEntries.Count);
+        foreach (var (v, meta) in allEntries)
+        {
+            float dist;
+            if (meta.CompressionLevel >= 1 && meta.VarianceVector is { Length: > 0 })
+            {
+                dist = Analysis.SessionVectorizer.MahalanobisDistance(vector, v, meta.VarianceVector);
+            }
+            else
+            {
+                // Cosine distance for L0 entries
+                dist = CosineDistance.SIMD(vector, v);
+                // Convert to approximate Euclidean-like scale; cosine dist [0,2], Mahalanobis unbounded
+                dist *= 3f; // Rough scale-matching so both can be compared with maxDistance
+            }
+
+            if (dist <= maxDistance)
+                scored.Add((dist, meta.Signature));
+        }
+
+        scored.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
+        if (scored.Count > topK) scored.RemoveRange(topK, scored.Count - topK);
+
+        // Convert distance back to similarity for the SessionVectorMatch interface
+        return scored
+            .Select(x => new SessionVectorMatch(x.Signature, Math.Max(0f, 1f - x.Distance / (maxDistance + 1f))))
+            .ToList();
     }
 
     public IReadOnlyList<(float[] Vector, SessionVectorMetadata Metadata)> GetAllVectorsSnapshot()

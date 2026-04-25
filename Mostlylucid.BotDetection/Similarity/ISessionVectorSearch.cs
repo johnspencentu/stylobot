@@ -14,11 +14,25 @@ public interface ISessionVectorSearch
 
     /// <summary>
     ///     Add a session vector to the index. Non-blocking; rebuilds graph asynchronously.
-    ///     velocityVector is the delta from the previous session for the same signature (null for first session).
-    ///     Stored in metadata to enable velocity-centroid preservation during compaction.
+    ///     All supplementary vectors are stored in metadata and preserved through compaction.
+    ///     - velocityVector: current - previous session (2-point delta)
+    ///     - frequencyFingerprint: 8D autocorrelation rhythm vector
+    ///     - driftVector: linear regression slope over N recent sessions
     /// </summary>
     Task AddAsync(float[] vector, string signature, bool isBot, double botProbability,
-        float[]? velocityVector = null);
+        float[]? velocityVector = null,
+        float[]? frequencyFingerprint = null,
+        float[]? driftVector = null);
+
+    /// <summary>
+    ///     Finds similar sessions using Mahalanobis distance for centroid entries that have
+    ///     a variance envelope. Falls back to cosine similarity for L0 entries.
+    ///     This correctly penalizes deviations in low-variance dimensions (discriminative dims)
+    ///     and tolerates deviations in high-variance dimensions (noise dims).
+    ///     topK results returned, ordered by ascending Mahalanobis distance.
+    /// </summary>
+    Task<IReadOnlyList<SessionVectorMatch>> FindSimilarMahalanobisAsync(
+        float[] vector, int topK = 10, float maxDistance = 5.0f);
 
     /// <summary>Flush the index to disk.</summary>
     Task SaveAsync();

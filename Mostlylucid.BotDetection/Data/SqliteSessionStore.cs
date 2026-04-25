@@ -78,7 +78,9 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                 timing_entropy REAL DEFAULT 0,
                 narrative TEXT,
                 header_hashes_json TEXT,
-                user_agent_raw TEXT
+                user_agent_raw TEXT,
+                frequency_fingerprint BLOB,
+                drift_vector BLOB
             );
 
             CREATE INDEX IF NOT EXISTS idx_sessions_signature ON sessions(signature, ended_at DESC);
@@ -162,8 +164,34 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         """;
         await cmd.ExecuteNonQueryAsync(ct);
 
+        // Schema migration: add columns introduced after initial release.
+        // ALTER TABLE ADD COLUMN is idempotent in the sense that we catch duplicate-column errors.
+        await MigrateAddColumnAsync(conn, "sessions", "frequency_fingerprint", "BLOB", ct);
+        await MigrateAddColumnAsync(conn, "sessions", "drift_vector", "BLOB", ct);
+
         _initialized = true;
         _logger.LogInformation("SQLite session store initialized at {ConnectionString}", _connectionString);
+    }
+
+    // === Schema migration helper ===
+
+    private static async Task MigrateAddColumnAsync(
+        SqliteConnection conn, string table, string column, string type, CancellationToken ct)
+    {
+        // Check if column already exists using PRAGMA table_info
+        await using var checkCmd = conn.CreateCommand();
+        checkCmd.CommandText = $"PRAGMA table_info({table})";
+        await using var reader = await checkCmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                return; // Column already exists
+        }
+
+        // Add the column
+        await using var alterCmd = conn.CreateCommand();
+        alterCmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type}";
+        await alterCmd.ExecuteNonQueryAsync(ct);
     }
 
     // === Write path ===
@@ -184,14 +212,16 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                     action, bot_name, bot_type, country_code, top_reasons_json,
                     transition_counts_json, paths_json, avg_processing_time_ms,
                     error_count, timing_entropy, narrative,
-                    header_hashes_json, user_agent_raw
+                    header_hashes_json, user_agent_raw,
+                    frequency_fingerprint, drift_vector
                 ) VALUES (
                     @sig, @started, @ended, @reqCount, @vector, @maturity,
                     @domState, @isBot, @avgProb, @avgConf, @risk,
                     @action, @botName, @botType, @country, @reasons,
                     @transitions, @paths, @avgTime,
                     @errors, @entropy, @narrative,
-                    @headerHashes, @uaRaw
+                    @headerHashes, @uaRaw,
+                    @freqFp, @driftVec
                 )
             """;
             cmd.Parameters.AddWithValue("@sig", session.Signature);
@@ -218,6 +248,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             cmd.Parameters.AddWithValue("@narrative", (object?)session.Narrative ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@headerHashes", (object?)session.HeaderHashesJson ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@uaRaw", (object?)session.UserAgentRaw ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@freqFp", (object?)session.FrequencyFingerprintBlob ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@driftVec", (object?)session.DriftVectorBlob ?? DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync(ct);
         }
@@ -228,7 +260,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         {
             var vector = DeserializeVector(session.Vector);
             if (vector != null)
-                _ = AddToVectorSearchAsync(vector, session.Signature, session.IsBot, session.AvgBotProbability);
+                _ = AddToVectorSearchAsync(vector, session.Signature, session.IsBot, session.AvgBotProbability,
+                    session.FrequencyFingerprintBlob, session.DriftVectorBlob);
         }
     }
 
@@ -1114,7 +1147,8 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
     ///     then adds to the HNSW index with velocity metadata.
     ///     Runs off the write path; failures are silently swallowed.
     /// </summary>
-    private async Task AddToVectorSearchAsync(float[] vector, string signature, bool isBot, double botProbability)
+    private async Task AddToVectorSearchAsync(float[] vector, string signature, bool isBot, double botProbability,
+        byte[]? frequencyFingerprintBlob = null, byte[]? driftVectorBlob = null)
     {
         try
         {
@@ -1139,7 +1173,11 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
                     velocityVector = Analysis.SessionVectorizer.ComputeVelocity(vector, prevVector);
             }
 
-            await _vectorSearch!.AddAsync(vector, signature, isBot, botProbability, velocityVector);
+            var frequencyFingerprint = DeserializeVector(frequencyFingerprintBlob);
+            var driftVector = DeserializeVector(driftVectorBlob);
+
+            await _vectorSearch!.AddAsync(vector, signature, isBot, botProbability,
+                velocityVector, frequencyFingerprint, driftVector);
         }
         catch (Exception ex)
         {
@@ -1186,7 +1224,9 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         ErrorCount = reader.IsDBNull(reader.GetOrdinal("error_count")) ? 0 : reader.GetInt32(reader.GetOrdinal("error_count")),
         TimingEntropy = reader.IsDBNull(reader.GetOrdinal("timing_entropy")) ? 0 : reader.GetFloat(reader.GetOrdinal("timing_entropy")),
         Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative")),
-        UserAgentRaw = SafeGetString(reader, "user_agent_raw")
+        UserAgentRaw = SafeGetString(reader, "user_agent_raw"),
+        FrequencyFingerprintBlob = SafeGetBytes(reader, "frequency_fingerprint"),
+        DriftVectorBlob = SafeGetBytes(reader, "drift_vector")
     };
 
     /// <summary>Safe column read that handles missing columns (for DBs created before migration).</summary>
@@ -1196,6 +1236,20 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         {
             var ordinal = reader.GetOrdinal(column);
             return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null; // Column doesn't exist yet (pre-migration DB)
+        }
+    }
+
+    /// <summary>Safe BLOB column read that handles missing columns (for DBs created before migration).</summary>
+    private static byte[]? SafeGetBytes(SqliteDataReader reader, string column)
+    {
+        try
+        {
+            var ordinal = reader.GetOrdinal(column);
+            return reader.IsDBNull(ordinal) ? null : (byte[])reader[ordinal];
         }
         catch (ArgumentOutOfRangeException)
         {

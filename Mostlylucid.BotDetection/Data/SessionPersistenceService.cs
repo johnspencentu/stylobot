@@ -100,7 +100,11 @@ public sealed class SessionPersistenceService : BackgroundService
             PathsJson = JsonSerializer.Serialize(paths),
             ErrorCount = errorCount,
             TimingEntropy = ComputeTimingEntropy(requests),
-            HeaderHashesJson = snapshot.HeaderHashesJson
+            HeaderHashesJson = snapshot.HeaderHashesJson,
+            FrequencyFingerprintBlob = snapshot.FrequencyFingerprint != null
+                ? SqliteSessionStore.SerializeVector(snapshot.FrequencyFingerprint) : null,
+            DriftVectorBlob = snapshot.DriftVector != null
+                ? SqliteSessionStore.SerializeVector(snapshot.DriftVector) : null
         };
 
         await _store.AddSessionAsync(persisted, ct);

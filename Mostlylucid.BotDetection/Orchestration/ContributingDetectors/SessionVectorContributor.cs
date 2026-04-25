@@ -178,9 +178,13 @@ public class SessionVectorContributor : ConfiguredContributorBase
             if (sessionHistory.Count >= 2)
                 AnalyzeInterSessionVelocity(state, sessionHistory, contributions);
 
-            // === Frequency fingerprinting: detect temporal periodicity ===
+            // === Frequency fingerprinting: detect temporal periodicity + cross-session rhythm match ===
             if (currentSession != null && currentSession.Count >= 5)
+            {
                 AnalyzeFrequencyRhythm(state, currentSession, contributions);
+                if (sessionHistory.Count >= 2)
+                    AnalyzeCrossSessionRhythm(state, currentSession, sessionHistory, contributions);
+            }
 
             // === Void detection + trajectory analysis (require HNSW) ===
             if (_vectorSearch != null && currentSession != null && currentSession.Count >= MinSessionRequests)
@@ -367,6 +371,43 @@ public class SessionVectorContributor : ConfiguredContributorBase
         contributions.Add(BotContribution(
             PeriodicityBotConfidence,
             $"Periodic request rhythm detected (score={periodicityScore:F2}, dominant_lag={lagDesc})",
+            BotType.Scraper));
+    }
+
+    /// <summary>
+    ///     Cross-session rhythm comparison: checks if the current frequency fingerprint matches
+    ///     prior sessions for this signature. A rhythm-preserving behavioral rotation (same timing
+    ///     cadence, different Markov paths) is a strong indicator of deliberate evasion:
+    ///     the bot changed what it requests but kept the same mechanical timing loop.
+    /// </summary>
+    private void AnalyzeCrossSessionRhythm(
+        BlackboardState state,
+        IReadOnlyList<SessionRequest> currentSession,
+        IReadOnlyList<SessionSnapshot> sessionHistory,
+        List<DetectionContribution> contributions)
+    {
+        var currentFingerprint = FrequencyFingerprintEncoder.Encode(currentSession);
+        var currentPeriodicity = FrequencyFingerprintEncoder.PeriodicityScore(currentFingerprint);
+
+        // Only flag rhythm-preserving rotation when current session is itself periodic
+        if (currentPeriodicity < PeriodicityBotThreshold) return;
+
+        var priorFingerprints = sessionHistory
+            .Where(s => s.FrequencyFingerprint is { Length: > 0 })
+            .Select(s => s.FrequencyFingerprint!)
+            .ToList();
+
+        if (priorFingerprints.Count == 0) return;
+
+        var maxSimilarity = priorFingerprints
+            .Select(fp => FrequencyFingerprintEncoder.Similarity(currentFingerprint, fp))
+            .Max();
+
+        if (maxSimilarity < FrequencyRhythmSimilarityThreshold) return;
+
+        contributions.Add(BotContribution(
+            PeriodicityBotConfidence + 0.1, // Slightly higher confidence: cross-session pattern match
+            $"Rhythm-preserving rotation detected: periodicity preserved across sessions (similarity={maxSimilarity:F2})",
             BotType.Scraper));
     }
 

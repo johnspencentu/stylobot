@@ -95,6 +95,22 @@ public sealed record PersistedSession
     ///     Emails, credential URLs, and phone numbers are redacted before storage.
     /// </summary>
     public string? UserAgentRaw { get; init; }
+
+    /// <summary>
+    ///     Frequency fingerprint BLOB: 8-element float[] serialized as raw bytes.
+    ///     Autocorrelation at [1s, 3s, 10s, 30s, 1m, 3m, 10m, 30m] lag scales.
+    ///     Null when computed from fewer than 3 requests.
+    ///     Loaded from SQLite to seed the HNSW index with rhythm metadata.
+    /// </summary>
+    public byte[]? FrequencyFingerprintBlob { get; init; }
+
+    /// <summary>
+    ///     Drift vector BLOB: 129-element float[] serialized as raw bytes.
+    ///     Linear regression slope over the preceding N session vectors.
+    ///     Null for the first session or when fewer than 3 prior sessions exist.
+    ///     Preserved through HNSW compaction to show where a campaign was heading.
+    /// </summary>
+    public byte[]? DriftVectorBlob { get; init; }
 }
 
 /// <summary>
