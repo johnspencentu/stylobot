@@ -1051,6 +1051,44 @@ public static class SignalKeys
     public const string SessionMahalanobisNearestDistance = "session.mahalanobis_nearest_distance";
 
     // ==========================================
+    // Reactive pattern signals
+    // Set by ReactivePatternContributor after analyzing post-4xx client behavior
+    // ==========================================
+
+    /// <summary>Int: number of error events recorded for this signature</summary>
+    public const string ReactiveErrorEventCount = "reactive.error_event_count";
+
+    /// <summary>Float: milliseconds since the last 4xx/5xx response was served to this signature</summary>
+    public const string ReactivePost4xxGapMs = "reactive.post_4xx_gap_ms";
+
+    /// <summary>Float: ratio of actual retry gap to Retry-After header value (1.0 = perfect compliance = bot-like)</summary>
+    public const string ReactiveRetryAfterCompliance = "reactive.retry_after_compliance";
+
+    /// <summary>Float [0,1]: 1.0 if current request is retrying a path that previously received a 403</summary>
+    public const string ReactivePathPersistencePost403 = "reactive.path_persistence_post_403";
+
+    /// <summary>Float [0,1]: fraction of error events on paths that received a 403 (high = path-targeted probe)</summary>
+    public const string ReactivePathPersistenceRatio = "reactive.path_persistence_ratio";
+
+    /// <summary>Float: coefficient of variation of consecutive retry gap ratios (low = mechanical geometric backoff)</summary>
+    public const string ReactiveGeometricRatioCv = "reactive.geometric_ratio_cv";
+
+    /// <summary>Float: mean ratio of consecutive retry gaps (2.0 = exponential, 1.618 = Fibonacci, 1.0 = linear)</summary>
+    public const string ReactiveBackoffBase = "reactive.backoff_base";
+
+    /// <summary>String: detected backoff pattern name (exponential, fibonacci, linear, mild_exponential, unknown, none)</summary>
+    public const string ReactiveBackoffPattern = "reactive.backoff_pattern";
+
+    /// <summary>Float [0,1]: monotone increase score of 429 gaps (high = automated rate adaptation)</summary>
+    public const string ReactiveRateAdapted = "reactive.rate_adapted";
+
+    /// <summary>Float: 1.0 if multiple signatures are retrying the same blocked paths simultaneously</summary>
+    public const string ReactiveCoordinatedRetry = "reactive.coordinated_retry";
+
+    /// <summary>Int: number of other signatures co-retrying the same blocked paths</summary>
+    public const string ReactiveCoRetryerCount = "reactive.co_retryer_count";
+
+    // ==========================================
     // Intent / Threat scoring signals
     // Set by IntentContributor from session activity analysis
     // ==========================================

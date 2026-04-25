@@ -43,7 +43,8 @@ public class BotDetectionMiddleware(
     ILogger<BotDetectionMiddleware> logger,
     IOptions<BotDetectionOptions> options,
     CountryReputationTracker? countryTracker = null,
-    BotClusterService? clusterService = null)
+    BotClusterService? clusterService = null,
+    ReactiveSignalTracker? reactiveTracker = null)
 {
     // Default test mode simulations - used as fallback when options don't contain the mode
     private static readonly Dictionary<string, string> DefaultTestModeSimulations =
@@ -87,6 +88,7 @@ public class BotDetectionMiddleware(
     private readonly ILogger<BotDetectionMiddleware> _logger = logger;
     private readonly RequestDelegate _next = next;
     private readonly BotDetectionOptions _options = options.Value;
+    private readonly ReactiveSignalTracker? _reactiveTracker = reactiveTracker;
 
     /// <summary>
     ///     Main middleware entry point. Runs bot detection and handles blocking/throttling.
@@ -303,6 +305,23 @@ public class BotDetectionMiddleware(
             await RecordResponseAsync(context, finalEvidence, responseCoordinator, requestStartTime);
             if (auditProcessorDispatcher?.HasProcessors == true)
                 await auditProcessorDispatcher.DispatchAsync(context, finalEvidence);
+
+            // Record 4xx/5xx responses for reactive pattern analysis (including bot-detection-triggered ones).
+            // This intentionally captures our own 429s and 403s: those are exactly what bots react to.
+            if (_reactiveTracker != null && context.Response.StatusCode >= 400)
+            {
+                var sig = context.Items["BotDetection:Signature"] as string;
+                if (!string.IsNullOrEmpty(sig))
+                {
+                    int? retryAfter = null;
+                    if (context.Response.Headers.TryGetValue("Retry-After", out var raVal)
+                        && int.TryParse(raVal.ToString(), out var parsed))
+                        retryAfter = parsed;
+                    _reactiveTracker.RecordErrorServed(
+                        sig, context.Response.StatusCode,
+                        context.Request.Path.Value ?? "/", retryAfter);
+                }
+            }
         });
 
         // Log detection result

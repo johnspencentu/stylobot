@@ -567,6 +567,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, SessionVectorContributor>();
         // Periodicity detection - temporal pattern analysis for identity resolution
         services.AddSingleton<IContributingDetector, PeriodicityContributor>();
+        // Reactive pattern detection - post-error client behavior (backoff, compliance, coordinated retry)
+        services.TryAddSingleton<ReactiveSignalTracker>();
+        services.AddSingleton<IContributingDetector, ReactivePatternContributor>();
         // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
         // Factory registration so ISessionVectorSearch (registered later) can be injected optionally.
         services.TryAddSingleton<Data.ISessionStore>(sp =>

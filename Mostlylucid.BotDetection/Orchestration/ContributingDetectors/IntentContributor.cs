@@ -305,6 +305,25 @@ public class IntentContributor : ConfiguredContributorBase
         features["session:trajectory_similarity"] = trajSimilarity;
         features["session:drift_magnitude"] = Math.Min(driftMagnitude / 2.0f, 1.0f); // Normalize; large drift = bot rotation
 
+        // Reactive pattern signals: post-error client behavior
+        var complianceRatio = state.GetSignal<float?>(SignalKeys.ReactiveRetryAfterCompliance) ?? -1f;
+        var pathPersistence = state.GetSignal<float?>(SignalKeys.ReactivePathPersistencePost403) ?? 0f;
+        var geoCv = state.GetSignal<float?>(SignalKeys.ReactiveGeometricRatioCv) ?? -1f;
+        var rateAdapted = state.GetSignal<float?>(SignalKeys.ReactiveRateAdapted) ?? 0f;
+        var coordinatedRetry = state.GetSignal<float?>(SignalKeys.ReactiveCoordinatedRetry) ?? 0f;
+
+        // Compliance near 1.0 = mechanical (0 = no data or not precise)
+        features["reactive:compliance_precision"] = complianceRatio >= 0
+            ? Math.Max(0f, 1f - Math.Abs(complianceRatio - 1f))
+            : 0f;
+        features["reactive:path_persistence"] = pathPersistence;
+        // Low CV = mechanical backoff; scale so 0.25 threshold → 1.0 signal
+        features["reactive:geometric_backoff"] = geoCv >= 0
+            ? Math.Max(0f, 1f - (float)(geoCv / 0.25))
+            : 0f;
+        features["reactive:rate_adapted"] = rateAdapted;
+        features["reactive:coordinated_retry"] = coordinatedRetry;
+
         // Path classification based on current request path
         ClassifyPath(state.Path, features);
 
