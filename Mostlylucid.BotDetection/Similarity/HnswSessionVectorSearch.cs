@@ -350,6 +350,35 @@ public sealed class HnswSessionVectorSearch : ISessionVectorSearch, IDisposable
             .ToList();
     }
 
+    public Task<IReadOnlyList<GhostCentroidMatch>> FindGhostCentroidsAsync(
+        float[] vector, int topK = 5, float minSimilarity = 0.75f)
+    {
+        var snapshot = GetAllVectorsSnapshot();
+        var results = new List<(float Sim, GhostCentroidMatch Match)>(snapshot.Count);
+
+        foreach (var (v, meta) in snapshot)
+        {
+            if (meta.CompressionLevel < 1) continue; // L0 sessions are not ghost shapes
+            var sim = 1f - CosineDistance.SIMD(vector, v);
+            if (sim < minSimilarity) continue;
+            results.Add((sim, new GhostCentroidMatch(
+                FamilyId: meta.Signature,
+                Similarity: sim,
+                CompressionLevel: meta.CompressionLevel,
+                IsBot: meta.IsBot,
+                BotProbability: meta.BotProbability,
+                VelocityVector: meta.VelocityVector,
+                VarianceVector: meta.VarianceVector,
+                FrequencyFingerprint: meta.FrequencyFingerprint)));
+        }
+
+        results.Sort(static (a, b) => b.Sim.CompareTo(a.Sim));
+        if (results.Count > topK) results.RemoveRange(topK, results.Count - topK);
+
+        return Task.FromResult<IReadOnlyList<GhostCentroidMatch>>(
+            results.Select(r => r.Match).ToList());
+    }
+
     public IReadOnlyList<(float[] Vector, SessionVectorMetadata Metadata)> GetAllVectorsSnapshot()
     {
         lock (_writeLock)

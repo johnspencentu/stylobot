@@ -21,6 +21,27 @@ public sealed record InvestigationResult
     public IReadOnlyList<EndpointStat> EndpointStats { get; init; } = [];
     public IReadOnlyList<CountryStat> CountryBreakdown { get; init; } = [];
     public int TotalCount { get; init; }
+
+    /// <summary>
+    ///     Ghost campaign matches for signatures found in this result set.
+    ///     Each entry is a crystallized dormant campaign whose 129D behavioural centroid
+    ///     is similar to at least one signature's root_vector in the result.
+    ///     FOSS: populated from L1/L2 HNSW centroid entries (available after first nightly compaction).
+    ///     Commercial: additionally includes cross-gateway ghost shapes persisted to PostgreSQL.
+    ///     Empty when no compacted centroids have been created yet.
+    /// </summary>
+    public IReadOnlyList<GhostCampaignHit> GhostMatches { get; init; } = [];
+
+    /// <summary>
+    ///     Unknown-space pressure [0, 1].
+    ///     Non-zero when the shape query matched nothing and the nearest radar-shape
+    ///     neighbour in the HNSW index is far away -- the query sits in unexplored space.
+    ///     HIGH PRESSURE is not inherently bad (rare but legitimate visitors can also
+    ///     have unique radar shapes). Treat as a contributor signal, not a direct alarm.
+    ///     FOSS: always 0 (void pressure requires radar-space pgvector HNSW from commercial).
+    ///     Commercial: computed by PostgresShapeSearchStore against the 16D radar HNSW.
+    /// </summary>
+    public float VoidPressure { get; init; }
 }
 
 /// <summary>At-a-glance summary for the filtered segment.</summary>
@@ -47,6 +68,43 @@ public sealed record SignatureSummary
     public bool IsKnownBot { get; init; }
     public DateTime LastSeen { get; init; }
     public string? ClientSideSignature { get; init; }
+
+    /// <summary>
+    ///     Mean frequency fingerprint (8D autocorrelation) from compacted sessions.
+    ///     FOSS: populated from HNSW L1 metadata (FrequencyFingerprint on SessionVectorMetadata),
+    ///     written during VectorCompactionService Phase 2.
+    ///     Null for signatures with no compacted sessions (before first nightly compaction).
+    ///     Displayed as a bar chart in the Fingerprints tab to show temporal rhythm.
+    /// </summary>
+    public float[]? FrequencyCentroid { get; init; }
+}
+
+/// <summary>
+///     A ghost campaign match for the investigation view.
+///     Produced when a signature's 129D root_vector is similar to a crystallized campaign centroid.
+/// </summary>
+public sealed record GhostCampaignHit
+{
+    /// <summary>The ghost campaign family ID.</summary>
+    public required string FamilyId { get; init; }
+
+    /// <summary>Human-readable label set by analysts (null if unlabelled).</summary>
+    public string? Label { get; init; }
+
+    /// <summary>Cosine similarity between the matched signature's root_vector and the ghost centroid.</summary>
+    public float Similarity { get; init; }
+
+    /// <summary>Which signature in the result set triggered this ghost match.</summary>
+    public required string MatchedSignature { get; init; }
+
+    /// <summary>Risk band of the ghost campaign.</summary>
+    public string RiskBand { get; init; } = "High";
+
+    /// <summary>How many signatures were compacted into this ghost.</summary>
+    public int SignatureCount { get; init; }
+
+    /// <summary>When this ghost was last active.</summary>
+    public DateTime LastSeen { get; init; }
 }
 
 /// <summary>Endpoint stats grouped by method + path.</summary>

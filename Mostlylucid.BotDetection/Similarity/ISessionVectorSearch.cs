@@ -40,6 +40,17 @@ public interface ISessionVectorSearch
     /// <summary>Load the index from disk (called on startup).</summary>
     Task LoadAsync();
 
+    /// <summary>
+    ///     Find compacted L1/L2 centroid entries similar to the query vector.
+    ///     These represent dormant campaigns that have been compressed by VectorCompactionService.
+    ///     Unlike FindSimilarAsync (which returns any L0/L1/L2 entry), this method returns only
+    ///     CompressionLevel >= 1 entries — the crystallized campaign centroids.
+    ///     FOSS: served from the in-memory HNSW graph.
+    ///     Commercial: served from PostgreSQL pgvector ghost_shapes table for cross-gateway sharing.
+    /// </summary>
+    Task<IReadOnlyList<GhostCentroidMatch>> FindGhostCentroidsAsync(
+        float[] vector, int topK = 5, float minSimilarity = 0.75f);
+
     /// <summary>Total vectors in the index (graph + pending).</summary>
     int Count { get; }
 
@@ -60,3 +71,18 @@ public interface ISessionVectorSearch
 
 /// <summary>A single ANN search result from the session vector index.</summary>
 public record SessionVectorMatch(string Signature, float Similarity);
+
+/// <summary>
+///     A match against a compacted campaign centroid (CompressionLevel >= 1).
+///     FamilyId is the centroid's Signature field (e.g. the primary signature for L1,
+///     or the cluster ID for L2 entries).
+/// </summary>
+public record GhostCentroidMatch(
+    string FamilyId,
+    float Similarity,
+    int CompressionLevel,       // 1 = per-signature centroid, 2 = cluster centroid
+    bool IsBot,
+    double BotProbability,
+    float[]? VelocityVector,
+    float[]? VarianceVector,
+    float[]? FrequencyFingerprint);

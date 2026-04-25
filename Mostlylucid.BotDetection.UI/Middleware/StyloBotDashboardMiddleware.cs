@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Mostlylucid.BotDetection.Dashboard;
 using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Extensions;
+using Mostlylucid.BotDetection.Similarity;
 using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
@@ -3962,6 +3963,11 @@ public class StyloBotDashboardMiddleware
             result = await _eventStore.GetInvestigationAsync(investigationFilter);
         }
 
+        // Enrich with FOSS ghost centroid matches and FrequencyCentroid.
+        // Ghost shapes in FOSS = L1/L2 HNSW entries (crystallized campaign centroids).
+        // VoidPressure stays 0 for FOSS (requires pgvector radar HNSW in commercial).
+        result = await EnrichWithGhostMatchesAsync(context, result);
+
         // Load presets
         var presets = shapeStore is not null
             ? await shapeStore.GetPresetsAsync()
@@ -4033,6 +4039,7 @@ public class StyloBotDashboardMiddleware
     {
         var filter = ParseInvestigationFilter(context) with { Tab = tab };
         var result = await _eventStore.GetInvestigationAsync(filter);
+        result = await EnrichWithGhostMatchesAsync(context, result);
         var vm = BuildInvestigationViewModel(filter, result, context);
 
         var partialName = tab.ToLowerInvariant() switch
@@ -4050,6 +4057,88 @@ public class StyloBotDashboardMiddleware
             $"/Views/StyloBot/Dashboard/{partialName}.cshtml", vm, context);
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.WriteAsync(html);
+    }
+
+    /// <summary>
+    /// Enrich an InvestigationResult with FOSS ghost centroid matches and per-signature FrequencyCentroid.
+    /// Ghost shapes are L1/L2 HNSW entries already in memory from VectorCompactionService.
+    /// FrequencyCentroid is the mean frequency fingerprint from the signature's compacted sessions.
+    /// VoidPressure is left at 0 for FOSS (requires pgvector radar-HNSW in commercial).
+    /// </summary>
+    private static async Task<InvestigationResult> EnrichWithGhostMatchesAsync(
+        HttpContext context, InvestigationResult result)
+    {
+        // Skip enrichment if the result was already populated by a commercial store
+        if (result.GhostMatches.Count > 0) return result;
+
+        var vectorSearch = context.RequestServices.GetService<ISessionVectorSearch>();
+        if (vectorSearch == null || result.Signatures.Count == 0) return result;
+
+        var sessionStore = context.RequestServices.GetService<ISessionStore>();
+        var ghostHits = new List<GhostCampaignHit>();
+        var enrichedSignatures = new List<SignatureSummary>(result.Signatures.Count);
+
+        // Build a per-signature HNSW metadata lookup (L1 entries keyed by signature)
+        var snapshot = vectorSearch.GetAllVectorsSnapshot();
+        var l1BySignature = snapshot
+            .Where(e => e.Metadata.CompressionLevel == 1)
+            .GroupBy(e => e.Metadata.Signature)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var sig in result.Signatures.Take(10)) // cap to avoid slow scan
+        {
+            // FrequencyCentroid: prefer HNSW L1 metadata (already in memory, no I/O)
+            float[]? freqCentroid = null;
+            float[]? queryVec = null;
+
+            if (l1BySignature.TryGetValue(sig.PrimarySignature, out var l1Entry))
+            {
+                freqCentroid = l1Entry.Metadata.FrequencyFingerprint;
+                queryVec = l1Entry.Vector;
+            }
+            else if (sessionStore != null)
+            {
+                // Fallback: load most recent session vector from SQLite
+                var sessions = await sessionStore.GetSessionsAsync(sig.PrimarySignature, 1);
+                if (sessions.Count > 0)
+                    queryVec = SqliteSessionStore.DeserializeVector(sessions[0].Vector);
+            }
+
+            enrichedSignatures.Add(sig with { FrequencyCentroid = freqCentroid });
+
+            if (queryVec == null) continue;
+
+            // Ghost matches: find L1/L2 centroids similar to this signature's vector
+            var ghosts = await vectorSearch.FindGhostCentroidsAsync(queryVec, topK: 3, minSimilarity: 0.75f);
+            foreach (var g in ghosts)
+            {
+                // Don't match the signature to itself
+                if (string.Equals(g.FamilyId, sig.PrimarySignature, StringComparison.Ordinal)) continue;
+                ghostHits.Add(new GhostCampaignHit
+                {
+                    FamilyId = g.FamilyId,
+                    Label = null,  // FOSS has no analyst labels
+                    Similarity = g.Similarity,
+                    MatchedSignature = sig.PrimarySignature,
+                    RiskBand = g.BotProbability > 0.7 ? "High" : "Medium",
+                    SignatureCount = 1,  // FOSS doesn't track merged count
+                    LastSeen = sig.LastSeen
+                });
+            }
+        }
+
+        // Deduplicate: keep highest-similarity hit per FamilyId
+        var dedupedGhosts = ghostHits
+            .GroupBy(h => h.FamilyId)
+            .Select(g => g.OrderByDescending(h => h.Similarity).First())
+            .OrderByDescending(h => h.Similarity)
+            .ToList();
+
+        return result with
+        {
+            Signatures = enrichedSignatures,
+            GhostMatches = dedupedGhosts
+        };
     }
 
     private static DateTime ParseRangeStart(string range)

@@ -168,6 +168,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         // ALTER TABLE ADD COLUMN is idempotent in the sense that we catch duplicate-column errors.
         await MigrateAddColumnAsync(conn, "sessions", "frequency_fingerprint", "BLOB", ct);
         await MigrateAddColumnAsync(conn, "sessions", "drift_vector", "BLOB", ct);
+        await MigrateAddColumnAsync(conn, "signatures", "frequency_centroid", "BLOB", ct);
 
         _initialized = true;
         _logger.LogInformation("SQLite session store initialized at {ConnectionString}", _connectionString);
@@ -1046,16 +1047,19 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             await conn.OpenAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
 
-            // Update root_vector on signature
+            // Update root_vector and frequency_centroid on signature
             await using var updateCmd = conn.CreateCommand();
             updateCmd.CommandText = """
                 UPDATE signatures
-                SET root_vector = @vec, root_vector_maturity = @mat
+                SET root_vector = @vec, root_vector_maturity = @mat,
+                    frequency_centroid = @freqCentroid
                 WHERE signature_id = @sig
             """;
             updateCmd.Parameters.AddWithValue("@vec", compactedCentroidBytes);
             updateCmd.Parameters.AddWithValue("@mat", avgMaturity);
             updateCmd.Parameters.AddWithValue("@sig", signature);
+            updateCmd.Parameters.AddWithValue("@freqCentroid",
+                freqCentroid != null ? (object)SerializeVector(freqCentroid) : DBNull.Value);
             await updateCmd.ExecuteNonQueryAsync(ct);
 
             // Delete compacted session rows (keep most recent keepCount)
