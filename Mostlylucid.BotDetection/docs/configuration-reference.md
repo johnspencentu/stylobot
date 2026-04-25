@@ -443,8 +443,8 @@ Use `Reputation` section instead for new deployments.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `StorageProvider` | `StorageProvider` | `Sqlite` | Storage provider: `PostgreSQL`, `Sqlite`, or `Json` |
-| `PostgreSQLConnectionString` | `string?` | `null` | PostgreSQL connection string (auto-enables PostgreSQL when set) |
+| `StorageProvider` | `StorageProvider` | `Sqlite` | Storage provider: `Sqlite` or `Json` (FOSS); `PostgreSQL` available in commercial |
+| `PostgreSQLConnectionString` | `string?` | `null` | PostgreSQL connection string (commercial only; ignored in FOSS) |
 | `DatabasePath` | `string?` | `null` | Path to SQLite/JSON file |
 | `EnableDatabaseWalMode` | `bool` | `true` | Enable WAL mode for SQLite concurrent access |
 | `WeightStoreCacheSize` | `int` | `1000` | Max weight entries cached in memory (LRU) |
@@ -761,8 +761,8 @@ ASP.NET Core maps nested configuration keys using double-underscore (`__`) separ
 | `BotDetection__AiDetection__TimeoutMs` | `AiDetection.TimeoutMs` | `10000` |
 | `BotDetection__AiDetection__Ollama__Endpoint` | `AiDetection.Ollama.Endpoint` | `http://ollama:11434` |
 | `BotDetection__AiDetection__Ollama__Model` | `AiDetection.Ollama.Model` | `qwen3:0.6b` |
-| `BotDetection__StorageProvider` | `StorageProvider` | `PostgreSQL` |
-| `BotDetection__PostgreSQLConnectionString` | `PostgreSQLConnectionString` | `Host=db;Database=bots;...` |
+| `BotDetection__StorageProvider` | `StorageProvider` | `Sqlite` |
+| `BotDetection__PostgreSQLConnectionString` | `PostgreSQLConnectionString` | `Host=db;Database=bots;...` (commercial only) |
 | `BotDetection__MaxRequestsPerMinute` | `MaxRequestsPerMinute` | `120` |
 | `BotDetection__CacheDurationSeconds` | `CacheDurationSeconds` | `600` |
 | `BotDetection__TrustUpstreamDetection` | `TrustUpstreamDetection` | `true` |

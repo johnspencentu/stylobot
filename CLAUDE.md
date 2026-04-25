@@ -24,7 +24,7 @@ dotnet build mostlylucid.stylobot.sln
 # Build specific project
 dotnet build Mostlylucid.BotDetection/Mostlylucid.BotDetection.csproj
 
-# Run the full demo application (all 32 detectors + dashboard)
+# Run the full demo application (all 47 detectors + dashboard)
 dotnet run --project Mostlylucid.BotDetection.Demo
 # Visit: https://localhost:5001/SignatureDemo
 # Dashboard: http://localhost:5080/_stylobot
@@ -59,7 +59,7 @@ dotnet pack Mostlylucid.BotDetection -c Release
 | `Mostlylucid.BotDetection.Api` | Public REST API for detection & dashboard data |
 | `Mostlylucid.BotDetection.ApiHolodeck` | Honeypot responses, beacon tracking, holodeck coordinator |
 | `Mostlylucid.BotDetection.UI` | Dashboard, TagHelpers, SignalR hub |
-| `Mostlylucid.BotDetection.UI.PostgreSQL` | PostgreSQL persistence layer |
+| `Mostlylucid.BotDetection.UI.PostgreSQL` | PostgreSQL persistence layer (in `stylobot-commercial` repo) |
 | `Mostlylucid.BotDetection.Llm` | LLM abstraction (`ILlmProvider`, prompts, parsing) |
 | `Mostlylucid.BotDetection.Llm.Ollama` | Ollama HTTP LLM provider |
 | `Mostlylucid.BotDetection.Llm.LlamaSharp` | LlamaSharp in-process LLM provider |
@@ -136,11 +136,12 @@ Measured via YAML-driven BenchmarkDotNet harness (`Mostlylucid.BotDetection.Benc
 
 Sessions are the primary behavioral unit. Per-request Markov chain transitions are compressed into a fixed-dimension vector per session, enabling similarity search and inter-session anomaly detection.
 
-**Vector dimensions (118 total):**
+**Vector dimensions (129 total):**
 - `[0..99]` Markov transition probabilities (10 states × 10 states)
 - `[100..109]` Stationary distribution (time spent in each state)
 - `[110..117]` Temporal features (timing entropy, burst ratio, error rate, etc.)
 - `[118..125]` Fingerprint features (TLS, HTTP protocol, TCP OS, headless, datacenter)
+- `[126..128]` Transition timing features (per-transition timing anomaly scores)
 
 **Markov states:** PageView, ApiCall, StaticAsset, WebSocket, SignalR, ServerSentEvent, FormSubmit, AuthAttempt, NotFound, Search
 
@@ -171,7 +172,7 @@ Sessions are the primary behavioral unit. Per-request Markov chain transitions a
 
 - `Extensions/ServiceCollectionExtensions.cs` - DI registration entry points
 - `Orchestration/BlackboardOrchestrator.cs` - Main detection orchestration
-- `Orchestration/ContributingDetectors/` - All 32 detector implementations
+- `Orchestration/ContributingDetectors/` - All 47 detector implementations
 - `Orchestration/Manifests/detectors/*.yaml` - Detector configurations
 - `Models/BotDetectionOptions.cs` - Configuration model
 - `Actions/*.cs` - Response policies (block, throttle, challenge, redirect)
@@ -388,7 +389,7 @@ Internet → Cloudflare Tunnel → Caddy (TLS) → YARP Gateway (bot detection) 
                                             → Website (direct for /_stylobot* / SignalR)
 ```
 
-- **Gateway** (`Stylobot.Gateway`) - YARP reverse proxy with all 32 detectors, no dashboard
+- **Gateway** (`Stylobot.Gateway`) - YARP reverse proxy with all 47 detectors, no dashboard
 - **Website** (`mostlylucid.stylobot.website`) - ASP.NET Core MVC + dashboard UI + SignalR hub
 - **Caddy** routes `/_stylobot*` directly to website (bypasses gateway for SignalR WebSocket)
 - **TimescaleDB** - Dashboard event persistence (commercial); SQLite for core product

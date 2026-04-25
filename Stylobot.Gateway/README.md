@@ -48,7 +48,7 @@ docker compose up -d
 ```
 
 **What you get:**
-- Bot detection on every request (10 fast-path detectors, <1ms)
+- Bot detection on every request (up to 47 detectors, wave-gated — typically 5-15 run per request)
 - Heuristic AI classification with weight learning (in-memory)
 - `X-Bot-*` response headers
 - Structured logging with risk scores
@@ -147,7 +147,7 @@ docker compose up -d
 
 **Best for:** Production deployments that need full persistence, multi-instance scaling, advanced detection.
 
-PostgreSQL stores learned weights, patterns, and reputation data. Enables all 29 detectors including advanced fingerprinting.
+PostgreSQL stores learned weights, patterns, and reputation data. Full 47-detector pipeline with persistence and adaptive learning.
 
 ```yaml
 # docker-compose.yml
@@ -249,7 +249,7 @@ docker compose up -d
 
 **What you get (in addition to Tier 2):**
 - PostgreSQL-backed persistence (weights, patterns, reputation, bot data)
-- All 29 detectors including TLS/TCP/HTTP2 fingerprinting
+- Full 47-detector pipeline including TLS/TCP/HTTP2 fingerprinting (wave-gated; typically 5-15 run per request)
 - Adaptive learning with drift detection
 - Multi-instance safe (shared database)
 - Path-specific detection policies
@@ -260,7 +260,7 @@ docker compose up -d
 
 | Feature | Minimal | Standard | Full |
 |---------|---------|----------|------|
-| Bot detection | 10 fast detectors | 10 fast detectors | All 29 detectors |
+| Bot detection | Up to 47 detectors, wave-gated | Up to 47 detectors, wave-gated | Up to 47 detectors, wave-gated |
 | Latency | <1ms | <1ms | <2ms |
 | Config files | None | `yarp.json` | `yarp.json` + `appsettings.json` |
 | Database | None | SQLite (auto) | PostgreSQL |

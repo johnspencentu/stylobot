@@ -16,7 +16,7 @@ The CLI client is an ASP.NET Core/YARP gateway packaged as a single-file Native 
 
 These have now been corrected.
 
-Note: the current detector set is 32 detectors total, including the new `Threat Intelligence` detector.
+Note: the current detector set is 47 detectors total, including the `Threat Intelligence` detector.
 
 ## Changes Made
 

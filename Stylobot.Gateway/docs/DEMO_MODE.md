@@ -55,30 +55,47 @@ services:
 
 ### 1. Switches to 'demo' Policy
 
-Automatically activates the `demo` policy with **ALL 29 detectors** enabled:
+Automatically activates the `demo` policy. The pipeline has **47 detectors** across 4 waves; the orchestrator runs only as many as needed — confidence gating and trigger conditions mean a typical request runs 5-15 detectors, not all 47:
 
-**Fast Path Detectors:**
+**Fast Path Detectors (Wave 0-1):**
 - FastPathReputation - Cached reputation
-- HoneypotLink - Honeypot trap detection
 - UserAgent - Bot UA patterns
 - Header - HTTP header analysis
 - Ip - Datacenter/cloud IP detection
 - SecurityTool - Scanner signatures
-- ProjectHoneypot - IP reputation (DNS lookup)
-- CacheBehavior - Cache header analysis
 - Behavioral - Rate limiting patterns
-- AdvancedBehavioral - Advanced behavioral analysis
 - ClientSide - Browser fingerprints
-- **ResponseBehavior** - Historical feedback ⭐ NEW
 - Inconsistency - Cross-signal contradictions
 - VersionAge - Browser/OS freshness
+- Heuristic - ML-trained weighted model (with learning enabled)
+- AiScraper - AI crawler detection (GPTBot, ClaudeBot, etc.)
+- Haxxor - Injection/exploit probe detection
+- CveProbe - CVE-targeting bot detection
+- CacheBehavior - Cache header analysis
+- CookieBehavior - Cookie handling analysis
+- ResourceWaterfall - Asset load pattern analysis
 - ReputationBias - Historical reputation
-- **Heuristic** - ML-trained weighted model (with learning enabled)
-- **TlsFingerprint** - JA3/JA4 TLS fingerprinting ⭐ NEW
-- **TcpIpFingerprint** - p0f passive OS detection ⭐ NEW
-- **Http2Fingerprint** - HTTP/2 SETTINGS analysis ⭐ NEW
-- **MultiLayerCorrelation** - Cross-layer consistency ⭐ NEW
-- **BehavioralWaveform** - Temporal pattern detection ⭐ NEW
+- TransportProtocol - Transport class classification
+
+**Protocol Fingerprinting (Wave 1-2):**
+- TlsFingerprint - JA3/JA4 TLS fingerprinting
+- TcpIpFingerprint - p0f passive OS detection
+- Http2Fingerprint - HTTP/2 SETTINGS analysis
+- Http3Fingerprint - QUIC/HTTP3 analysis
+- MultiLayerCorrelation - Cross-layer consistency
+- BehavioralWaveform - Temporal pattern detection
+- ResponseBehavior - Historical response feedback
+
+**Session & Behavioral Analysis (Wave 2-3):**
+- ContentSequence - Document/asset/API load order
+- SessionVector - 129-dim Markov chain behavioral vectors
+- Periodicity - Rotation cadence and temporal patterns
+- ReactivePattern - Retry-After compliance, geometric backoff detection
+- Intent - Threat scoring and intent classification
+- ProjectHoneypot - IP reputation (DNS lookup, slow path)
+
+**Entity Resolution:**
+- Merge, Split, Convergence - Identity anchor detection and rotation trail analysis
 
 ### 2. Passes ALL Headers Downstream
 
@@ -268,7 +285,7 @@ function BotDetectionBadge({ headers }) {
 
 | Feature | Production | Demo Mode |
 |---------|-----------|-----------|
-| **Policy** | `default` (10 detectors) | `demo` (29 detectors) |
+| **Policy** | `default` | `demo` |
 | **Headers Passed** | Basic only | ALL (comprehensive) |
 | **Detector Contributions** | ❌ Not exposed | ✅ Full JSON array |
 | **Detection Reasons** | ❌ Not exposed | ✅ Top 5 reasons |
@@ -282,11 +299,10 @@ function BotDetectionBadge({ headers }) {
 
 ## Performance Impact
 
-Demo mode runs **ALL 29 detectors** instead of the default 10:
+Same detector pipeline in both modes — the difference is verbosity. Demo mode exposes full detection metadata downstream:
 
 | Metric | Production (default) | Demo Mode |
 |--------|---------------------|-----------|
-| **Detectors** | 10 | 29 |
 | **Typical Latency** | 5-15ms | 18-25ms |
 | **Worst-Case** | 20ms | 150ms (with ProjectHoneypot DNS) |
 | **Memory/Request** | ~30KB | ~43KB |
@@ -345,7 +361,7 @@ docker run -d ... (without -e GATEWAY_DEMO_MODE)
 
 ### Demo Policy Not Active
 
-**Problem:** Only 10 detectors running instead of 29
+**Problem:** Demo policy not active (missing verbose headers downstream)
 
 **Solution:**
 1. Check PathPolicies configuration:

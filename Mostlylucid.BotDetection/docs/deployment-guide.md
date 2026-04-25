@@ -289,9 +289,11 @@ ENTRYPOINT ["dotnet", "YourApp.dll"]
 
 ---
 
-## Tier 3: Production (PostgreSQL + TimescaleDB + pgvector)
+## Tier 3: Production (PostgreSQL + TimescaleDB + pgvector) — Commercial
 
 For high-traffic production deployments. Replaces SQLite with PostgreSQL for concurrent multi-server access, adds TimescaleDB for time-series analytics, and optionally pgvector for ML-based signature similarity search.
+
+> **Note:** Tier 3 requires `Mostlylucid.BotDetection.UI.PostgreSQL` from the `stylobot-commercial` repo. The `AddStyloBotPostgreSQL` extension method is not available in the FOSS package.
 
 ### Program.cs
 

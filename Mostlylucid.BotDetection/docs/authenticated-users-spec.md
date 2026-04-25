@@ -137,7 +137,7 @@ Uses the existing `ResponseCoordinator` fail2ban sliding window - new policy `lo
 
 ### `UserBehaviorBaselineContributor` (Wave 1, priority 27)
 
-For each authenticated user we've seen enough of (min 20 requests over 7 days), maintain a baseline session vector (existing 118-dim Markov+temporal+fingerprint). On each new authenticated request, compute cosine similarity against the user's baseline.
+For each authenticated user we've seen enough of (min 20 requests over 7 days), maintain a baseline session vector (existing 129-dim Markov+temporal+fingerprint). On each new authenticated request, compute cosine similarity against the user's baseline.
 
 Emits:
 - `auth.baseline_similarity` = float (0..1; 1 = matches baseline perfectly)
