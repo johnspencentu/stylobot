@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Mostlylucid.BotDetection.Definitions.BotPatterns;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
@@ -23,67 +24,9 @@ namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
 /// </summary>
 public class AiScraperContributor : ConfiguredContributorBase
 {
-    /// <summary>
-    ///     Known AI bot User-Agent patterns mapped to bot identity.
-    ///     Format: { substring -> (BotName, Category, Operator) }
-    /// </summary>
-    private static readonly List<AiBotPattern> KnownAiBots = new()
-    {
-        // === AI Training Crawlers ===
-        new("GPTBot", "GPTBot", AiBotCategory.Training, "OpenAI"),
-        new("ClaudeBot", "ClaudeBot", AiBotCategory.Training, "Anthropic"),
-        new("Claude-Web", "Claude-Web", AiBotCategory.Training, "Anthropic"),
-        new("anthropic-ai", "Anthropic-AI", AiBotCategory.Training, "Anthropic"),
-        new("Google-Extended", "Google-Extended", AiBotCategory.Training, "Google"),
-        new("Google-CloudVertexBot", "Google-CloudVertexBot", AiBotCategory.Training, "Google"),
-        new("Bytespider", "Bytespider", AiBotCategory.Training, "ByteDance"),
-        new("CCBot", "CCBot", AiBotCategory.Training, "Common Crawl"),
-        new("Meta-ExternalAgent", "Meta-ExternalAgent", AiBotCategory.Training, "Meta"),
-        new("facebookexternalhit", "FacebookBot", AiBotCategory.Training, "Meta"),
-        new("Amazonbot", "Amazonbot", AiBotCategory.Training, "Amazon"),
-        new("Applebot-Extended", "Applebot-Extended", AiBotCategory.Training, "Apple"),
-        new("Diffbot", "Diffbot", AiBotCategory.Training, "Diffbot"),
-        new("Cohere-AI", "Cohere-AI", AiBotCategory.Training, "Cohere"),
-        new("DeepseekBot", "DeepseekBot", AiBotCategory.Training, "DeepSeek"),
-        new("xAI-Bot", "xAI-Bot", AiBotCategory.Training, "xAI"),
-        new("AI2Bot", "AI2Bot", AiBotCategory.Training, "Allen Institute"),
-        new("HuggingFace-Bot", "HuggingFace-Bot", AiBotCategory.Training, "Hugging Face"),
-        new("Brightbot", "Brightbot", AiBotCategory.Training, "Bright Data"),
-        new("Together-Bot", "Together-Bot", AiBotCategory.Training, "Together AI"),
-        new("ImagesiftBot", "ImagesiftBot", AiBotCategory.Training, "The Hive"),
-        new("Webzio-Extended", "Webzio-Extended", AiBotCategory.Training, "Webz.io"),
-        new("Kangaroo Bot", "Kangaroo Bot", AiBotCategory.Training, "Unknown"),
-        new("PanguBot", "PanguBot", AiBotCategory.Training, "Unknown"),
-        new("Timpi", "TimpiBot", AiBotCategory.Training, "Timpi"),
-
-        // === AI Search Bots ===
-        new("OAI-SearchBot", "OAI-SearchBot", AiBotCategory.Search, "OpenAI"),
-        new("PerplexityBot", "PerplexityBot", AiBotCategory.Search, "Perplexity"),
-        new("Perplexity-User", "Perplexity-User", AiBotCategory.Assistant, "Perplexity"),
-        new("DuckAssistBot", "DuckAssistBot", AiBotCategory.Search, "DuckDuckGo"),
-        new("YouBot", "YouBot", AiBotCategory.Search, "You.com"),
-        new("IbouBot", "IbouBot", AiBotCategory.Search, "Ibou.io"),
-        new("Andibot", "Andibot", AiBotCategory.Search, "Andi"),
-
-        // === AI Assistants (user-triggered) ===
-        new("ChatGPT-User", "ChatGPT-User", AiBotCategory.Assistant, "OpenAI"),
-        new("ChatGPT-Browser", "ChatGPT-Browser", AiBotCategory.Assistant, "OpenAI"),
-        new("Claude-User", "Claude-User", AiBotCategory.Assistant, "Anthropic"),
-        new("Claude-SearchBot", "Claude-SearchBot", AiBotCategory.Search, "Anthropic"),
-        new("Meta-ExternalFetcher", "Meta-ExternalFetcher", AiBotCategory.Assistant, "Meta"),
-        new("MistralAI-User", "MistralAI-User", AiBotCategory.Assistant, "Mistral"),
-        new("Cohere-Command", "Cohere-Command", AiBotCategory.Assistant, "Cohere"),
-        new("Google-NotebookLM", "Google-NotebookLM", AiBotCategory.Assistant, "Google"),
-        new("Gemini-AI", "Gemini-AI", AiBotCategory.Assistant, "Google"),
-        new("Gemini-Deep-Research", "Gemini-Deep-Research", AiBotCategory.Assistant, "Google"),
-        new("GoogleAgent-Mariner", "GoogleAgent-Mariner", AiBotCategory.Assistant, "Google"),
-        new("Character-AI", "Character-AI", AiBotCategory.Assistant, "Character.AI"),
-        new("Devin", "Devin", AiBotCategory.Assistant, "Cognition"),
-
-        // === AI Scraping Services ===
-        new("FirecrawlAgent", "FirecrawlAgent", AiBotCategory.ScrapingService, "Firecrawl"),
-        new("JinaBot", "JinaBot", AiBotCategory.ScrapingService, "Jina")
-    };
+    // Loaded from ai-scrapers.bot-patterns.yaml (and any other YAML with ai_category set).
+    // To add or modify AI bot patterns, edit the YAML files — never add hardcoded entries here.
+    private readonly IReadOnlyList<BotPatternEntry> _knownAiBots;
 
     /// <summary>
     ///     AI discovery endpoint paths that only AI systems request.
@@ -99,10 +42,13 @@ public class AiScraperContributor : ConfiguredContributorBase
 
     public AiScraperContributor(
         ILogger<AiScraperContributor> logger,
-        IDetectorConfigProvider configProvider)
+        IDetectorConfigProvider configProvider,
+        BotPatternLoader? patternLoader = null)
         : base(configProvider)
     {
         _logger = logger;
+        var loader = patternLoader ?? BotPatternLoader.Default;
+        _knownAiBots = loader.AiPatterns.ToList();
     }
 
     public override string Name => "AiScraper";
@@ -131,28 +77,30 @@ public class AiScraperContributor : ConfiguredContributorBase
             var userAgent = request.Headers.UserAgent.ToString();
             var foundBot = false;
 
-            // 1. Known AI bot User-Agent matching
+            // 1. Known AI bot User-Agent matching (loaded from YAML)
             if (!string.IsNullOrEmpty(userAgent))
             {
-                foreach (var bot in KnownAiBots)
+                foreach (var bot in _knownAiBots)
                 {
                     if (userAgent.Contains(bot.Pattern, StringComparison.OrdinalIgnoreCase))
                     {
+                        var category = bot.AiCategory ?? "Unknown";
                         state.WriteSignals([
                             new(SignalKeys.AiScraperDetected, true),
                             new(SignalKeys.AiScraperName, bot.BotName),
-                            new(SignalKeys.AiScraperOperator, bot.Operator),
-                            new(SignalKeys.AiScraperCategory, bot.Category.ToString())
+                            new(SignalKeys.AiScraperOperator, bot.Vendor),
+                            new(SignalKeys.AiScraperCategory, category)
                         ]);
                         foundBot = true;
 
-                        var botType = bot.Category == AiBotCategory.Training
+                        // Training bots → AiBot (harvesting content); Search/Assistant/ScrapingService → use YAML bot_type
+                        var botType = string.Equals(category, "Training", StringComparison.OrdinalIgnoreCase)
                             ? BotType.AiBot.ToString()
-                            : BotType.GoodBot.ToString();
+                            : bot.BotType;
 
                         contributions.Add(BotContribution(
                             "AI Scraper",
-                            $"Known AI {bot.Category.ToString().ToLowerInvariant()} bot: {bot.BotName} ({bot.Operator})",
+                            $"Known AI {category.ToLowerInvariant()} bot: {bot.BotName} ({bot.Vendor})",
                             confidenceOverride: KnownAiBotConfidence,
                             weightMultiplier: 2.0,
                             botType: botType,
@@ -321,17 +269,4 @@ public class AiScraperContributor : ConfiguredContributorBase
         return null;
     }
 
-    private enum AiBotCategory
-    {
-        Training,
-        Search,
-        Assistant,
-        ScrapingService
-    }
-
-    private sealed record AiBotPattern(
-        string Pattern,
-        string BotName,
-        AiBotCategory Category,
-        string Operator);
 }

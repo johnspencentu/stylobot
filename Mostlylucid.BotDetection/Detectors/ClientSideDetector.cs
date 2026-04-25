@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.ClientSide;
 using Mostlylucid.BotDetection.Metrics;
 using Mostlylucid.BotDetection.Models;
+using Mostlylucid.BotDetection.Proxy;
 
 namespace Mostlylucid.BotDetection.Detectors;
 
@@ -21,18 +22,21 @@ public class ClientSideDetector : IDetector
     private readonly ILogger<ClientSideDetector> _logger;
     private readonly BotDetectionMetrics? _metrics;
     private readonly BotDetectionOptions _options;
+    private readonly IProxyEnvironment? _proxyEnvironment;
     private readonly IBrowserFingerprintStore _store;
 
     public ClientSideDetector(
         ILogger<ClientSideDetector> logger,
         IOptions<BotDetectionOptions> options,
         IBrowserFingerprintStore store,
-        BotDetectionMetrics? metrics = null)
+        BotDetectionMetrics? metrics = null,
+        IProxyEnvironment? proxyEnvironment = null)
     {
         _logger = logger;
         _options = options.Value;
         _store = store;
         _metrics = metrics;
+        _proxyEnvironment = proxyEnvironment;
     }
 
     public string Name => "Client-Side Detector";
@@ -192,8 +196,15 @@ public class ClientSideDetector : IDetector
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private static string GetClientIp(HttpContext context)
+    private string GetClientIp(HttpContext context)
     {
+        if (_proxyEnvironment != null)
+        {
+            var ip = _proxyEnvironment.GetRealClientIp(context);
+            return string.IsNullOrEmpty(ip) ? "unknown" : ip;
+        }
+
+        // Legacy fallback when IProxyEnvironment is not registered
         var headers = context.Request.Headers;
 
         if (headers.TryGetValue("CF-Connecting-IP", out var cfIp) && !string.IsNullOrEmpty(cfIp))

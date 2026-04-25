@@ -5,6 +5,7 @@ using Mostlylucid.BotDetection.Actions;
 using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Policies;
+using Mostlylucid.BotDetection.Proxy;
 using Mostlylucid.BotDetection.Yarp;
 
 namespace Mostlylucid.BotDetection.Models;
@@ -123,6 +124,14 @@ public class BotDetectionOptions
     public LicensingOptions Licensing { get; set; } = new();
 
     /// <summary>
+    ///     Proxy topology sensing: controls how the real client IP and scheme are resolved
+    ///     when the application sits behind a CDN or reverse proxy.
+    ///     Auto-detected from request headers on first request, then cached.
+    ///     Override: BotDetection:ProxyEnvironment:Mode = Cloudflare | CloudFront | Fastly | Nginx | Generic | Direct.
+    /// </summary>
+    public ProxyEnvironmentOptions ProxyEnvironment { get; set; } = new();
+
+    /// <summary>
     ///     When true, detections from local/private IPs are excluded from SignalR broadcasts
     ///     and the live feed. Prevents self-detection from contaminating production data.
     ///     Default: true (set to false for local development/testing).
@@ -168,10 +177,10 @@ public class BotDetectionOptions
 
     /// <summary>
     ///     Minimum bot probability when AI/LLM detectors have not run.
-    ///     Prevents false negatives from pulling the score too low before the full pipeline completes.
+    ///     Set to 0.0 to allow scores to reach zero when human evidence is strong.
     ///     Valid range: 0.0 to 0.5
     /// </summary>
-    public double NonAiMinProbability { get; set; } = 0.05;
+    public double NonAiMinProbability { get; set; } = 0.0;
 
     /// <summary>
     ///     Maximum bot probability when AI/LLM detectors have not run.

@@ -9,74 +9,12 @@ namespace Mostlylucid.BotDetection.Data;
 public static partial class BotSignatures
 {
     /// <summary>
-    ///     Known good bots (search engines, monitoring tools, etc.)
+    ///     Known good bots (search engines, monitoring tools, social media, AI crawlers, dev tools, etc.)
+    ///     Populated at startup from embedded YAML bot-pattern files via <see cref="Definitions.BotPatterns.BotPatternLoader"/>.
+    ///     To add or modify entries, edit the YAML files in Definitions/BotPatterns/ — never add hardcoded entries here.
     /// </summary>
-    public static readonly Dictionary<string, string> GoodBots = new(StringComparer.OrdinalIgnoreCase)
-    {
-        // Search Engines
-        ["Googlebot"] = "Google Search",
-        ["Googlebot-Image"] = "Google Image Search",
-        ["Googlebot-News"] = "Google News",
-        ["Googlebot-Video"] = "Google Video Search",
-        ["Google-InspectionTool"] = "Google Search Console",
-        ["Google-Site-Verification"] = "Google Site Verification",
-        ["Storebot-Google"] = "Google Store Bot",
-        ["Bingbot"] = "Bing Search",
-        ["msnbot"] = "MSN Search",
-        ["BingPreview"] = "Bing Preview",
-        ["Slurp"] = "Yahoo Search",
-        ["DuckDuckBot"] = "DuckDuckGo",
-        ["Baiduspider"] = "Baidu Search",
-        ["YandexBot"] = "Yandex Search",
-        ["Sogou"] = "Sogou Search",
-        ["Exabot"] = "Exalead Search",
-
-        // Social Media
-        ["facebookexternalhit"] = "Facebook",
-        ["facebot"] = "Facebook Bot",
-        ["Twitterbot"] = "Twitter",
-        ["LinkedInBot"] = "LinkedIn",
-        ["Slackbot"] = "Slack",
-        ["Discordbot"] = "Discord",
-        ["TelegramBot"] = "Telegram",
-        ["WhatsApp"] = "WhatsApp",
-
-        // SEO & Monitoring
-        ["AhrefsBot"] = "Ahrefs SEO",
-        ["SemrushBot"] = "SEMrush",
-        ["MJ12bot"] = "Majestic SEO",
-        ["DotBot"] = "Moz",
-        ["Screaming Frog"] = "Screaming Frog SEO",
-        ["SEOkicks"] = "SEOkicks",
-        ["Uptimebot"] = "Uptime Monitor",
-        ["UptimeRobot"] = "UptimeRobot Monitor",
-        ["StatusCake"] = "StatusCake Monitor",
-        ["Pingdom"] = "Pingdom Monitor",
-
-        // AI/LLM Crawlers
-        ["GPTBot"] = "OpenAI GPT",
-        ["ChatGPT-User"] = "ChatGPT User",
-        ["OAI-SearchBot"] = "OpenAI Search",
-        ["ClaudeBot"] = "Anthropic Claude",
-        ["Claude-Web"] = "Anthropic Claude Web",
-        ["PerplexityBot"] = "Perplexity AI",
-        ["Bytespider"] = "ByteDance AI",
-        ["cohere-ai"] = "Cohere AI",
-
-        // Archives & Research
-        ["ia_archiver"] = "Internet Archive",
-        ["archive.org_bot"] = "Internet Archive",
-        ["Amazonbot"] = "Amazon",
-        ["AppleBot"] = "Apple",
-        ["Applebot-Extended"] = "Apple Extended",
-
-        // Development & Testing
-        ["curl"] = "cURL",
-        ["Wget"] = "GNU Wget",
-        ["python-requests"] = "Python Requests",
-        ["Postman"] = "Postman",
-        ["Insomnia"] = "Insomnia"
-    };
+    public static readonly Dictionary<string, string> GoodBots =
+        Definitions.BotPatterns.BotPatternLoader.Default.BuildGoodBotsDict();
 
     /// <summary>
     ///     Known malicious or suspicious bot patterns

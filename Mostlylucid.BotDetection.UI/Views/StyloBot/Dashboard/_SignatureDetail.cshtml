@@ -247,37 +247,69 @@ else
         </div>
     </div>
 
-    <!-- Fingerprint Profile (placeholder - individual fingerprint dims require API plumbing) -->
+    <!-- Fingerprint Profile -->
     <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
         <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">
             <i class="bx bx-fingerprint text-sm" style="color: var(--sb-accent);"></i>
             Fingerprint Profile
         </h3>
+        @{
+            // Helper to find a detector contribution by name fragment
+            SignatureDetectorEntry? FindDetector(params string[] names) =>
+                Model.DetectorContributions.FirstOrDefault(d => names.Any(n => d.Name.Contains(n, StringComparison.OrdinalIgnoreCase)));
+
+            // Helper to get signal value by category+key or flat key
+            string? Signal(string category, string key) =>
+                Model.SignalCategories.TryGetValue(category, out var cat) && cat.TryGetValue(key, out var v) ? v : null;
+
+            string? SignalFlat(string key) =>
+                Model.SignalCategories.TryGetValue("general", out var cat) && cat.TryGetValue(key, out var v) ? v : null;
+
+            // Derive fingerprint fields from detector contributions + signals
+            var fingerprintDetector = FindDetector("ClientFingerprint", "Fingerprint", "JA3", "TLS");
+            var headlessDetector = FindDetector("Headless", "SecurityTool", "Playwright", "Selenium", "Puppeteer");
+            var datacenterDetector = FindDetector("IpReputation", "Datacenter", "ASN", "Hosting");
+            var consistencyDetector = FindDetector("Consistency", "HttpHeader", "Header", "Inconsistency");
+            var uaDetector = FindDetector("UserAgent", "UA");
+
+            var tlsVersion = Signal("tls", "version") ?? Signal("tls", "Version") ?? Signal("ja3", "version") ?? "--";
+            var httpProtocol = Model.Protocol ?? Signal("http", "protocol") ?? Signal("http", "version") ?? "--";
+            var protocolClient = Signal("tls", "client") ?? Signal("ja3", "hash") ?? (fingerprintDetector != null ? "Detected" : "--");
+
+            string? FpValue(SignatureDetectorEntry? det) => det == null ? null :
+                Math.Abs(det.Contribution) >= 0.1 ? $"{(det.Contribution >= 0 ? "+" : "")}{det.Contribution:F2}" : "Low";
+
+            string FpColor(SignatureDetectorEntry? det) => det == null ? "text-base-content/40" :
+                Math.Abs(det.Contribution) >= 0.3 ? "text-error" :
+                Math.Abs(det.Contribution) >= 0.1 ? "text-warning" : "text-success";
+
+            var fpItems = new (string Label, string Icon, string Value, string Color, string? Tooltip)[] {
+                ("TLS Version", "bx-lock-alt", tlsVersion, tlsVersion == "--" ? "text-base-content/40" : "text-info", "TLS version negotiated by the client. Old versions (1.0/1.1) flag automation tools."),
+                ("HTTP Protocol", "bx-globe", httpProtocol, httpProtocol == "--" ? "text-base-content/40" : "text-info", "HTTP protocol version observed. HTTP/1.1 from a 'modern browser' is suspicious."),
+                ("Protocol Client", "bx-transfer", protocolClient, protocolClient == "--" ? "text-base-content/40" : (fingerprintDetector != null ? FpColor(fingerprintDetector) : "text-info"), "TLS/JA3 client fingerprint consistency with declared User-Agent."),
+                ("TCP OS Hint", "bx-chip", consistencyDetector != null ? (FpValue(consistencyDetector) ?? "Flagged") : "--", FpColor(consistencyDetector), "TCP stack behaviour consistency with claimed OS. Mismatches indicate spoofing."),
+                ("Fingerprint Integrity", "bx-shield", fingerprintDetector != null ? (FpValue(fingerprintDetector) ?? "Checked") : "--", FpColor(fingerprintDetector), "Browser fingerprint cross-consistency check. High score = fingerprint spoofing detected."),
+                ("UA Consistency", "bx-badge-check", uaDetector != null ? (FpValue(uaDetector) ?? "Checked") : "--", FpColor(uaDetector), "User-Agent string matches actual client behaviour. Mismatches reveal bots."),
+                ("Headless Indicator", "bx-bot", headlessDetector != null ? (FpValue(headlessDetector) ?? "Detected") : "Clean", headlessDetector != null ? FpColor(headlessDetector) : "text-success", "Signals of headless browser (Playwright, Puppeteer, Selenium). Positive = automation tool detected."),
+                ("Datacenter IP", "bx-server", datacenterDetector != null ? (FpValue(datacenterDetector) ?? "Detected") : "Clean", datacenterDetector != null ? FpColor(datacenterDetector) : "text-success", "IP address belongs to a cloud/datacenter ASN. Real users typically browse from ISP IPs.")
+            };
+        }
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            @{
-                var fpDims = new[] {
-                    ("TLS Version", "bx-lock-alt"),
-                    ("HTTP Protocol", "bx-globe"),
-                    ("Protocol Client", "bx-transfer"),
-                    ("TCP OS Consistency", "bx-chip"),
-                    ("QUIC 0-RTT", "bx-bolt-circle"),
-                    ("Fingerprint Integrity", "bx-shield"),
-                    ("Headless Indicator", "bx-bot"),
-                    ("Datacenter IP", "bx-server")
-                };
-            }
-            @foreach (var (label, icon) in fpDims)
+            @foreach (var (label, icon, value, color, tooltip) in fpItems)
             {
-                <div class="flex items-center gap-2 rounded-lg border px-2 py-1.5" style="border-color: var(--sb-card-divider);">
+                <div class="flex items-center gap-2 rounded-lg border px-2 py-1.5 cursor-help" style="border-color: var(--sb-card-divider);" title="@tooltip">
                     <i class="bx @icon text-sm" style="color: var(--sb-accent);"></i>
                     <div>
                         <div class="text-[10px] text-base-content/50">@label</div>
-                        <div class="text-xs font-mono text-base-content/40">--</div>
+                        <div class="text-xs font-mono @color">@value</div>
                     </div>
                 </div>
             }
         </div>
-        <p class="text-[10px] text-base-content/30 mt-2 italic">TLS/TCP/HTTP layer consistency from session vector dimensions 118-125. Individual dimension data requires API enhancement.</p>
+        @if (Model.DetectorContributions.Count == 0 && !Model.SignalCategories.Any())
+        {
+            <p class="text-[10px] text-base-content/30 mt-2 italic">No detector signal data available for this signature.</p>
+        }
     </div>
 
     <!-- Endpoints Visited (collapsed) -->

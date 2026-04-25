@@ -96,6 +96,7 @@
     <!-- Embed policy definition YAML files -->
     <ItemGroup>
         <EmbeddedResource Include="Definitions\Actions\*.yaml" />
+        <EmbeddedResource Include="Definitions\BotPatterns\*.yaml" />
     </ItemGroup>
 
     <!-- Embed detector and pipeline YAML manifests -->

@@ -33,10 +33,16 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Configure Kestrel shutdown timeout so keep-alive connections drain before SIGKILL
+    // Configure Kestrel: accept H1 and H2C (cleartext HTTP/2).
+    // H2C is required when cloudflared has http2Origin: true - cloudflared speaks H2C to the origin.
+    // Without this, cloudflared falls back to H1 and loses multiplexing benefits.
     builder.WebHost.ConfigureKestrel(options =>
     {
         options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(5);
+        options.ConfigureEndpointDefaults(listenOptions =>
+        {
+            listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
+        });
     });
     builder.Host.ConfigureHostOptions(options =>
     {

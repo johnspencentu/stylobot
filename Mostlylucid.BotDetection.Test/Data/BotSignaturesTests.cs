@@ -42,7 +42,7 @@ public class BotSignaturesTests
     [Theory]
     [InlineData("Googlebot", "Google")]
     [InlineData("Bingbot", "Bing")]
-    [InlineData("DuckDuckBot", "DuckDuckGo")]
+    [InlineData("DuckDuckBot", "DuckDuck")]
     public void GoodBots_HasDescriptiveNames(string key, string expectedPartOfValue)
     {
         // Assert

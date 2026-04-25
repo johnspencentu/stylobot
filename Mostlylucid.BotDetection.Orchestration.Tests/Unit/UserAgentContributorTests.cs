@@ -44,7 +44,8 @@ public class UserAgentContributorTests
             _loggerMock.Object,
             _options,
             _configProviderMock.Object,
-            patternCache);
+            patternLoader: null,
+            patternCache: patternCache);
     }
 
     private BlackboardState CreateState(string? userAgent = null)

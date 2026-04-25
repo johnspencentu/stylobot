@@ -287,7 +287,7 @@ Every detector touches exactly 5 files. Use `Http3FingerprintContributor` as a r
 
 ## Versioning
 
-Uses MinVer with tag prefix `botdetection-v{version}`. NuGet packages auto-version from git tags.
+Uses MinVer with tag prefix `allbot-v{version}`. NuGet packages auto-version from git tags.
 
 ## Target Frameworks
 

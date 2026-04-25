@@ -5,6 +5,7 @@ using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Helpers;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
+using Mostlylucid.BotDetection.Proxy;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
@@ -45,17 +46,20 @@ public class IpContributor : ConfiguredContributorBase
     private readonly IAsnLookupService? _asnLookup;
     private readonly IBotListDatabase? _botListDatabase;
     private readonly ILogger<IpContributor> _logger;
+    private readonly IProxyEnvironment? _proxyEnvironment;
 
     public IpContributor(
         ILogger<IpContributor> logger,
         IDetectorConfigProvider configProvider,
         IBotListDatabase? botListDatabase = null,
-        IAsnLookupService? asnLookup = null)
+        IAsnLookupService? asnLookup = null,
+        IProxyEnvironment? proxyEnvironment = null)
         : base(configProvider)
     {
         _logger = logger;
         _botListDatabase = botListDatabase;
         _asnLookup = asnLookup;
+        _proxyEnvironment = proxyEnvironment;
     }
 
     public override string Name => "Ip";
@@ -79,6 +83,7 @@ public class IpContributor : ConfiguredContributorBase
         var clientIp = ResolveClientIp(state.HttpContext);
 
         state.WriteSignal(SignalKeys.ClientIp, clientIp);
+        state.WriteSignal(SignalKeys.ProxyTopology, _proxyEnvironment?.DetectedTopology.ToString() ?? "Unknown");
 
         // Check if IP is empty/null - confidence from YAML
         if (string.IsNullOrEmpty(clientIp))
@@ -291,30 +296,32 @@ public class IpContributor : ConfiguredContributorBase
     }
 
     /// <summary>
-    ///     Resolves the real client IP address.
-    ///     Prefers Connection.RemoteIpAddress (set by UseForwardedHeaders middleware).
-    ///     Falls back to X-Forwarded-For header when the connection IP is a private/Docker network IP,
-    ///     which indicates UseForwardedHeaders isn't configured or doesn't trust the proxy.
+    ///     Resolves the real client IP address using topology-aware header selection.
+    ///     When IProxyEnvironment is registered, reads from the correct CDN/proxy header
+    ///     (CF-Connecting-IP, CloudFront-Viewer-Address, Fastly-Client-IP, X-Real-IP, etc.).
+    ///     Falls back to Connection.RemoteIpAddress + X-Forwarded-For when not registered.
     /// </summary>
-    private static string ResolveClientIp(Microsoft.AspNetCore.Http.HttpContext httpContext)
+    private string ResolveClientIp(Microsoft.AspNetCore.Http.HttpContext httpContext)
     {
+        if (_proxyEnvironment != null)
+            return _proxyEnvironment.GetRealClientIp(httpContext);
+
+        // Legacy fallback when IProxyEnvironment is not registered (e.g., minimal test setup):
+        // prefer Connection.RemoteIpAddress if it's already public (UseForwardedHeaders ran),
+        // else fall back to leftmost X-Forwarded-For entry.
         var connectionIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "";
 
-        // If connection IP is already public, UseForwardedHeaders did its job - use it
         if (!string.IsNullOrEmpty(connectionIp) && !IsLocalIp(connectionIp))
             return connectionIp;
 
-        // Connection IP is private (likely Docker/proxy). Check X-Forwarded-For as fallback.
         var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
         if (!string.IsNullOrEmpty(forwardedFor))
         {
-            // X-Forwarded-For format: "client, proxy1, proxy2" - leftmost is the original client
             var firstIp = forwardedFor.Split(',', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
             if (!string.IsNullOrEmpty(firstIp) && !IsLocalIp(firstIp))
                 return firstIp;
         }
 
-        // No forwarded header or it's also private - return what we have
         return connectionIp;
     }
 

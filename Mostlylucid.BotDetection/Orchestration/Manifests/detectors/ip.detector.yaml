@@ -127,7 +127,7 @@ defaults:
     missing_ip_penalty: 0.6
     # Private/local IP handling
     loopback_penalty: 0.0     # 127.0.0.1, ::1 - neutral for dev
-    private_ip_penalty: 0.1   # 192.168.x.x, 10.x.x.x - slight indicator
+    private_ip_penalty: 0.0   # 192.168.x.x, 10.x.x.x - neutral (internal services, dev machines, corporate proxies)
     # Datacenter ranges (simplified prefixes)
     datacenter_ranges:
       AWS: ["3.", "13.", "18.", "35.", "52.", "54."]

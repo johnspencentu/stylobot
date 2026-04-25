@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Mostlylucid.BotDetection.Definitions.BotPatterns;
 
 namespace Mostlylucid.BotDetection.Services;
 
@@ -66,48 +67,17 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
 
     /// <summary>
     ///     Bot definitions with verification methods.
+    ///     Loaded from YAML bot-pattern files (entries with ip_ranges_url or verified_domains).
     ///     Order matters: first match wins, so more specific patterns should come first.
+    ///     To add a verifiable bot, add it to the appropriate YAML file in Definitions/BotPatterns/.
     /// </summary>
-    private static readonly BotDefinition[] BotDefinitions =
-    [
-        // === Bots with BOTH published IP ranges AND FCrDNS fallback ===
-        new("Googlebot", "Googlebot",
-            "https://developers.google.com/static/search/apis/ipranges/googlebot.json",
-            ["*.googlebot.com", "*.google.com"]),
-        new("Bingbot", "bingbot",
-            "https://www.bing.com/toolbox/bingbot.json",
-            ["*.search.msn.com"]),
-
-        // === Bots with published IP ranges only (no FCrDNS) ===
-        new("GPTBot", "GPTBot",
-            "https://openai.com/gptbot-ranges.json",
-            null),
-        new("ChatGPT-User", "ChatGPT-User",
-            "https://openai.com/gptbot-ranges.json", // Same IP ranges as GPTBot
-            null),
-
-        // === Bots with FCrDNS verification only ===
-        new("DuckDuckBot", "DuckDuckBot",
-            null,
-            ["*.duckduckgo.com"]),
-        new("Applebot", "Applebot",
-            null,
-            ["*.applebot.apple.com"]),
-        new("YandexBot", "YandexBot",
-            null,
-            ["*.yandex.ru", "*.yandex.net", "*.yandex.com"]),
-        new("Baiduspider", "Baiduspider",
-            null,
-            ["*.baidu.com", "*.baidu.jp"]),
-        new("LinkedInBot", "LinkedInBot",
-            null,
-            ["*.linkedin.com"]),
-    ];
+    private readonly BotDefinition[] _botDefinitions;
 
     public VerifiedBotRegistry(
         ILogger<VerifiedBotRegistry> logger,
         IHttpClientFactory httpClientFactory,
-        IOptions<VerifiedBotRegistryOptions> options)
+        IOptions<VerifiedBotRegistryOptions> options,
+        BotPatternLoader? patternLoader = null)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
@@ -117,6 +87,15 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
         _dnsFailedCacheTtl = TimeSpan.FromHours(opts.DnsFailedCacheTtlHours);
         _refreshInterval = TimeSpan.FromHours(opts.IpRangeRefreshHours);
         _dnsTimeout = TimeSpan.FromMilliseconds(opts.DnsTimeoutMs);
+
+        var loader = patternLoader ?? BotPatternLoader.Default;
+        _botDefinitions = loader.VerifiablePatterns
+            .Select(p => new BotDefinition(
+                p.BotName,
+                p.Pattern,
+                p.IpRangesUrl,
+                p.VerifiedDomains))
+            .ToArray();
     }
 
     /// <summary>
@@ -173,9 +152,9 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
         return FindBotByUserAgent(userAgent)?.Name;
     }
 
-    private static BotDefinition? FindBotByUserAgent(string userAgent)
+    private BotDefinition? FindBotByUserAgent(string userAgent)
     {
-        foreach (var bot in BotDefinitions)
+        foreach (var bot in _botDefinitions)
         {
             if (userAgent.Contains(bot.UaPattern, StringComparison.OrdinalIgnoreCase))
                 return bot;
@@ -395,7 +374,7 @@ public sealed class VerifiedBotRegistry : IHostedService, IDisposable
 
             // Group by URL to avoid fetching the same endpoint multiple times
             // (e.g. GPTBot and ChatGPT-User share the same OpenAI ranges URL)
-            var urlGroups = BotDefinitions
+            var urlGroups = _botDefinitions
                 .Where(b => !string.IsNullOrEmpty(b.IpRangeUrl))
                 .GroupBy(b => b.IpRangeUrl!)
                 .Select(g => FetchIpRangesForUrlAsync(g.Key, g.Select(b => b.Name).ToArray()));

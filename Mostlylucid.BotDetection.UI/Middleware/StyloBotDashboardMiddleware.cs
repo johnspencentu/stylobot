@@ -1660,7 +1660,7 @@ public class StyloBotDashboardMiddleware
                             RiskBand = dominantRisk,
                             ErrorCount = 0,
                             timingEntropy = 0.0,
-                            Maturity = "Observed",
+                            Maturity = 0.0,
                             live = false,
                             velocity = (object?)null,
                             transitionCounts = (Dictionary<string, int>?)null,
@@ -2966,9 +2966,8 @@ public class StyloBotDashboardMiddleware
     private async Task ServeSignatureSessionsPartialAsync(HttpContext context)
     {
         var signature = context.Request.Query["signature"].FirstOrDefault() ?? "";
-        var sessionStore = context.RequestServices.GetService<BotDetection.Data.ISessionStore>();
 
-        if (sessionStore is null || string.IsNullOrEmpty(signature))
+        if (string.IsNullOrEmpty(signature))
         {
             context.Response.ContentType = "text/html";
             await context.Response.WriteAsync(
@@ -2977,14 +2976,84 @@ public class StyloBotDashboardMiddleware
         }
 
         var decodedSig = Uri.UnescapeDataString(signature);
+        var sessionStore = context.RequestServices.GetService<BotDetection.Data.ISessionStore>();
 
         // Bridge signature key spaces (multi-factor → waveform)
-        var sessions = await sessionStore.GetSessionsAsync(decodedSig, 20);
+        var sessions = sessionStore != null
+            ? await sessionStore.GetSessionsAsync(decodedSig, 20)
+            : new List<BotDetection.Data.SessionRecord>();
 
-        context.Response.ContentType = "text/html";
-
+        // Detection fallback: if no finalized sessions, synthesize from dashboard_detections
         if (sessions.Count == 0)
         {
+            var eventStore = context.RequestServices.GetService<IDashboardEventStore>();
+            if (eventStore != null)
+            {
+                var detections = await eventStore.GetDetectionsAsync(new DashboardFilter
+                {
+                    SignatureId = decodedSig,
+                    Limit = 100
+                });
+
+                if (detections.Count > 0)
+                {
+                    var ordered = detections.OrderBy(d => d.Timestamp).ToList();
+                    var syntheticGroups = new List<List<DashboardDetectionEvent>>();
+                    var currentGroup = new List<DashboardDetectionEvent> { ordered[0] };
+                    for (var i = 1; i < ordered.Count; i++)
+                    {
+                        if ((ordered[i].Timestamp - ordered[i - 1].Timestamp).TotalMinutes > 30)
+                        {
+                            syntheticGroups.Add(currentGroup);
+                            currentGroup = new List<DashboardDetectionEvent>();
+                        }
+                        currentGroup.Add(ordered[i]);
+                    }
+                    syntheticGroups.Add(currentGroup);
+
+                    var html = new System.Text.StringBuilder();
+                    html.Append("<div class=\"overflow-x-auto\"><table class=\"table table-xs w-full\"><thead>");
+                    html.Append("<tr class=\"text-[10px] uppercase tracking-wider text-base-content/40\">");
+                    html.Append("<th class=\"py-1\">Started</th>");
+                    html.Append("<th class=\"py-1\">Duration</th>");
+                    html.Append("<th class=\"py-1 text-right\">Requests</th>");
+                    html.Append("<th class=\"py-1\">Dominant Risk</th>");
+                    html.Append("<th class=\"py-1 text-right\">Bot %</th>");
+                    html.Append("<th class=\"py-1\">Risk Band</th>");
+                    html.Append("<th class=\"py-1\">Paths</th>");
+                    html.Append("</tr></thead><tbody>");
+
+                    foreach (var group in syntheticGroups.OrderByDescending(g => g[0].Timestamp))
+                    {
+                        var avgProb = group.Average(d => d.BotProbability);
+                        var dominantRisk = group.GroupBy(d => d.RiskBand).OrderByDescending(g => g.Count()).First().Key;
+                        var paths = group.Select(d => d.Path).Where(p => p != null).Distinct().Take(4).ToList();
+                        var pathPreview = string.Join(" > ", paths) + (group.Select(d => d.Path).Distinct().Count() > 4 ? $" (+{group.Select(d => d.Path).Distinct().Count() - 4})" : "");
+                        var duration = (group[^1].Timestamp - group[0].Timestamp).TotalMinutes;
+                        var probClass = avgProb >= 0.7 ? "text-error" : avgProb >= 0.4 ? "text-warning" : "text-success";
+                        var riskClass = dominantRisk is "VeryHigh" or "High" ? "text-error" : dominantRisk is "Elevated" or "Medium" ? "text-warning" : "text-success";
+
+                        html.Append("<tr class=\"hover:bg-base-200/50\">");
+                        html.Append($"<td class=\"py-1 text-[10px] text-base-content/50 whitespace-nowrap\">{group[0].Timestamp:MMM dd HH:mm}</td>");
+                        html.Append($"<td class=\"py-1 text-xs text-base-content/60\">{duration:F1}m</td>");
+                        html.Append($"<td class=\"py-1 text-right text-xs font-mono\">{group.Count}</td>");
+                        html.Append($"<td class=\"py-1 text-[10px] text-base-content/60\">{dominantRisk}</td>");
+                        html.Append($"<td class=\"py-1 text-right text-xs font-bold {probClass}\">{avgProb:P0}</td>");
+                        html.Append($"<td class=\"py-1 text-[10px] {riskClass}\">{dominantRisk}</td>");
+                        html.Append($"<td class=\"py-1 text-[10px] text-base-content/40 max-w-[250px] truncate\" title=\"{System.Net.WebUtility.HtmlEncode(pathPreview)}\">{System.Net.WebUtility.HtmlEncode(pathPreview)}</td>");
+                        html.Append("</tr>");
+                    }
+
+                    html.Append("</tbody></table></div>");
+                    html.Append($"<div class=\"text-[10px] text-base-content/30 mt-2\">{syntheticGroups.Count} activity period(s) from {detections.Count} detections <span class=\"italic\">(in-flight sessions)</span></div>");
+
+                    context.Response.ContentType = "text/html";
+                    await context.Response.WriteAsync(html.ToString());
+                    return;
+                }
+            }
+
+            context.Response.ContentType = "text/html";
             await context.Response.WriteAsync(
                 "<div class=\"text-xs text-base-content/40 py-4 text-center\">No sessions recorded yet. Sessions are created when a visitor's activity gap exceeds 30 minutes.</div>");
             return;

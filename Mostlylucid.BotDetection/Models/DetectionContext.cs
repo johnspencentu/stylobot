@@ -250,6 +250,7 @@ public static class SignalKeys
     public const string IpProvider = "ip.provider";
     public const string IpAsn = "ip.asn";
     public const string IpAsnOrg = "ip.asn_org";
+    public const string ProxyTopology = "proxy.topology";
 
     public const string FingerprintHash = "fingerprint.hash";
     public const string FingerprintHeadlessScore = "fingerprint.headless_score";

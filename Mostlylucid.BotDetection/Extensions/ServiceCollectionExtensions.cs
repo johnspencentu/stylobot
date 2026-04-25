@@ -27,6 +27,7 @@ using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.Similarity;
 using Mostlylucid.BotDetection.Compliance;
+using Mostlylucid.BotDetection.Proxy;
 using Mostlylucid.BotDetection.SimulationPacks;
 
 namespace Mostlylucid.BotDetection.Extensions;
@@ -256,8 +257,16 @@ public static class ServiceCollectionExtensions
         services.AddOptions<VerifiedBotRegistryOptions>()
             .BindConfiguration("BotDetection:VerifiedBotRegistry");
 
+        // Proxy topology sensing: auto-detects the CDN/proxy in front of the app and
+        // resolves the real client IP from the correct headers (CF-Connecting-IP, X-Real-IP, etc.).
+        // Registered as singleton - topology is detected once on first request and cached.
+        services.TryAddSingleton<IProxyEnvironment, ProxyEnvironmentDetector>();
+
         // Add memory cache if not already registered
         services.AddMemoryCache();
+
+        // Register bot pattern loader (YAML-driven, replaces hardcoded bot lists)
+        services.TryAddSingleton<Definitions.BotPatterns.BotPatternLoader>();
 
         // Register performance infrastructure
         services.TryAddSingleton<BotDetectionMetrics>();

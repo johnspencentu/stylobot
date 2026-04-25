@@ -294,12 +294,15 @@ public class IntentContributor : ConfiguredContributorBase
             : 0.0f;
 
         var mahalDist = state.GetSignal<float?>(SignalKeys.SessionMahalanobisNearestDistance) ?? float.MaxValue;
-        var isDeepVoid = isVoid && mahalDist > 3.0f; // Void under BOTH cosine and Mahalanobis
+        // float.MaxValue = no centroids in index (untrained). Only treat as deep-void when data exists.
+        var hasCentroids = mahalDist != float.MaxValue;
+        var isDeepVoid = isVoid && hasCentroids && mahalDist > 3.0f;
 
         features["session:is_void"] = isVoid ? 1.0f : 0.0f;
         features["session:is_deep_void"] = isDeepVoid ? 1.0f : 0.0f;
         features["session:novelty"] = isVoid ? 1.0f : Math.Max(0.0f, 1.0f - topSimilarity);
-        features["session:mahalanobis_distance"] = Math.Min(mahalDist == float.MaxValue ? 1.0f : mahalDist / 5.0f, 1.0f);
+        // No centroids (untrained) → neutral 0.0, not max-bot 1.0
+        features["session:mahalanobis_distance"] = hasCentroids ? Math.Min(mahalDist / 5.0f, 1.0f) : 0.0f;
         features["session:periodicity"] = periodicityScore;
         features["session:trajectory_in_attack"] = inAttackCluster ? 1.0f : 0.0f;
         features["session:trajectory_similarity"] = trajSimilarity;

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Data;
+using Mostlylucid.BotDetection.Definitions.BotPatterns;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
@@ -22,17 +23,25 @@ public partial class UserAgentContributor : ConfiguredContributorBase
     private readonly ILogger<UserAgentContributor> _logger;
     private readonly BotDetectionOptions _options;
     private readonly ICompiledPatternCache? _patternCache;
+    private readonly (string Pattern, BotType Type, string Name)[] _botPatterns;
 
     public UserAgentContributor(
         ILogger<UserAgentContributor> logger,
         IOptions<BotDetectionOptions> options,
         IDetectorConfigProvider configProvider,
+        BotPatternLoader? patternLoader = null,
         ICompiledPatternCache? patternCache = null)
         : base(configProvider)
     {
         _logger = logger;
         _options = options.Value;
         _patternCache = patternCache;
+
+        var loader = patternLoader ?? BotPatternLoader.Default;
+        _botPatterns = loader.AllPatterns
+            .Where(p => Enum.TryParse<BotType>(p.BotType, true, out _))
+            .Select(p => (p.Pattern, Enum.Parse<BotType>(p.BotType, true), p.BotName))
+            .ToArray();
     }
 
     public override string Name => "UserAgent";
@@ -195,70 +204,9 @@ public partial class UserAgentContributor : ConfiguredContributorBase
     private static readonly string[] BrowserOnlyHeaders =
         ["Sec-Fetch-Mode", "Sec-Fetch-Site", "Sec-Fetch-Dest"];
 
-    private static readonly (string pattern, BotType type, string name)[] CommonBotPatterns =
-    [
-        // Developer HTTP tools (libraries/CLIs - not automation frameworks)
-        ("curl/", BotType.Tool, "curl"),
-        ("wget/", BotType.Tool, "wget"),
-        ("python-requests", BotType.Tool, "python-requests"),
-        ("python-urllib", BotType.Tool, "python-urllib"),
-        ("python-httpx", BotType.Tool, "python-httpx"),
-        ("aiohttp", BotType.Tool, "aiohttp"),
-        ("httpie", BotType.Tool, "HTTPie"),
-        ("java/", BotType.Tool, "Java HTTP client"),
-        ("apache-httpclient", BotType.Tool, "Apache HttpClient"),
-        ("okhttp", BotType.Tool, "OkHttp"),
-        ("go-http-client", BotType.Tool, "Go HTTP client"),
-        ("node-fetch", BotType.Tool, "node-fetch"),
-        ("axios/", BotType.Tool, "axios"),
-        // Automation / scraping frameworks
-        ("scrapy", BotType.Scraper, "Scrapy"),
-        ("selenium", BotType.Scraper, "Selenium"),
-        ("HeadlessChrome", BotType.Scraper, "Headless Chrome (likely Puppeteer/Playwright)"),
-        ("headless", BotType.Scraper, "Headless browser"),
-        ("phantomjs", BotType.Scraper, "PhantomJS"),
-        ("puppeteer", BotType.Scraper, "Puppeteer"),
-        ("playwright", BotType.Scraper, "Playwright"),
-        ("httrack", BotType.Scraper, "HTTrack"),
-        ("libwww-perl", BotType.Scraper, "libwww-perl"),
-        ("colly", BotType.Scraper, "Colly"),
-        // Search engines (when not whitelisted)
-        ("Googlebot", BotType.SearchEngine, "Googlebot"),
-        ("bingbot", BotType.SearchEngine, "Bingbot"),
-        ("YandexBot", BotType.SearchEngine, "YandexBot"),
-        ("Baiduspider", BotType.SearchEngine, "Baiduspider"),
-        ("DuckDuckBot", BotType.SearchEngine, "DuckDuckBot"),
-        // Social media bots
-        ("facebookexternalhit", BotType.SocialMediaBot, "FacebookBot"),
-        ("Facebot", BotType.SocialMediaBot, "FacebookBot"),
-        ("Twitterbot", BotType.SocialMediaBot, "TwitterBot"),
-        ("LinkedInBot", BotType.SocialMediaBot, "LinkedInBot"),
-        ("Slackbot", BotType.SocialMediaBot, "SlackBot"),
-        ("Discordbot", BotType.SocialMediaBot, "DiscordBot"),
-        ("TelegramBot", BotType.SocialMediaBot, "TelegramBot"),
-        ("WhatsApp", BotType.SocialMediaBot, "WhatsApp"),
-        // AI / LLM crawlers
-        ("GPTBot", BotType.AiBot, "GPTBot"),
-        ("ChatGPT-User", BotType.AiBot, "ChatGPT"),
-        ("ClaudeBot", BotType.AiBot, "ClaudeBot"),
-        ("Claude-Web", BotType.AiBot, "Claude"),
-        ("anthropic-ai", BotType.AiBot, "Anthropic"),
-        ("CCBot", BotType.AiBot, "CommonCrawl"),
-        ("cohere-ai", BotType.AiBot, "Cohere"),
-        ("PerplexityBot", BotType.AiBot, "PerplexityBot"),
-        ("Bytespider", BotType.AiBot, "Bytespider"),
-        // Monitoring / uptime bots
-        ("UptimeRobot", BotType.MonitoringBot, "UptimeRobot"),
-        ("Pingdom", BotType.MonitoringBot, "Pingdom"),
-        ("StatusCake", BotType.MonitoringBot, "StatusCake"),
-        ("Site24x7", BotType.MonitoringBot, "Site24x7"),
-        ("NewRelicPinger", BotType.MonitoringBot, "New Relic"),
-        ("Datadog", BotType.MonitoringBot, "Datadog"),
-    ];
-
-    private static bool IsCommonBotPattern(string userAgent, out BotType? botType, out string? botName)
+    private bool IsCommonBotPattern(string userAgent, out BotType? botType, out string? botName)
     {
-        foreach (var (pattern, type, name) in CommonBotPatterns)
+        foreach (var (pattern, type, name) in _botPatterns)
             if (userAgent.Contains(pattern, StringComparison.OrdinalIgnoreCase))
             {
                 botType = type;
@@ -484,8 +432,12 @@ public partial class InconsistencyContributor : ConfiguredContributorBase
         // Check for Chrome UA without sec-ch-ua headers
         // Note: Service worker, fetch API, WebSocket upgrades, same-origin fetch,
         // and some browser configurations may not send Client Hints.
+        // Also: Client Hints are only sent over HTTPS (requires HTTP/2 or HTTP/1.1+TLS).
+        // Browsers never send Sec-CH-UA over plain HTTP/1.1, so suppress this check there.
         var path = state.HttpContext.Request.Path.Value?.ToLowerInvariant() ?? "";
-        var isLegitimateNoHintsRequest = isWebSocketUpgrade || isSameOriginFetch ||
+        var isHttp11 = state.HttpContext.Request.Protocol.Equals("HTTP/1.1", StringComparison.OrdinalIgnoreCase);
+        var isPlainHttp = isHttp11 && !state.HttpContext.Request.IsHttps;
+        var isLegitimateNoHintsRequest = isWebSocketUpgrade || isSameOriginFetch || isPlainHttp ||
                                          path.Contains("serviceworker") ||
                                          path.Contains("sw.js") ||
                                          path.Contains("worker");

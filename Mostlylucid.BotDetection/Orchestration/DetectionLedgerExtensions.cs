@@ -25,8 +25,8 @@ public static class DetectionLedgerExtensions
         var confidence = ledger.Confidence;
 
         // Clamp probability when AI hasn't run.
-        // Floor prevents strong human evidence from hitting exactly zero;
-        // ceiling prevents high-confidence bot verdicts without AI confirmation.
+        // Floor defaults to 0.0 (allowing scores to reach zero on strong human evidence).
+        // Ceiling prevents high-confidence bot verdicts without AI confirmation.
         // Configurable via BotDetection:NonAiMinProbability / NonAiMaxProbability.
         if (!aiRan)
         {
