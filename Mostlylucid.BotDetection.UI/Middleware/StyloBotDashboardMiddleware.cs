@@ -1613,7 +1613,8 @@ public class StyloBotDashboardMiddleware
                             .First().Key;
                         var paths = group.Select(d => d.Path).Distinct().ToList();
 
-                        // Build 8-axis radar: average 16-dim RadarShape across the group
+                        // Build 8-axis radar: prefer 16-dim RadarShape; fall back to
+                        // aggregating detector contributions (available on all detections).
                         double[]? radarAxes = null;
                         var withShape = group.Where(d => d.RadarShape is { Length: 16 }).ToList();
                         if (withShape.Count > 0)
@@ -1623,6 +1624,27 @@ public class StyloBotDashboardMiddleware
                                 for (var i = 0; i < 16; i++) avgShape[i] += d.RadarShape![i];
                             for (var i = 0; i < 16; i++) avgShape[i] /= withShape.Count;
                             radarAxes = ProjectDetectionRadarTo8Axes(avgShape);
+                        }
+                        else
+                        {
+                            // Fallback: build radar from detector_contributions using the
+                            // SearchProjection axis map (16-dim indices) then project to 8 axes.
+                            var accumulated = new float[16];
+                            var accumCount = 0;
+                            foreach (var d in group.Where(d => d.DetectorContributions is { Count: > 0 }))
+                            {
+                                foreach (var (name, contrib) in d.DetectorContributions!)
+                                {
+                                    var axisIdx = MapDetectorNameToRadarDim(name);
+                                    if (axisIdx >= 0) accumulated[axisIdx] += (float)Math.Abs(contrib.Contribution);
+                                }
+                                accumCount++;
+                            }
+                            if (accumCount > 0)
+                            {
+                                for (var i = 0; i < 16; i++) accumulated[i] /= accumCount;
+                                radarAxes = ProjectDetectionRadarTo8Axes(accumulated);
+                            }
                         }
 
                         result.Add(new
@@ -1652,6 +1674,63 @@ public class StyloBotDashboardMiddleware
 
         context.Response.ContentType = "application/json";
         await JsonSerializer.SerializeAsync(context.Response.Body, result, CamelCaseJson);
+    }
+
+    // Detector name → 16-dim RadarDimensions index (matches SearchProjection.DetectorAxisMap)
+    private static readonly Dictionary<string, int> DetectorToRadarDimMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["UserAgent"] = 0,           // ua_anomaly
+        ["Header"] = 1,              // header_anomaly
+        ["HeaderCorrelation"] = 1,   // header_anomaly
+        ["Ip"] = 2,                  // ip_reputation
+        ["FastPathReputation"] = 2,  // ip_reputation
+        ["ProjectHoneypot"] = 2,     // ip_reputation
+        ["Behavioral"] = 3,          // behavioral
+        ["Heuristic"] = 3,           // behavioral
+        ["HeuristicLate"] = 3,       // behavioral
+        ["BehavioralWaveform"] = 3,  // behavioral
+        ["AdvancedBehavioral"] = 4,  // advanced_behavioral
+        ["SessionVector"] = 4,       // advanced_behavioral
+        ["Periodicity"] = 4,         // advanced_behavioral
+        ["CacheBehavior"] = 5,       // cache_behavior
+        ["ResourceWaterfall"] = 5,   // cache_behavior
+        ["CookieBehavior"] = 5,      // cache_behavior
+        ["SecurityTool"] = 6,        // security_tool
+        ["Haxxor"] = 6,              // security_tool
+        ["CveProbe"] = 6,            // security_tool
+        ["CveFingerprint"] = 6,      // security_tool
+        ["TlsFingerprint"] = 7,      // client_fingerprint
+        ["Http2Fingerprint"] = 7,    // client_fingerprint
+        ["Http3Fingerprint"] = 7,    // client_fingerprint
+        ["TcpIpFingerprint"] = 7,    // client_fingerprint
+        ["FingerprintApproval"] = 7, // client_fingerprint
+        ["ClientSide"] = 7,          // client_fingerprint
+        ["VersionAge"] = 8,          // version_age
+        ["Inconsistency"] = 9,       // inconsistency
+        ["TransportProtocol"] = 9,   // inconsistency
+        ["TimescaleReputation"] = 10,// reputation_match
+        ["ReputationBias"] = 10,     // reputation_match
+        ["Similarity"] = 10,         // reputation_match
+        ["VerifiedBot"] = 10,        // reputation_match
+        ["Llm"] = 11,                // ai_classification
+        ["AI"] = 11,                 // ai_classification
+        ["AiScraper"] = 11,          // ai_classification
+        ["ClusterContributor"] = 12, // cluster_signal
+        ["MultiLayerCorrelation"] = 12, // cluster_signal
+        ["GeoChange"] = 13,          // country_reputation
+        ["StreamAbuse"] = 14,        // rate_pattern
+        ["Intent"] = 14,             // rate_pattern
+        ["ResponseBehavior"] = 15,   // payload_signature
+        ["PiiQueryString"] = 15,     // payload_signature
+    };
+
+    private static int MapDetectorNameToRadarDim(string name)
+    {
+        // Try exact match first, then prefix match on the first capitalized word
+        if (DetectorToRadarDimMap.TryGetValue(name, out var idx)) return idx;
+        foreach (var (key, val) in DetectorToRadarDimMap)
+            if (name.StartsWith(key, StringComparison.OrdinalIgnoreCase)) return val;
+        return -1;
     }
 
     /// <summary>
