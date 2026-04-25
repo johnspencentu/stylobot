@@ -423,8 +423,7 @@ jobs:
     name: Publish Linux .deb to Cloudsmith
     needs: build-binaries
     runs-on: ubuntu-latest
-    # Only publish stable releases (not betas/pre-releases)
-    if: ${{ !contains(github.ref, '-') }}
+    # TEST: running on all tags to verify Cloudsmith OIDC; restore stable-only after confirmed
 
     permissions:
       contents: read
