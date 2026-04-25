@@ -74,6 +74,20 @@ public sealed record SessionSnapshot
     ///     Null for sessions created before this field was added.
     /// </summary>
     public string? HeaderHashesJson { get; init; }
+
+    /// <summary>
+    ///     Frequency fingerprint: autocorrelation at 8 lag scales [1s, 3s, 10s, 30s, 1m, 3m, 10m, 30m].
+    ///     Near-zero = aperiodic human; spike at lag k = bot with that rhythm.
+    ///     Null when computed from fewer than 3 requests.
+    /// </summary>
+    public float[]? FrequencyFingerprint { get; init; }
+
+    /// <summary>
+    ///     Drift vector: linear regression slope over the preceding N session vectors.
+    ///     Represents the behavioral direction this signature is heading in shape-space.
+    ///     Null for the first session or when fewer than 3 prior sessions exist.
+    /// </summary>
+    public float[]? DriftVector { get; init; }
 }
 
 /// <summary>
@@ -322,6 +336,156 @@ public static class SessionVectorizer
         for (var i = 0; i < laterVelocity.Length; i++)
             acc[i] = laterVelocity[i] - earlierVelocity[i];
         return acc;
+    }
+
+    /// <summary>
+    ///     Fits a linear regression over a time series of session vectors and returns the slope vector.
+    ///     The slope vector is the behavioral "drift direction" -- where this entity is heading in shape-space.
+    ///
+    ///     Sessions are ordered by time (earliest first). Time values are normalized to [0, 1]
+    ///     over the observed window so the slope is independent of the actual duration.
+    ///
+    ///     Returns a zero vector if fewer than 3 sessions are provided (not enough for a trend).
+    ///
+    ///     Uses ordinary least squares per dimension:
+    ///     slope_d = cov(t, v_d) / var(t)
+    /// </summary>
+    public static float[] ComputeDriftVector(IReadOnlyList<SessionSnapshot> sessions)
+    {
+        if (sessions.Count < 3) return new float[Dimensions];
+
+        var dims = Dimensions;
+        var n = sessions.Count;
+
+        // Normalize time to [0, 1] over the observed window
+        var tMin = sessions[0].EndedAt.ToUnixTimeSeconds();
+        var tMax = sessions[^1].EndedAt.ToUnixTimeSeconds();
+        var tRange = tMax - tMin;
+
+        if (tRange <= 0)
+        {
+            // All sessions at the same timestamp; use index as time
+            tRange = n - 1;
+            tMin = 0;
+        }
+
+        var times = new double[n];
+        for (var i = 0; i < n; i++)
+            times[i] = tRange > 0
+                ? (double)(sessions[i].EndedAt.ToUnixTimeSeconds() - tMin) / tRange
+                : (double)i / (n - 1);
+
+        // Compute mean_t
+        var meanT = 0.0;
+        for (var i = 0; i < n; i++) meanT += times[i];
+        meanT /= n;
+
+        // Compute var(t)
+        var varT = 0.0;
+        for (var i = 0; i < n; i++)
+        {
+            var dt = times[i] - meanT;
+            varT += dt * dt;
+        }
+        if (varT < 1e-12) return new float[dims]; // Degenerate case
+
+        // Compute slope per dimension: cov(t, v_d) / var(t)
+        var slope = new float[dims];
+        for (var d = 0; d < dims; d++)
+        {
+            var covTv = 0.0;
+            var meanV = 0.0;
+            for (var i = 0; i < n; i++) meanV += sessions[i].Vector.Length > d ? sessions[i].Vector[d] : 0f;
+            meanV /= n;
+
+            for (var i = 0; i < n; i++)
+            {
+                var vd = sessions[i].Vector.Length > d ? sessions[i].Vector[d] : 0f;
+                covTv += (times[i] - meanT) * (vd - meanV);
+            }
+
+            slope[d] = (float)(covTv / varT);
+        }
+
+        return slope;
+    }
+
+    /// <summary>
+    ///     Projects a session vector forward in time by extrapolating along the drift vector.
+    ///     driftVector is the slope from ComputeDriftVector (unit = change per normalized time unit).
+    ///     steps is the number of normalized time units to project forward.
+    ///     Returns an L2-normalized predicted position vector.
+    /// </summary>
+    public static float[] ProjectForward(float[] currentVector, float[] driftVector, float steps = 1.0f)
+    {
+        var dims = Math.Min(currentVector.Length, driftVector.Length);
+        var predicted = new float[currentVector.Length];
+        for (var i = 0; i < currentVector.Length; i++)
+            predicted[i] = currentVector[i];
+        for (var i = 0; i < dims; i++)
+            predicted[i] += driftVector[i] * steps;
+
+        // Re-normalize: predicted position must be on the unit sphere for cosine search
+        Normalize(predicted);
+        return predicted;
+    }
+
+    /// <summary>
+    ///     Computes the Mahalanobis distance from a query vector to a centroid with a
+    ///     diagonal covariance (per-dimension variance).
+    ///
+    ///     d_M = sqrt( sum_d (x_d - mu_d)^2 / (sigma_d^2 + epsilon) )
+    ///
+    ///     Unlike cosine similarity, this accounts for variance:
+    ///     - A deviation in a low-variance dimension is anomalous (even if small)
+    ///     - A deviation in a high-variance dimension is expected noise
+    ///
+    ///     epsilon prevents division by zero on degenerate dimensions (default 1e-6).
+    ///     Returns float.MaxValue if vectors are incompatible lengths.
+    /// </summary>
+    public static float MahalanobisDistance(float[] query, float[] centroid, float[] variance,
+        float epsilon = 1e-6f)
+    {
+        var dims = Math.Min(query.Length, Math.Min(centroid.Length, variance.Length));
+        if (dims == 0) return float.MaxValue;
+
+        var sum = 0.0f;
+        for (var d = 0; d < dims; d++)
+        {
+            var diff = query[d] - centroid[d];
+            sum += (diff * diff) / (variance[d] + epsilon);
+        }
+
+        return MathF.Sqrt(sum);
+    }
+
+    /// <summary>
+    ///     Computes per-dimension variance from a set of vectors.
+    ///     Used by the compaction service to build variance envelopes for ghost shapes.
+    ///     Returns null if fewer than 2 vectors are provided.
+    /// </summary>
+    public static float[]? ComputeVarianceVector(IReadOnlyList<float[]> vectors)
+    {
+        if (vectors.Count < 2) return null;
+
+        var dims = vectors[0].Length;
+        var mean = new float[dims];
+
+        foreach (var v in vectors)
+            for (var d = 0; d < dims && d < v.Length; d++)
+                mean[d] += v[d];
+        for (var d = 0; d < dims; d++) mean[d] /= vectors.Count;
+
+        var variance = new float[dims];
+        foreach (var v in vectors)
+            for (var d = 0; d < dims && d < v.Length; d++)
+            {
+                var diff = v[d] - mean[d];
+                variance[d] += diff * diff;
+            }
+        for (var d = 0; d < dims; d++) variance[d] /= vectors.Count;
+
+        return variance;
     }
 
     private static float L2Slice(float[] v, int start, int end)
@@ -662,6 +826,16 @@ public sealed class SessionStore
             .OrderByDescending(g => g.Count())
             .First().Key;
 
+        // Compute frequency fingerprint from request timestamps
+        var frequencyFingerprint = FrequencyFingerprintEncoder.Encode(requests);
+
+        // Compute drift vector from prior session history (needs at least 3 prior sessions)
+        var historyKey = $"session:history:{signature}";
+        var priorHistory = _cache.Get<List<SessionSnapshot>>(historyKey) ?? new List<SessionSnapshot>();
+        var driftVector = priorHistory.Count >= 3
+            ? SessionVectorizer.ComputeDriftVector(priorHistory)
+            : null;
+
         var snapshot = new SessionSnapshot
         {
             Signature = signature,
@@ -671,12 +845,13 @@ public sealed class SessionStore
             Vector = vector,
             Maturity = maturity,
             DominantState = dominantState,
-            HeaderHashesJson = _cache.Get<string>($"session:headers:{signature}")
+            HeaderHashesJson = _cache.Get<string>($"session:headers:{signature}"),
+            FrequencyFingerprint = frequencyFingerprint.Any(f => f > 0) ? frequencyFingerprint : null,
+            DriftVector = driftVector
         };
 
         // Append to history (ring buffer)
-        var historyKey = $"session:history:{signature}";
-        var history = _cache.Get<List<SessionSnapshot>>(historyKey) ?? new List<SessionSnapshot>();
+        var history = priorHistory;
         history.Add(snapshot);
 
         // Compact old snapshots into a root when history grows too large.

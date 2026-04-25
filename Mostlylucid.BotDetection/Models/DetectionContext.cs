@@ -1020,6 +1020,33 @@ public static class SignalKeys
     /// <summary>Float: scaled confidence delta from partial chain archetype match</summary>
     public const string SessionPartialChainConfidence = "session.partial_chain_confidence";
 
+    // Frequency fingerprinting
+    /// <summary>Float[8]: autocorrelation at [1s,3s,10s,30s,1m,3m,10m,30m] lag scales</summary>
+    public const string SessionFrequencyFingerprint = "session.frequency_fingerprint";
+
+    /// <summary>Float: periodicity score [0,1] — how far from white noise (0=human, 1=bot rhythm)</summary>
+    public const string SessionFrequencyPeriodicityScore = "session.frequency_periodicity_score";
+
+    /// <summary>Int: dominant lag index (0-7) or -1 if aperiodic</summary>
+    public const string SessionFrequencyDominantLag = "session.frequency_dominant_lag";
+
+    // Trajectory modeling
+    /// <summary>Float[129]: drift vector — linear regression slope over recent session vectors</summary>
+    public const string SessionDriftVector = "session.drift_vector";
+
+    /// <summary>Float: similarity of the predicted 24h-forward position to the nearest known bot pattern</summary>
+    public const string SessionTrajectoryClusterSimilarity = "session.trajectory_cluster_similarity";
+
+    /// <summary>Boolean: true if predicted trajectory lands inside a known attack cluster</summary>
+    public const string SessionTrajectoryInAttackCluster = "session.trajectory_in_attack_cluster";
+
+    // Void detection (novel behavior)
+    /// <summary>Boolean: true if the current session is in empty shape-space (no similar sessions found)</summary>
+    public const string SessionIsVoid = "session.is_void";
+
+    /// <summary>Float: highest similarity score from the similarity search (0 if void)</summary>
+    public const string SessionTopSimilarity = "session.top_similarity";
+
     // ==========================================
     // Intent / Threat scoring signals
     // Set by IntentContributor from session activity analysis

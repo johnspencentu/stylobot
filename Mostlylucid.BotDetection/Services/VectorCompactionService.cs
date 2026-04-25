@@ -240,6 +240,8 @@ public sealed class VectorCompactionService : BackgroundService
                 // Collapse to L1 centroid
                 var centroid = ComputeBehavioralCentroid(items);
                 var velCentroid = ComputeVelocityCentroid(items);
+                var variance = ComputeVarianceVector(items);
+                var freqCentroid = ComputeFrequencyFingerprintCentroid(items);
                 var priority = priorityMap.GetValueOrDefault(group.Key, 0.5);
 
                 var meta = new SessionVectorMetadata
@@ -252,6 +254,8 @@ public sealed class VectorCompactionService : BackgroundService
                     VelocityMagnitude = velCentroid != null
                         ? Analysis.SessionVectorizer.VelocityMagnitude(velCentroid)
                         : 0f,
+                    VarianceVector = variance,
+                    FrequencyFingerprint = freqCentroid,
                     CompressionLevel = 1,
                     Priority = priority,
                     ClusterId = items.FirstOrDefault(x => x.Metadata.ClusterId != null).Metadata.ClusterId
@@ -311,6 +315,8 @@ public sealed class VectorCompactionService : BackgroundService
                 // Collapse all low-priority signatures in this cluster to a single cluster centroid
                 var centroid = ComputeBehavioralCentroid(lowPriority);
                 var velCentroid = ComputeVelocityCentroid(lowPriority);
+                var variance = ComputeVarianceVector(lowPriority);
+                var freqCentroid = ComputeFrequencyFingerprintCentroid(lowPriority);
 
                 var meta = new SessionVectorMetadata
                 {
@@ -322,6 +328,8 @@ public sealed class VectorCompactionService : BackgroundService
                     VelocityMagnitude = velCentroid != null
                         ? Analysis.SessionVectorizer.VelocityMagnitude(velCentroid)
                         : 0f,
+                    VarianceVector = variance,
+                    FrequencyFingerprint = freqCentroid,
                     CompressionLevel = 2,
                     Priority = lowPriority.Average(x => priorityMap.GetValueOrDefault(x.Meta.Signature, 0)),
                     ClusterId = cluster.Key
@@ -348,6 +356,38 @@ public sealed class VectorCompactionService : BackgroundService
                 centroid[i] += v[i];
         for (var i = 0; i < dims; i++)
             centroid[i] /= items.Count;
+        return centroid;
+    }
+
+    /// <summary>
+    ///     Computes per-dimension variance for the given set of vectors.
+    ///     Stored alongside the centroid in metadata to enable Mahalanobis distance
+    ///     during ghost shape matching: low-variance dimensions are discriminative.
+    /// </summary>
+    private static float[]? ComputeVarianceVector(
+        IReadOnlyList<(float[] Vector, SessionVectorMetadata Meta)> items)
+    {
+        if (items.Count < 2) return null;
+        var vectors = items.Select(x => x.Vector).ToList();
+        return Analysis.SessionVectorizer.ComputeVarianceVector(vectors);
+    }
+
+    /// <summary>
+    ///     Computes the frequency fingerprint centroid: mean of all frequency fingerprints
+    ///     in this group that have one. Represents the campaign's typical temporal rhythm.
+    /// </summary>
+    private static float[]? ComputeFrequencyFingerprintCentroid(
+        IReadOnlyList<(float[] Vector, SessionVectorMetadata Meta)> items)
+    {
+        var withFp = items.Where(x => x.Meta.FrequencyFingerprint is { Length: > 0 }).ToList();
+        if (withFp.Count == 0) return null;
+
+        var dims = withFp[0].Meta.FrequencyFingerprint!.Length;
+        var centroid = new float[dims];
+        foreach (var (_, meta) in withFp)
+            for (var i = 0; i < dims && i < meta.FrequencyFingerprint!.Length; i++)
+                centroid[i] += meta.FrequencyFingerprint[i];
+        for (var i = 0; i < dims; i++) centroid[i] /= withFp.Count;
         return centroid;
     }
 

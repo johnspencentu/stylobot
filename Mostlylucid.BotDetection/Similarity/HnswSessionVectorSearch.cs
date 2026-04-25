@@ -430,6 +430,29 @@ public class SessionVectorMetadata
 
     /// <summary>Cluster ID if this entry belongs to a detected bot cluster (set during L2 compaction).</summary>
     public string? ClusterId { get; set; }
+
+    /// <summary>
+    ///     Per-dimension variance of the vectors that were compacted into this centroid.
+    ///     Non-null only for L1/L2 centroid entries (CompressionLevel >= 1).
+    ///     Used for Mahalanobis ghost matching: dimensions with low variance are
+    ///     discriminative; deviations there are anomalous even if small.
+    /// </summary>
+    public float[]? VarianceVector { get; set; }
+
+    /// <summary>
+    ///     Frequency fingerprint: autocorrelation at 8 lag scales.
+    ///     Captures temporal rhythm independent of behavioral path.
+    ///     Two campaigns with the same crawl loop will score high similarity
+    ///     here even if their Markov path has rotated.
+    /// </summary>
+    public float[]? FrequencyFingerprint { get; set; }
+
+    /// <summary>
+    ///     Drift vector: behavioral trajectory direction in 129-dim space.
+    ///     Slope of linear regression over the most recent N session vectors.
+    ///     Non-null when at least 3 sessions exist for this signature.
+    /// </summary>
+    public float[]? DriftVector { get; set; }
 }
 
 [JsonSerializable(typeof(List<SessionVectorMetadata>))]

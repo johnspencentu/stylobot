@@ -139,6 +139,29 @@ defaults:
     partial_chain_similarity_threshold: 0.6
     # Partial chain: maximum confidence delta to emit
     partial_chain_max_confidence: 0.35
+    # Frequency fingerprinting: periodicity score above which bot rhythm is flagged
+    periodicity_bot_threshold: 0.5
+    # Confidence for periodic rhythm detection
+    periodicity_bot_confidence: 0.35
+    # Cosine similarity threshold for frequency rhythm comparison (cross-session)
+    frequency_rhythm_similarity_threshold: 0.85
+    # Gap-normalized velocity: bots rotate faster than humans per unit time
+    gap_normalized_velocity_threshold: 0.4
+    gap_normalized_velocity_confidence: 0.45
+    # Fingerprint rotation: velocity dominated by transport fingerprint dims
+    fingerprint_rotation_threshold: 0.15
+    fingerprint_rotation_confidence: 0.55
+    # Acceleration: constant rotation rate across 3 sessions
+    acceleration_threshold: 0.25
+    acceleration_confidence: 0.35
+    # Trajectory modeling: predicted position similarity to attack cluster
+    trajectory_attack_cluster_threshold: 0.72
+    trajectory_attack_cluster_confidence: 0.45
+    # How many normalized time units to project forward (1.0 = one session-interval forward)
+    trajectory_projection_steps: 1.5
+    # Void detection: min similarity to consider a session "in empty space"
+    void_detection_min_similarity: 0.40
+    void_detection_top_k: 5
 
 tags:
   - behavioral

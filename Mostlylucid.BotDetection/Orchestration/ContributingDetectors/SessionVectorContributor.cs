@@ -4,6 +4,7 @@ using Mostlylucid.BotDetection.Analysis;
 using Mostlylucid.BotDetection.Markov;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
+using Mostlylucid.BotDetection.Similarity;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
 namespace Mostlylucid.BotDetection.Orchestration.ContributingDetectors;
@@ -27,15 +28,18 @@ public class SessionVectorContributor : ConfiguredContributorBase
 {
     private readonly ILogger<SessionVectorContributor> _logger;
     private readonly SessionStore _sessionStore;
+    private readonly ISessionVectorSearch? _vectorSearch;
 
     public SessionVectorContributor(
         ILogger<SessionVectorContributor> logger,
         IDetectorConfigProvider configProvider,
-        SessionStore sessionStore)
+        SessionStore sessionStore,
+        ISessionVectorSearch? vectorSearch = null)
         : base(configProvider)
     {
         _logger = logger;
         _sessionStore = sessionStore;
+        _vectorSearch = vectorSearch;
     }
 
     public override string Name => "SessionVector";
@@ -70,7 +74,21 @@ public class SessionVectorContributor : ConfiguredContributorBase
     private float PartialChainSimilarityThreshold => (float)GetParam("partial_chain_similarity_threshold", 0.6);
     private float PartialChainMaxConfidence => (float)GetParam("partial_chain_max_confidence", 0.35);
 
-    public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
+    // Frequency fingerprinting thresholds
+    private float PeriodicityBotThreshold => (float)GetParam("periodicity_bot_threshold", 0.5);
+    private double PeriodicityBotConfidence => GetParam("periodicity_bot_confidence", 0.35);
+    private float FrequencyRhythmSimilarityThreshold => (float)GetParam("frequency_rhythm_similarity_threshold", 0.85);
+
+    // Trajectory modeling thresholds
+    private float TrajectoryAttackClusterThreshold => (float)GetParam("trajectory_attack_cluster_threshold", 0.72);
+    private double TrajectoryAttackClusterConfidence => GetParam("trajectory_attack_cluster_confidence", 0.45);
+    private float TrajectoryProjectionSteps => (float)GetParam("trajectory_projection_steps", 1.5f);
+
+    // Void detection thresholds
+    private float VoidDetectionMinSimilarity => (float)GetParam("void_detection_min_similarity", 0.40);
+    private int VoidDetectionTopK => GetParam("void_detection_top_k", 5);
+
+    public override async Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
         BlackboardState state,
         CancellationToken cancellationToken = default)
     {
@@ -82,7 +100,7 @@ public class SessionVectorContributor : ConfiguredContributorBase
             if (string.IsNullOrEmpty(signature))
             {
                 contributions.Add(NeutralContribution("No waveform signature available"));
-                return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
+                return contributions;
             }
 
             // Classify the current request into a Markov state
@@ -160,6 +178,20 @@ public class SessionVectorContributor : ConfiguredContributorBase
             if (sessionHistory.Count >= 2)
                 AnalyzeInterSessionVelocity(state, sessionHistory, contributions);
 
+            // === Frequency fingerprinting: detect temporal periodicity ===
+            if (currentSession != null && currentSession.Count >= 5)
+                AnalyzeFrequencyRhythm(state, currentSession, contributions);
+
+            // === Void detection + trajectory analysis (require HNSW) ===
+            if (_vectorSearch != null && currentSession != null && currentSession.Count >= MinSessionRequests)
+            {
+                var currentVector = SessionVectorizer.Encode(currentSession, BuildFingerprintContext(state));
+                await AnalyzeVoidnessAsync(state, currentVector, contributions, cancellationToken);
+
+                if (sessionHistory.Count >= 3)
+                    await AnalyzeTrajectoryAsync(state, currentVector, sessionHistory, contributions, cancellationToken);
+            }
+
             // Default: neutral if no analysis triggered
             if (contributions.Count == 0)
                 contributions.Add(NeutralContribution(
@@ -171,7 +203,7 @@ public class SessionVectorContributor : ConfiguredContributorBase
             contributions.Add(NeutralContribution("Session vector analysis error"));
         }
 
-        return Task.FromResult<IReadOnlyList<DetectionContribution>>(contributions);
+        return contributions;
     }
 
     /// <summary>
@@ -303,6 +335,157 @@ public class SessionVectorContributor : ConfiguredContributorBase
             contributions.Add(HumanContribution(
                 Math.Abs(StableVelocityHumanConfidence),
                 $"Stable behavior across {history.Count} sessions (velocity={magnitude:F2})"));
+        }
+    }
+
+    /// <summary>
+    ///     Computes the frequency fingerprint for the current session and emits periodicity signals.
+    ///     High periodicity = bot rhythm (scraper retry loop, crawl window, credential stuffer).
+    ///     Low periodicity = human (broadband, aperiodic).
+    /// </summary>
+    private void AnalyzeFrequencyRhythm(
+        BlackboardState state,
+        IReadOnlyList<SessionRequest> currentSession,
+        List<DetectionContribution> contributions)
+    {
+        var fingerprint = FrequencyFingerprintEncoder.Encode(currentSession);
+        var periodicityScore = FrequencyFingerprintEncoder.PeriodicityScore(fingerprint);
+        var dominantLag = FrequencyFingerprintEncoder.DominantLagIndex(fingerprint);
+
+        state.WriteSignals([
+            new(SignalKeys.SessionFrequencyFingerprint, fingerprint),
+            new(SignalKeys.SessionFrequencyPeriodicityScore, periodicityScore),
+            new(SignalKeys.SessionFrequencyDominantLag, dominantLag)
+        ]);
+
+        if (periodicityScore < PeriodicityBotThreshold) return;
+
+        var lagDesc = dominantLag >= 0
+            ? $"{FrequencyFingerprintEncoder.LagSeconds[dominantLag]}s"
+            : "unknown";
+
+        contributions.Add(BotContribution(
+            PeriodicityBotConfidence,
+            $"Periodic request rhythm detected (score={periodicityScore:F2}, dominant_lag={lagDesc})",
+            BotType.Scraper));
+    }
+
+    /// <summary>
+    ///     Void detection: checks if the current session vector is in empty shape-space.
+    ///     A session with no similar vectors in the HNSW index is genuinely novel behavior --
+    ///     the highest-priority alert: cannot match against known signatures, but the absence
+    ///     of neighbors is itself a strong signal that this doesn't look like any known human either.
+    ///
+    ///     Note: this fires as a signal, not a hard bot contribution. Novel sessions might be
+    ///     legitimate (new service, new user population). The signal feeds into LLM escalation.
+    /// </summary>
+    private async Task AnalyzeVoidnessAsync(
+        BlackboardState state,
+        float[] currentVector,
+        List<DetectionContribution> contributions,
+        CancellationToken ct)
+    {
+        if (_vectorSearch == null) return;
+
+        try
+        {
+            var similar = await _vectorSearch.FindSimilarAsync(
+                currentVector, topK: VoidDetectionTopK, minSimilarity: VoidDetectionMinSimilarity);
+
+            var topSimilarity = similar.Count > 0 ? similar[0].Similarity : 0f;
+            var isVoid = similar.Count == 0;
+
+            state.WriteSignals([
+                new(SignalKeys.SessionIsVoid, isVoid),
+                new(SignalKeys.SessionTopSimilarity, topSimilarity)
+            ]);
+
+            if (isVoid)
+            {
+                _logger.LogDebug("Void detection: session in empty shape-space for {Signature}",
+                    state.GetSignal<string>(SignalKeys.PrimarySignature));
+                // Void is a high-priority signal but not a definitive bot signal by itself.
+                // It feeds LLM escalation and intent classification.
+                // We don't add a bot contribution here -- the LLM or IntentContributor handles it.
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Void detection HNSW search failed");
+        }
+    }
+
+    /// <summary>
+    ///     Trajectory analysis: fits a linear regression over recent session vectors to compute
+    ///     the drift direction, then projects forward to predict where this entity is heading.
+    ///     If the predicted position lands inside a known attack cluster, flags as pre-crime.
+    ///
+    ///     This detects reactivating campaigns: a signature that reappears moving in the same
+    ///     direction it was drifting when it went dormant is continuing, not returning.
+    /// </summary>
+    private async Task AnalyzeTrajectoryAsync(
+        BlackboardState state,
+        float[] currentVector,
+        IReadOnlyList<SessionSnapshot> sessionHistory,
+        List<DetectionContribution> contributions,
+        CancellationToken ct)
+    {
+        if (_vectorSearch == null) return;
+
+        try
+        {
+            // Use the most recent sessions (ordered oldest-first for regression)
+            var recent = sessionHistory
+                .Where(h => h.Maturity >= MinMaturityForScoring)
+                .OrderBy(h => h.EndedAt)
+                .TakeLast(8)
+                .ToList();
+
+            if (recent.Count < 3) return;
+
+            var driftVector = SessionVectorizer.ComputeDriftVector(recent);
+            var driftMagnitude = SessionVectorizer.VelocityMagnitude(driftVector);
+
+            state.WriteSignal(SignalKeys.SessionDriftVector, driftVector);
+
+            // Only project if there is meaningful drift; zero drift = stable behavior
+            if (driftMagnitude < 0.05f) return;
+
+            // Project forward by TrajectoryProjectionSteps normalized time units
+            var predicted = SessionVectorizer.ProjectForward(currentVector, driftVector, TrajectoryProjectionSteps);
+
+            // Search HNSW for vectors near the predicted position
+            var nearPredicted = await _vectorSearch.FindSimilarAsync(
+                predicted, topK: 3, minSimilarity: TrajectoryAttackClusterThreshold);
+
+            if (nearPredicted.Count == 0) return;
+
+            // Take the highest-similarity match; if it's from a known bot signature, flag it.
+            // We use IsBot from the vector index metadata (set when vectors are added).
+            var top = nearPredicted[0];
+            var allVectors = _vectorSearch.GetAllVectorsSnapshot();
+            var topMeta = allVectors.FirstOrDefault(v => v.Metadata.Signature == top.Signature).Metadata;
+            if (topMeta == null || !topMeta.IsBot) return;
+
+            var similarity = top.Similarity;
+
+            state.WriteSignals([
+                new(SignalKeys.SessionTrajectoryClusterSimilarity, similarity),
+                new(SignalKeys.SessionTrajectoryInAttackCluster, true)
+            ]);
+
+            contributions.Add(BotContribution(
+                TrajectoryAttackClusterConfidence,
+                $"Behavioral trajectory points toward known attack cluster (predicted_similarity={similarity:F2}, drift_magnitude={driftMagnitude:F2})",
+                BotType.Scraper));
+
+            _logger.LogDebug(
+                "Trajectory alert: {Signature} drifting toward bot cluster (predicted_sim={Sim:F2})",
+                state.GetSignal<string>(SignalKeys.PrimarySignature), similarity);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Trajectory analysis failed");
         }
     }
 
