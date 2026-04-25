@@ -46,6 +46,38 @@
             }
         </div>
 
+        @* ── Ghost campaign matches (commercial PostgreSQL only) ──────────────── *@
+        @if (Model.Result.GhostMatches.Count > 0)
+        {
+            <div style="padding:0.75rem 1rem; background:rgba(var(--sb-accent-rgb, 99,102,241),0.06); border:1px solid var(--sb-accent); border-radius:8px; margin-bottom:1rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                    <span style="font-size:0.8rem; font-weight:700; color:var(--sb-accent); text-transform:uppercase; letter-spacing:0.05em;">Dormant Campaign Match</span>
+                    <span style="font-size:0.75rem; color:var(--sb-brand-muted);">Signatures in this result match crystallized past campaigns</span>
+                </div>
+                @foreach (var ghost in Model.Result.GhostMatches.Take(5))
+                {
+                    var simPct = (ghost.Similarity * 100).ToString("F0");
+                    var riskColor = ghost.RiskBand switch {
+                        "Critical" => "var(--sb-signal-danger)",
+                        "High"     => "var(--sb-signal-danger)",
+                        "Medium"   => "var(--sb-signal-warn)",
+                        _          => "var(--sb-signal-pos)"
+                    };
+                    <div style="display:flex; gap:1rem; align-items:center; padding:0.4rem 0; border-top:1px solid var(--sb-card-divider); font-size:0.82rem;">
+                        <span style="font-weight:600; color:@riskColor; min-width:3rem;">@simPct%</span>
+                        <span style="font-family:monospace; font-size:0.75rem; color:var(--sb-brand-muted);">@ghost.FamilyId</span>
+                        @if (!string.IsNullOrEmpty(ghost.Label))
+                        {
+                            <span style="font-weight:500;">@ghost.Label</span>
+                        }
+                        <span style="color:var(--sb-brand-muted);">@ghost.SignatureCount sig@(ghost.SignatureCount == 1 ? "" : "s")</span>
+                        <span style="color:var(--sb-brand-muted);">via @(ghost.MatchedSignature.Length > 8 ? ghost.MatchedSignature[..8] + "…" : ghost.MatchedSignature)</span>
+                        <span style="color:var(--sb-brand-muted); margin-left:auto;">last @ghost.LastSeen.ToString("MMM dd yyyy")</span>
+                    </div>
+                }
+            </div>
+        }
+
         <div style="display:flex; gap:2px; border-bottom:1px solid var(--sb-card-border); margin-bottom:1rem;">
             @foreach (var tab in Model.AvailableTabs)
             {
@@ -92,5 +124,26 @@
         <div style="padding:2rem; text-align:center; color:var(--sb-brand-muted);">
             No detections found. Adjust the shape filters or time range above.
         </div>
+        @if (Model.Result.VoidPressure > 0.05f)
+        {
+            var pressure = Model.Result.VoidPressure;
+            var pct = (pressure * 100).ToString("F0");
+            var pressureColor = pressure > 0.7f ? "var(--sb-signal-danger)"
+                              : pressure > 0.4f ? "var(--sb-signal-warn)"
+                              : "var(--sb-brand-muted)";
+            <div style="margin-top:1rem; padding:0.75rem 1.25rem; background:var(--sb-surface); border:1px solid var(--sb-card-divider); border-radius:8px; display:inline-block; text-align:left; min-width:300px;">
+                <div style="font-size:0.8rem; font-weight:600; color:@pressureColor; margin-bottom:0.25rem;">
+                    Unknown-Space Pressure: @pct%
+                </div>
+                <div style="background:var(--sb-card-bg); border-radius:4px; height:6px; overflow:hidden; margin-bottom:0.5rem;">
+                    <div style="width:@(pct)%; height:100%; background:@pressureColor; border-radius:4px; transition:width 0.3s;"></div>
+                </div>
+                <p style="font-size:0.75rem; margin:0; color:var(--sb-brand-muted); line-height:1.5;">
+                    This shape sits <strong style="color:@pressureColor;">@pct% away</strong> from the nearest known detection in behavioural space.
+                    High pressure is not inherently bad -- rare but legitimate visitors can also have unique shapes.
+                    Consider it a contributor signal alongside bot probability and risk band.
+                </p>
+            </div>
+        }
     }
 </div>

@@ -338,7 +338,16 @@
       "Bash(/tmp/dead_code_analysis.sh)",
       "Bash(/tmp/comprehensive_summary.sh)",
       "Bash(git merge feature/compliance-packs --no-ff -m ':*)",
-      "Bash(ruby:*)"
+      "Bash(ruby:*)",
+      "Bash(git -C /Users/scottgalloway/RiderProjects/stylobot add Mostlylucid.BotDetection/Services/CentroidSequenceRebuildHostedService.cs Mostlylucid.BotDetection/Extensions/ServiceCollectionExtensions.cs)",
+      "Bash(git -C /Users/scottgalloway/RiderProjects/stylobot commit -m ':*)",
+      "Bash(git merge:*)",
+      "Bash(git:*)",
+      "Bash(echo \"Demo started, PID: $!\")",
+      "Bash(gtimeout 20 dotnet run --project Mostlylucid.BotDetection.Console -- llmtunnel)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(sort -k4)",
+      "Bash(wait)"
     ]
   }
 }
