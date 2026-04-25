@@ -1542,7 +1542,7 @@ public class StyloBotDashboardMiddleware
         if (liveSessionStore != null)
         {
             var liveSession = liveSessionStore.GetCurrentSession(decodedSignature);
-            if (liveSession is { Count: >= 2 })
+            if (liveSession is { Count: >= 1 })
             {
                 var liveVector = BotDetection.Analysis.SessionVectorizer.Encode(liveSession);
                 var liveRadar = BotDetection.Analysis.VectorRadarProjection.Project(liveVector);
@@ -1573,8 +1573,113 @@ public class StyloBotDashboardMiddleware
             }
         }
 
+        // Fallback: when no finalized sessions and no live session exist, synthesize session
+        // objects from dashboard_detections. This guarantees behavioral shape always shows
+        // on the signature detail page even for in-flight or low-traffic signatures.
+        if (result.Count == 0)
+        {
+            var eventStore = context.RequestServices.GetService<IDashboardEventStore>();
+            if (eventStore != null)
+            {
+                var detections = await eventStore.GetDetectionsAsync(new DashboardFilter
+                {
+                    SignatureId = decodedSignature,
+                    Limit = limit
+                });
+
+                if (detections.Count > 0)
+                {
+                    // Group into synthetic sessions by 30-min inactivity gaps
+                    var ordered = detections.OrderBy(d => d.Timestamp).ToList();
+                    var syntheticGroups = new List<List<DashboardDetectionEvent>>();
+                    var currentGroup = new List<DashboardDetectionEvent> { ordered[0] };
+                    for (var i = 1; i < ordered.Count; i++)
+                    {
+                        if ((ordered[i].Timestamp - ordered[i - 1].Timestamp).TotalMinutes > 30)
+                        {
+                            syntheticGroups.Add(currentGroup);
+                            currentGroup = new List<DashboardDetectionEvent>();
+                        }
+                        currentGroup.Add(ordered[i]);
+                    }
+                    syntheticGroups.Add(currentGroup);
+
+                    foreach (var group in syntheticGroups.OrderByDescending(g => g[^1].Timestamp))
+                    {
+                        var avgProb = group.Average(d => d.BotProbability);
+                        var dominantRisk = group
+                            .GroupBy(d => d.RiskBand)
+                            .OrderByDescending(g => g.Count())
+                            .First().Key;
+                        var paths = group.Select(d => d.Path).Distinct().ToList();
+
+                        // Build 8-axis radar: average 16-dim RadarShape across the group
+                        double[]? radarAxes = null;
+                        var withShape = group.Where(d => d.RadarShape is { Length: 16 }).ToList();
+                        if (withShape.Count > 0)
+                        {
+                            var avgShape = new float[16];
+                            foreach (var d in withShape)
+                                for (var i = 0; i < 16; i++) avgShape[i] += d.RadarShape![i];
+                            for (var i = 0; i < 16; i++) avgShape[i] /= withShape.Count;
+                            radarAxes = ProjectDetectionRadarTo8Axes(avgShape);
+                        }
+
+                        result.Add(new
+                        {
+                            Id = $"det-{group[0].Timestamp:yyyyMMddHHmm}",
+                            StartedAt = group[0].Timestamp,
+                            EndedAt = group[^1].Timestamp,
+                            durationMinutes = Math.Round((group[^1].Timestamp - group[0].Timestamp).TotalMinutes, 1),
+                            RequestCount = group.Count,
+                            DominantState = dominantRisk,
+                            IsBot = avgProb >= 0.5,
+                            avgBotProbability = Math.Round(avgProb, 3),
+                            RiskBand = dominantRisk,
+                            ErrorCount = 0,
+                            timingEntropy = 0.0,
+                            Maturity = "Observed",
+                            live = false,
+                            velocity = (object?)null,
+                            transitionCounts = (Dictionary<string, int>?)null,
+                            paths,
+                            radarAxes
+                        });
+                    }
+                }
+            }
+        }
+
         context.Response.ContentType = "application/json";
         await JsonSerializer.SerializeAsync(context.Response.Body, result, CamelCaseJson);
+    }
+
+    /// <summary>
+    ///     Projects a 16-dimensional RadarDimensions shape (from dashboard_detections) to the
+    ///     8-axis radar used by the behavioral shape chart. Used when synthesizing session data
+    ///     from detection records rather than finalized session vectors.
+    /// </summary>
+    private static double[] ProjectDetectionRadarTo8Axes(float[] shape16)
+    {
+        // shape16 index → RadarDimensions: 0=ua_anomaly, 1=header_anomaly, 2=ip_reputation,
+        // 3=behavioral, 4=advanced_behavioral, 5=cache_behavior, 6=security_tool,
+        // 7=client_fingerprint, 8=version_age, 9=inconsistency, 10=reputation_match,
+        // 11=ai_classification, 12=cluster_signal, 13=country_reputation,
+        // 14=rate_pattern, 15=payload_signature
+        float R(int i) => i < shape16.Length ? shape16[i] : 0f;
+        double Clamp(double v) => Math.Max(0.05, Math.Min(1.0, v));
+
+        return
+        [
+            Clamp(R(3)),                          // 0: Browsing      ← behavioral
+            Clamp(R(14)),                          // 1: API Activity  ← rate_pattern
+            Clamp(Math.Max(R(6), R(15))),          // 2: Scan/Probe    ← security_tool, payload_signature
+            Clamp(Math.Max(R(0), R(9))),           // 3: Auth Pressure ← ua_anomaly, inconsistency
+            Clamp(R(4)),                           // 4: Timing Pattern← advanced_behavioral
+            Clamp(Math.Max(R(14) * 0.5f, R(12))), // 5: Burst Speed   ← rate_pattern, cluster_signal
+            Clamp(R(7)),                           // 6: Fingerprint   ← client_fingerprint
+            Clamp(Math.Max(R(3), R(5))),           // 7: Path Diversity← behavioral, cache_behavior
+        ];
     }
 
     /// <summary>Allowed values for sort parameter on top bots API (input validation).</summary>
