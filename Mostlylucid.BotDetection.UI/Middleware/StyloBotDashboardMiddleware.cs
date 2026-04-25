@@ -2981,7 +2981,7 @@ public class StyloBotDashboardMiddleware
         // Bridge signature key spaces (multi-factor → waveform)
         var sessions = sessionStore != null
             ? await sessionStore.GetSessionsAsync(decodedSig, 20)
-            : new List<BotDetection.Data.SessionRecord>();
+            : new List<BotDetection.Data.PersistedSession>();
 
         // Detection fallback: if no finalized sessions, synthesize from dashboard_detections
         if (sessions.Count == 0)
@@ -3011,17 +3011,17 @@ public class StyloBotDashboardMiddleware
                     }
                     syntheticGroups.Add(currentGroup);
 
-                    var html = new System.Text.StringBuilder();
-                    html.Append("<div class=\"overflow-x-auto\"><table class=\"table table-xs w-full\"><thead>");
-                    html.Append("<tr class=\"text-[10px] uppercase tracking-wider text-base-content/40\">");
-                    html.Append("<th class=\"py-1\">Started</th>");
-                    html.Append("<th class=\"py-1\">Duration</th>");
-                    html.Append("<th class=\"py-1 text-right\">Requests</th>");
-                    html.Append("<th class=\"py-1\">Dominant Risk</th>");
-                    html.Append("<th class=\"py-1 text-right\">Bot %</th>");
-                    html.Append("<th class=\"py-1\">Risk Band</th>");
-                    html.Append("<th class=\"py-1\">Paths</th>");
-                    html.Append("</tr></thead><tbody>");
+                    var syntheticHtml = new System.Text.StringBuilder();
+                    syntheticHtml.Append("<div class=\"overflow-x-auto\"><table class=\"table table-xs w-full\"><thead>");
+                    syntheticHtml.Append("<tr class=\"text-[10px] uppercase tracking-wider text-base-content/40\">");
+                    syntheticHtml.Append("<th class=\"py-1\">Started</th>");
+                    syntheticHtml.Append("<th class=\"py-1\">Duration</th>");
+                    syntheticHtml.Append("<th class=\"py-1 text-right\">Requests</th>");
+                    syntheticHtml.Append("<th class=\"py-1\">Dominant Risk</th>");
+                    syntheticHtml.Append("<th class=\"py-1 text-right\">Bot %</th>");
+                    syntheticHtml.Append("<th class=\"py-1\">Risk Band</th>");
+                    syntheticHtml.Append("<th class=\"py-1\">Paths</th>");
+                    syntheticHtml.Append("</tr></thead><tbody>");
 
                     foreach (var group in syntheticGroups.OrderByDescending(g => g[0].Timestamp))
                     {
@@ -3033,22 +3033,22 @@ public class StyloBotDashboardMiddleware
                         var probClass = avgProb >= 0.7 ? "text-error" : avgProb >= 0.4 ? "text-warning" : "text-success";
                         var riskClass = dominantRisk is "VeryHigh" or "High" ? "text-error" : dominantRisk is "Elevated" or "Medium" ? "text-warning" : "text-success";
 
-                        html.Append("<tr class=\"hover:bg-base-200/50\">");
-                        html.Append($"<td class=\"py-1 text-[10px] text-base-content/50 whitespace-nowrap\">{group[0].Timestamp:MMM dd HH:mm}</td>");
-                        html.Append($"<td class=\"py-1 text-xs text-base-content/60\">{duration:F1}m</td>");
-                        html.Append($"<td class=\"py-1 text-right text-xs font-mono\">{group.Count}</td>");
-                        html.Append($"<td class=\"py-1 text-[10px] text-base-content/60\">{dominantRisk}</td>");
-                        html.Append($"<td class=\"py-1 text-right text-xs font-bold {probClass}\">{avgProb:P0}</td>");
-                        html.Append($"<td class=\"py-1 text-[10px] {riskClass}\">{dominantRisk}</td>");
-                        html.Append($"<td class=\"py-1 text-[10px] text-base-content/40 max-w-[250px] truncate\" title=\"{System.Net.WebUtility.HtmlEncode(pathPreview)}\">{System.Net.WebUtility.HtmlEncode(pathPreview)}</td>");
-                        html.Append("</tr>");
+                        syntheticHtml.Append("<tr class=\"hover:bg-base-200/50\">");
+                        syntheticHtml.Append($"<td class=\"py-1 text-[10px] text-base-content/50 whitespace-nowrap\">{group[0].Timestamp:MMM dd HH:mm}</td>");
+                        syntheticHtml.Append($"<td class=\"py-1 text-xs text-base-content/60\">{duration:F1}m</td>");
+                        syntheticHtml.Append($"<td class=\"py-1 text-right text-xs font-mono\">{group.Count}</td>");
+                        syntheticHtml.Append($"<td class=\"py-1 text-[10px] text-base-content/60\">{dominantRisk}</td>");
+                        syntheticHtml.Append($"<td class=\"py-1 text-right text-xs font-bold {probClass}\">{avgProb:P0}</td>");
+                        syntheticHtml.Append($"<td class=\"py-1 text-[10px] {riskClass}\">{dominantRisk}</td>");
+                        syntheticHtml.Append($"<td class=\"py-1 text-[10px] text-base-content/40 max-w-[250px] truncate\" title=\"{System.Net.WebUtility.HtmlEncode(pathPreview)}\">{System.Net.WebUtility.HtmlEncode(pathPreview)}</td>");
+                        syntheticHtml.Append("</tr>");
                     }
 
-                    html.Append("</tbody></table></div>");
-                    html.Append($"<div class=\"text-[10px] text-base-content/30 mt-2\">{syntheticGroups.Count} activity period(s) from {detections.Count} detections <span class=\"italic\">(in-flight sessions)</span></div>");
+                    syntheticHtml.Append("</tbody></table></div>");
+                    syntheticHtml.Append($"<div class=\"text-[10px] text-base-content/30 mt-2\">{syntheticGroups.Count} activity period(s) from {detections.Count} detections <span class=\"italic\">(in-flight sessions)</span></div>");
 
                     context.Response.ContentType = "text/html";
-                    await context.Response.WriteAsync(html.ToString());
+                    await context.Response.WriteAsync(syntheticHtml.ToString());
                     return;
                 }
             }

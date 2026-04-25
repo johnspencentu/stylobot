@@ -262,9 +262,6 @@ else
             string? Signal(string category, string key) =>
                 Model.SignalCategories.TryGetValue(category, out var cat) && cat.TryGetValue(key, out var v) ? v : null;
 
-            string? SignalFlat(string key) =>
-                Model.SignalCategories.TryGetValue("general", out var cat) && cat.TryGetValue(key, out var v) ? v : null;
-
             // Derive fingerprint fields from detector contributions + signals
             var fingerprintDetector = FindDetector("ClientFingerprint", "Fingerprint", "JA3", "TLS");
             var headlessDetector = FindDetector("Headless", "SecurityTool", "Playwright", "Selenium", "Puppeteer");
