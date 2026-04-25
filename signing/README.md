@@ -36,13 +36,13 @@ per workflow run that Azure trusts directly. No long-lived client secret is stor
 | `AZURE_TENANT_ID` | Azure AD tenant ID |
 | `AZURE_CLIENT_ID` | App registration (service principal) client ID |
 
-### Required GitHub repository variables
+### Signing config (hardcoded in workflow - not sensitive)
 
-| Variable | Example | Description |
-|----------|---------|-------------|
-| `AZURE_CODE_SIGNING_ENDPOINT` | `https://eus.codesigning.azure.net/` | Regional endpoint for your Trusted Signing account |
-| `AZURE_CODE_SIGNING_ACCOUNT` | `stylobot-signing` | Trusted Signing account name |
-| `AZURE_CODE_SIGNING_PROFILE` | `stylobot-profile` | Certificate profile name |
+| Value | Set in workflow as |
+|-------|--------------------|
+| Endpoint: `https://weu.codesigning.azure.net/` | Inlined |
+| Account: `scottgal` | Inlined |
+| Profile: `mostlylucid` | Inlined |
 
 ### Service principal permissions
 
