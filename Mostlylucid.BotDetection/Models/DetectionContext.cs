@@ -1047,6 +1047,9 @@ public static class SignalKeys
     /// <summary>Float: highest similarity score from the similarity search (0 if void)</summary>
     public const string SessionTopSimilarity = "session.top_similarity";
 
+    /// <summary>Float: nearest Mahalanobis distance from variance-aware centroid search (lower = closer match)</summary>
+    public const string SessionMahalanobisNearestDistance = "session.mahalanobis_nearest_distance";
+
     // ==========================================
     // Intent / Threat scoring signals
     // Set by IntentContributor from session activity analysis

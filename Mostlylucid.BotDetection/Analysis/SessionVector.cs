@@ -933,6 +933,24 @@ public sealed class SessionStore
             .OrderByDescending(g => g.Sum(s => s.RequestCount))
             .First().Key;
 
+        // Preserve frequency fingerprint centroid so cross-session rhythm detection
+        // can still match against compacted history
+        var fingerprints = toCompact
+            .Where(s => s.FrequencyFingerprint is { Length: > 0 })
+            .Select(s => s.FrequencyFingerprint!)
+            .ToList();
+        float[]? rootFreqFingerprint = null;
+        if (fingerprints.Count > 0)
+        {
+            var fpDims = fingerprints[0].Length;
+            var fpSum = new float[fpDims];
+            foreach (var fp in fingerprints)
+                for (var i = 0; i < fpDims && i < fp.Length; i++)
+                    fpSum[i] += fp[i];
+            rootFreqFingerprint = fpSum;
+            for (var i = 0; i < fpDims; i++) rootFreqFingerprint[i] /= fingerprints.Count;
+        }
+
         var rootSnapshot = new SessionSnapshot
         {
             Signature = toCompact[0].Signature,
@@ -941,7 +959,8 @@ public sealed class SessionStore
             RequestCount = totalRequestCount,
             Vector = rootVector,
             Maturity = Math.Min(1f, totalWeight / compactCount), // Average maturity
-            DominantState = dominantState
+            DominantState = dominantState,
+            FrequencyFingerprint = rootFreqFingerprint
         };
 
         // Replace history: root + recent snapshots

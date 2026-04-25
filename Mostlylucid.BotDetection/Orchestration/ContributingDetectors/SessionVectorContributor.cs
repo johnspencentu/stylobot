@@ -4,6 +4,7 @@ using Mostlylucid.BotDetection.Analysis;
 using Mostlylucid.BotDetection.Markov;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration.Manifests;
+using Mostlylucid.BotDetection.Services;
 using Mostlylucid.BotDetection.Similarity;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
@@ -29,17 +30,20 @@ public class SessionVectorContributor : ConfiguredContributorBase
     private readonly ILogger<SessionVectorContributor> _logger;
     private readonly SessionStore _sessionStore;
     private readonly ISessionVectorSearch? _vectorSearch;
+    private readonly SessionEscalationService? _escalationService;
 
     public SessionVectorContributor(
         ILogger<SessionVectorContributor> logger,
         IDetectorConfigProvider configProvider,
         SessionStore sessionStore,
-        ISessionVectorSearch? vectorSearch = null)
+        ISessionVectorSearch? vectorSearch = null,
+        SessionEscalationService? escalationService = null)
         : base(configProvider)
     {
         _logger = logger;
         _sessionStore = sessionStore;
         _vectorSearch = vectorSearch;
+        _escalationService = escalationService;
     }
 
     public override string Name => "SessionVector";
@@ -436,18 +440,40 @@ public class SessionVectorContributor : ConfiguredContributorBase
             var topSimilarity = similar.Count > 0 ? similar[0].Similarity : 0f;
             var isVoid = similar.Count == 0;
 
+            // Second pass: Mahalanobis search for variance-aware matching.
+            // A session that looks void under cosine but lands inside a known centroid's variance
+            // envelope is NOT novel — it's a known campaign with high within-cluster variance.
+            // A session that looks void under BOTH is genuinely novel: highest-priority alert.
+            var mahalanobisNearest = float.MaxValue;
+            try
+            {
+                var mahalMatches = await _vectorSearch.FindSimilarMahalanobisAsync(
+                    currentVector, topK: 1, maxDistance: 5.0f);
+                if (mahalMatches.Count > 0)
+                {
+                    // Similarity is converted back from distance: high similarity = small distance
+                    mahalanobisNearest = 1f - mahalMatches[0].Similarity; // approx distance
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Mahalanobis search failed (non-fatal)");
+            }
+
             state.WriteSignals([
                 new(SignalKeys.SessionIsVoid, isVoid),
-                new(SignalKeys.SessionTopSimilarity, topSimilarity)
+                new(SignalKeys.SessionTopSimilarity, topSimilarity),
+                new(SignalKeys.SessionMahalanobisNearestDistance, mahalanobisNearest)
             ]);
 
             if (isVoid)
             {
-                _logger.LogDebug("Void detection: session in empty shape-space for {Signature}",
-                    state.GetSignal<string>(SignalKeys.PrimarySignature));
-                // Void is a high-priority signal but not a definitive bot signal by itself.
-                // It feeds LLM escalation and intent classification.
-                // We don't add a bot contribution here -- the LLM or IntentContributor handles it.
+                var signature = state.GetSignal<string>(SignalKeys.PrimarySignature);
+                _logger.LogDebug("Void detection: session in empty shape-space for {Signature}", signature);
+
+                // Flag for LLM escalation at session end: novel behavior needs deeper analysis.
+                if (signature != null)
+                    _escalationService?.FlagForEscalation(signature);
             }
         }
         catch (Exception ex)

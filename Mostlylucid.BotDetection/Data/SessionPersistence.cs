@@ -350,6 +350,9 @@ public sealed record CompactionResult
     /// <summary>Average velocity vector across consecutive session pairs (drift direction).</summary>
     public float[]? VelocityCentroid { get; init; }
 
+    /// <summary>Mean frequency fingerprint across compacted sessions (8D autocorrelation centroid).</summary>
+    public float[]? FrequencyCentroid { get; init; }
+
     /// <summary>Number of sessions that were compacted.</summary>
     public int CompactedCount { get; init; }
 

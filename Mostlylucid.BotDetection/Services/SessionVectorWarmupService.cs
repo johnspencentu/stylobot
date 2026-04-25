@@ -57,7 +57,11 @@ public sealed class SessionVectorWarmupService : BackgroundService
                 var vector = SqliteSessionStore.DeserializeVector(session.Vector);
                 if (vector == null) continue;
 
-                await _vectorSearch.AddAsync(vector, session.Signature, session.IsBot, session.AvgBotProbability);
+                var freqFp = SqliteSessionStore.DeserializeVector(session.FrequencyFingerprintBlob);
+                var driftVec = SqliteSessionStore.DeserializeVector(session.DriftVectorBlob);
+
+                await _vectorSearch.AddAsync(vector, session.Signature, session.IsBot, session.AvgBotProbability,
+                    frequencyFingerprint: freqFp, driftVector: driftVec);
                 added++;
             }
 

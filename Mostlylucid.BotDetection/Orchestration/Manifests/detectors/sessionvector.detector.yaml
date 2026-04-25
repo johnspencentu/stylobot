@@ -48,6 +48,42 @@ output:
       entity_type: float
       salience: 0.9
       description: Behavioral shift magnitude between sessions
+    - key: session.frequency_fingerprint
+      entity_type: float[]
+      salience: 0.7
+      description: 8D autocorrelation rhythm vector at [1s,3s,10s,30s,1m,3m,10m,30m] lag scales
+    - key: session.frequency_periodicity_score
+      entity_type: float
+      salience: 0.75
+      description: RMS deviation from broadband baseline; high = bot-like periodic timing
+    - key: session.frequency_dominant_lag
+      entity_type: integer
+      salience: 0.6
+      description: Index of dominant lag bin (>0.6); -1 if no dominant periodicity
+    - key: session.drift_vector
+      entity_type: float[]
+      salience: 0.8
+      description: OLS regression slope over N recent session vectors (trajectory direction)
+    - key: session.trajectory_cluster_similarity
+      entity_type: float
+      salience: 0.85
+      description: Similarity of projected future position to nearest known bot cluster
+    - key: session.trajectory_in_attack_cluster
+      entity_type: bool
+      salience: 0.9
+      description: Predicted future position lands inside a known attack cluster (pre-crime flag)
+    - key: session.is_void
+      entity_type: bool
+      salience: 0.85
+      description: No similar sessions found in HNSW index; genuinely novel behavior
+    - key: session.top_similarity
+      entity_type: float
+      salience: 0.7
+      description: Highest cosine similarity from HNSW search (0 if void)
+    - key: session.mahalanobis_nearest_distance
+      entity_type: float
+      salience: 0.75
+      description: Nearest Mahalanobis distance to a known centroid (variance-aware ghost matching)
 
 triggers:
   requires:
@@ -78,6 +114,42 @@ emits:
     - key: session.boundary_detected
       type: bool
       description: Whether a session boundary was just detected
+
+    - key: session.frequency_fingerprint
+      type: float[]
+      description: 8D autocorrelation rhythm vector (requires >= 5 requests)
+
+    - key: session.frequency_periodicity_score
+      type: float
+      description: Periodicity score [0,1]; values above periodicity_bot_threshold flag bot rhythm
+
+    - key: session.frequency_dominant_lag
+      type: int
+      description: Dominant lag index; -1 if aperiodic
+
+    - key: session.drift_vector
+      type: float[]
+      description: Trajectory drift direction from OLS regression over recent sessions
+
+    - key: session.trajectory_cluster_similarity
+      type: float
+      description: Similarity of predicted future position to nearest bot cluster
+
+    - key: session.trajectory_in_attack_cluster
+      type: bool
+      description: Pre-crime flag; predicted behavior lands in known attack cluster
+
+    - key: session.is_void
+      type: bool
+      description: No HNSW neighbors found; novel behavioral shape
+
+    - key: session.top_similarity
+      type: float
+      description: Best cosine neighbor similarity (0 when void)
+
+    - key: session.mahalanobis_nearest_distance
+      type: float
+      description: Nearest variance-aware centroid distance; float.MaxValue if no centroids exist
 
   on_failure:
     - detector.sessionvector.failed

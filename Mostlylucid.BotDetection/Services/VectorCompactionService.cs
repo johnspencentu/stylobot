@@ -182,6 +182,7 @@ public sealed class VectorCompactionService : BackgroundService
             VelocityMagnitude = result.VelocityCentroid != null
                 ? Analysis.SessionVectorizer.VelocityMagnitude(result.VelocityCentroid)
                 : 0f,
+            FrequencyFingerprint = result.FrequencyCentroid,
             CompressionLevel = 1, // L1 centroid
             Priority = 1.0
         };

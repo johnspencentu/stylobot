@@ -951,19 +951,22 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
         await readConn.OpenAsync(ct);
         await using var readCmd = readConn.CreateCommand();
         readCmd.CommandText = """
-            SELECT id, vector, maturity, ended_at FROM sessions
+            SELECT id, vector, maturity, ended_at, frequency_fingerprint FROM sessions
             WHERE signature = @sig AND vector IS NOT NULL
             ORDER BY ended_at ASC
         """;
         readCmd.Parameters.AddWithValue("@sig", signature);
 
-        var rows = new List<(long Id, byte[] Vector, float Maturity, DateTime EndedAt)>();
+        var rows = new List<(long Id, byte[] Vector, float Maturity, DateTime EndedAt, byte[]? FreqFp)>();
         await using var reader = await readCmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
             if (!reader.IsDBNull(1))
+            {
+                var freqFpBlob = reader.IsDBNull(4) ? null : (byte[])reader[4];
                 rows.Add((reader.GetInt64(0), (byte[])reader[1], reader.GetFloat(2),
-                    DateTime.Parse(reader.GetString(3))));
+                    DateTime.Parse(reader.GetString(3)), freqFpBlob));
+            }
         }
 
         if (rows.Count <= keepCount)
@@ -975,10 +978,13 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
 
         // Deserialize vectors for compaction
         var vecs = new List<(float[] Vector, float Maturity)>(toCompact.Count);
-        foreach (var (_, rawVec, maturity, _) in toCompact)
+        var freqFingerprints = new List<float[]>();
+        foreach (var (_, rawVec, maturity, _, freqFpBlob) in toCompact)
         {
             var v = DeserializeVector(rawVec);
             if (v != null) vecs.Add((v, maturity));
+            var fp = DeserializeVector(freqFpBlob);
+            if (fp != null) freqFingerprints.Add(fp);
         }
 
         if (vecs.Count == 0)
@@ -1018,6 +1024,19 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
 
         var avgMaturity = (float)(totalWeight / vecs.Count);
         var compactedCentroidBytes = SerializeVector(centroid);
+
+        // Frequency fingerprint centroid across compacted sessions
+        float[]? freqCentroid = null;
+        if (freqFingerprints.Count > 0)
+        {
+            var fpDims = freqFingerprints[0].Length;
+            var fpSum = new float[fpDims];
+            foreach (var fp in freqFingerprints)
+                for (var i = 0; i < fpDims && i < fp.Length; i++)
+                    fpSum[i] += fp[i];
+            freqCentroid = fpSum;
+            for (var i = 0; i < fpDims; i++) freqCentroid[i] /= freqFingerprints.Count;
+        }
 
         // Update signature root_vector with the compacted centroid, delete old session rows
         await _writeLock.WaitAsync(ct);
@@ -1063,6 +1082,7 @@ public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable
             Signature = signature,
             BehavioralCentroid = centroid,
             VelocityCentroid = velocityCentroid,
+            FrequencyCentroid = freqCentroid,
             CompactedCount = toCompact.Count,
             CentroidMaturity = avgMaturity
         };
