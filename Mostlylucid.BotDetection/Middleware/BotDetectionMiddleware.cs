@@ -13,6 +13,7 @@ using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Orchestration.Audit;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Dashboard;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Services;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
@@ -42,6 +43,7 @@ public class BotDetectionMiddleware(
     RequestDelegate next,
     ILogger<BotDetectionMiddleware> logger,
     IOptions<BotDetectionOptions> options,
+    ILicenseState licenseState,
     CountryReputationTracker? countryTracker = null,
     BotClusterService? clusterService = null,
     ReactiveSignalTracker? reactiveTracker = null)
@@ -85,6 +87,7 @@ public class BotDetectionMiddleware(
 
     // Random.Shared is thread-safe in .NET 6+
 
+    private readonly ILicenseState _licenseState = licenseState;
     private readonly ILogger<BotDetectionMiddleware> _logger = logger;
     private readonly RequestDelegate _next = next;
     private readonly BotDetectionOptions _options = options.Value;
@@ -340,6 +343,19 @@ public class BotDetectionMiddleware(
                 TriggeredActionPolicyName = apiKeyContext.ActionPolicyName
             };
             context.Items[AggregatedEvidenceKey] = aggregatedResult;
+        }
+
+        // License log-only override: when license is expired past grace period,
+        // force log-only regardless of any configured action policy.
+        if (_licenseState.LogOnly)
+        {
+            var logOnlyPolicy = actionPolicyRegistry.GetPolicy("logonly");
+            if (logOnlyPolicy != null)
+            {
+                await logOnlyPolicy.ExecuteAsync(context, aggregatedResult, context.RequestAborted);
+            }
+            await InvokeNextWithResponseMutationAsync(context);
+            return;
         }
 
         // Check for triggered action policy first (takes precedence over built-in actions)

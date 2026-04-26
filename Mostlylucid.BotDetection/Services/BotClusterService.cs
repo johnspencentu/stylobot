@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Clustering;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Markov;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
@@ -36,6 +37,7 @@ public class BotClusterService : BackgroundService
     private volatile ClusterDiagnosticsSnapshot _diagnostics = ClusterDiagnosticsSnapshot.Empty;
 
     private readonly ILogger<BotClusterService> _logger;
+    private readonly ILicenseState _licenseState;
     private readonly ClusterOptions _options;
     private readonly SignatureCoordinator _signatureCoordinator;
     private readonly IEmbeddingProvider? _embeddingProvider;
@@ -56,6 +58,7 @@ public class BotClusterService : BackgroundService
         ILogger<BotClusterService> logger,
         IOptions<BotDetectionOptions> options,
         SignatureCoordinator signatureCoordinator,
+        ILicenseState licenseState,
         IEmbeddingProvider? embeddingProvider = null,
         MarkovTracker? markovTracker = null,
         AdaptiveSimilarityWeighter? adaptiveWeighter = null)
@@ -63,6 +66,7 @@ public class BotClusterService : BackgroundService
         _logger = logger;
         _options = options.Value.Cluster;
         _signatureCoordinator = signatureCoordinator;
+        _licenseState = licenseState;
         _embeddingProvider = embeddingProvider;
         _markovTracker = markovTracker;
         _adaptiveWeighter = adaptiveWeighter;
@@ -165,13 +169,20 @@ public class BotClusterService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            if (_licenseState.LearningFrozen)
             {
-                RunClustering();
+                _logger.LogDebug("Learning frozen, skipping cluster run.");
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogWarning(ex, "Error during clustering run");
+                try
+                {
+                    RunClustering();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error during clustering run");
+                }
             }
 
             // Reset bot detection counter after each run

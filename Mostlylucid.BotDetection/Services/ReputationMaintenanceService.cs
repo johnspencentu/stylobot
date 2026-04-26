@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Data;
 using Mostlylucid.BotDetection.Events;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Models;
 
 namespace Mostlylucid.BotDetection.Services;
@@ -18,6 +19,7 @@ public class ReputationMaintenanceService : BackgroundService, ILearningEventHan
 {
     private readonly IPatternReputationCache _cache;
     private readonly ILearningEventBus? _learningBus;
+    private readonly ILicenseState _licenseState;
     private readonly ILogger<ReputationMaintenanceService> _logger;
     private readonly ReputationOptions _options;
     private readonly PatternReputationUpdater _updater;
@@ -27,12 +29,14 @@ public class ReputationMaintenanceService : BackgroundService, ILearningEventHan
         IPatternReputationCache cache,
         PatternReputationUpdater updater,
         IOptions<BotDetectionOptions> options,
+        ILicenseState licenseState,
         ILearningEventBus? learningBus = null)
     {
         _logger = logger;
         _cache = cache;
         _updater = updater;
         _options = options.Value.Reputation;
+        _licenseState = licenseState;
         _learningBus = learningBus;
     }
 
@@ -50,6 +54,8 @@ public class ReputationMaintenanceService : BackgroundService, ILearningEventHan
     /// </summary>
     public Task HandleAsync(LearningEvent evt, CancellationToken ct = default)
     {
+        if (_licenseState.LearningFrozen) return Task.CompletedTask;
+
         try
         {
             switch (evt.Type)
@@ -113,21 +119,23 @@ public class ReputationMaintenanceService : BackgroundService, ILearningEventHan
                 // Decay sweep
                 if (now - lastDecay >= decayInterval)
                 {
-                    await _cache.DecaySweepAsync(stoppingToken);
+                    if (!_licenseState.LearningFrozen)
+                        await _cache.DecaySweepAsync(stoppingToken);
                     lastDecay = now;
                 }
 
                 // Garbage collection
                 if (now - lastGc >= gcInterval)
                 {
-                    await _cache.GarbageCollectAsync(stoppingToken);
+                    if (!_licenseState.LearningFrozen)
+                    {
+                        await _cache.GarbageCollectAsync(stoppingToken);
+                        var stats = _cache.GetStats();
+                        _logger.LogInformation(
+                            "Reputation stats: {Total} patterns, {Bad} bad, {Suspect} suspect, {GcEligible} GC-eligible",
+                            stats.TotalPatterns, stats.ConfirmedBadCount, stats.SuspectCount, stats.GcEligibleCount);
+                    }
                     lastGc = now;
-
-                    // Log stats after GC
-                    var stats = _cache.GetStats();
-                    _logger.LogInformation(
-                        "Reputation stats: {Total} patterns, {Bad} bad, {Suspect} suspect, {GcEligible} GC-eligible",
-                        stats.TotalPatterns, stats.ConfirmedBadCount, stats.SuspectCount, stats.GcEligibleCount);
                 }
 
                 // Persistence

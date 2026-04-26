@@ -10,6 +10,7 @@ using Mostlylucid.BotDetection.Middleware;
 using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Policies;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Services;
 
 namespace Mostlylucid.BotDetection.Test.Middleware;
@@ -72,7 +73,8 @@ public class BotDetectionMiddlewarePiiMaskingTests
         var middleware = new BotDetectionMiddleware(
             next,
             Mock.Of<ILogger<BotDetectionMiddleware>>(),
-            Options.Create(options));
+            Options.Create(options),
+            new FossLicenseState());
 
         var evidence = new AggregatedEvidence
         {
@@ -141,7 +143,8 @@ public class BotDetectionMiddlewarePiiMaskingTests
                 {
                     Enabled = true
                 }
-            }));
+            }),
+            new FossLicenseState());
 
         var evidence = new AggregatedEvidence
         {
@@ -210,7 +213,8 @@ public class BotDetectionMiddlewarePiiMaskingTests
                 {
                     Enabled = true
                 }
-            }));
+            }),
+            new FossLicenseState());
 
         var evidence = new AggregatedEvidence
         {
@@ -277,7 +281,8 @@ public class BotDetectionMiddlewarePiiMaskingTests
                 {
                     Enabled = true
                 }
-            }));
+            }),
+            new FossLicenseState());
 
         var evidence = new AggregatedEvidence
         {
@@ -345,7 +350,8 @@ public class BotDetectionMiddlewarePiiMaskingTests
         var middleware = new BotDetectionMiddleware(
             next,
             Mock.Of<ILogger<BotDetectionMiddleware>>(),
-            Options.Create(new BotDetectionOptions { BotThreshold = 0.7 }));
+            Options.Create(new BotDetectionOptions { BotThreshold = 0.7 }),
+            new FossLicenseState());
 
         var evidence = new AggregatedEvidence
         {
