@@ -177,6 +177,10 @@ public class HeuristicDetector : IDetector, IDisposable
         ["stat:category_max"] = 0.5f,
         ["stat:category_avg"] = 0.3f,
 
+        // Click fraud signals
+        ["cf:click_fraud_score"] = 0.8f,
+        ["cf:is_paid_traffic"] = 0.3f,
+
         // Results - final scores from pipeline
         ["result:bot_probability"] = 1.0f,
         ["result:confidence"] = 0.8f,
