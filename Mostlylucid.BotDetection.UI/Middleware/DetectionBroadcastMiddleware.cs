@@ -216,6 +216,7 @@ public partial class DetectionBroadcastMiddleware
             TopReasons = detection.TopReasons?.ToList(),
             ThreatScore = detection.ThreatScore,
             ThreatBand = detection.ThreatBand,
+            RiskJustification = detection.RiskJustification,
         };
 
         return await eventStore.AddSignatureAsync(signature);
@@ -279,6 +280,7 @@ public partial class DetectionBroadcastMiddleware
             ThreatScore = evidence.ThreatScore > 0 ? evidence.ThreatScore : null,
             ThreatBand = evidence.ThreatBand != Orchestration.ThreatBand.None
                 ? evidence.ThreatBand.ToString() : null,
+            RiskJustification = evidence.RiskJustification,
         };
 
         return detection with { Narrative = DetectionNarrativeBuilder.Build(detection) };

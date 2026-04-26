@@ -39,7 +39,19 @@ public static class DetectionLedgerExtensions
         var coverageConfidence = ComputeCoverageConfidence(ledger.ContributingDetectors, aiRan);
         confidence = Math.Min(confidence, coverageConfidence);
 
-        var riskBand = DetermineRiskBand(botProbability, confidence, aiRan);
+        // Extract signals needed for context-aware risk band before building evidence
+        // (signals dict built below; extract from ledger merged signals here)
+        var preSignals = premergedSignals != null
+            ? premergedSignals
+            : (IReadOnlyDictionary<string, object>)ledger.MergedSignals.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        var earlyThreatForBand = ExtractThreatScoreRaw(preSignals);
+        var isConfirmedBadForBand = IsConfirmedBad(preSignals);
+        var sessionCountForBand = ExtractSessionCount(preSignals);
+        var intentCategory = preSignals.TryGetValue(SignalKeys.IntentCategory, out var ic) ? ic as string : null;
+
+        var (riskBand, riskJustification) = DetermineRiskBand(botProbability, confidence, aiRan,
+            earlyThreatForBand, isConfirmedBadForBand, sessionCountForBand, intentCategory);
 
         // Only set BotType/BotName if actually a bot
         var isActuallyBot = botProbability >= 0.5;
@@ -58,12 +70,17 @@ public static class DetectionLedgerExtensions
 
         var (threatScore, threatBand) = ExtractThreatScore(signals);
 
+        // Write risk justification back to signals so downstream consumers can read it
+        if (!string.IsNullOrEmpty(riskJustification))
+            signals[SignalKeys.RiskJustification] = riskJustification;
+
         return new AggregatedEvidence
         {
             Ledger = ledger,
             BotProbability = botProbability,
             Confidence = confidence,
             RiskBand = riskBand,
+            RiskJustification = riskJustification,
             EarlyExit = false,
             PrimaryBotType = primaryBotType,
             PrimaryBotName = primaryBotName,
@@ -89,7 +106,6 @@ public static class DetectionLedgerExtensions
     {
         var exitContrib = ledger.EarlyExitContribution!;
         var verdict = ParseEarlyExitVerdict(exitContrib.EarlyExitVerdict);
-        var isGood = verdict is EarlyExitVerdict.VerifiedGoodBot or EarlyExitVerdict.Whitelisted;
         var isBot = verdict is EarlyExitVerdict.VerifiedGoodBot or EarlyExitVerdict.VerifiedBadBot;
 
         var earlySignals = premergedSignals != null
@@ -98,19 +114,33 @@ public static class DetectionLedgerExtensions
 
         var (earlyThreatScore, earlyThreatBand) = ExtractThreatScore(earlySignals);
 
+        var earlyRiskBand = verdict switch
+        {
+            EarlyExitVerdict.VerifiedGoodBot => RiskBand.VeryLow,
+            EarlyExitVerdict.Whitelisted     => RiskBand.VeryLow,
+            EarlyExitVerdict.VerifiedBadBot  => RiskBand.VeryHigh,
+            EarlyExitVerdict.Blacklisted     => RiskBand.VeryHigh,
+            _                                => RiskBand.Medium
+        };
+        var earlyRiskJustification = verdict switch
+        {
+            EarlyExitVerdict.VerifiedGoodBot => "Cryptographically verified good bot",
+            EarlyExitVerdict.Whitelisted     => "Explicitly whitelisted",
+            EarlyExitVerdict.VerifiedBadBot  => "Verified bad bot",
+            EarlyExitVerdict.Blacklisted     => "Explicitly blacklisted",
+            _                                => "Early exit policy"
+        };
+
+        if (!string.IsNullOrEmpty(earlyRiskJustification))
+            earlySignals[SignalKeys.RiskJustification] = earlyRiskJustification;
+
         return new AggregatedEvidence
         {
             Ledger = ledger,
             BotProbability = isBot ? 1.0 : 0.0,
             Confidence = 1.0,
-            RiskBand = verdict switch
-            {
-                EarlyExitVerdict.VerifiedGoodBot => RiskBand.VeryLow,
-                EarlyExitVerdict.Whitelisted => RiskBand.VeryLow,
-                EarlyExitVerdict.VerifiedBadBot => RiskBand.VeryHigh,
-                EarlyExitVerdict.Blacklisted => RiskBand.VeryHigh,
-                _ => RiskBand.Medium
-            },
+            RiskBand = earlyRiskBand,
+            RiskJustification = earlyRiskJustification,
             EarlyExit = true,
             EarlyExitVerdict = verdict,
             PrimaryBotType = ParseBotType(exitContrib.BotType),
@@ -186,31 +216,149 @@ public static class DetectionLedgerExtensions
         return maxScore == 0 ? 0 : score / maxScore;
     }
 
-    private static RiskBand DetermineRiskBand(double botProbability, double confidence, bool aiRan)
+    /// <summary>
+    /// Multi-dimensional risk band classification.
+    ///
+    /// Risk = max(probability_band, threat_band, persistence_band)
+    ///
+    /// This correctly handles:
+    /// - A human manually running SQLi scans (low bot probability but high threat score = VeryHigh)
+    /// - A persistent scraper with no threat indicators (high probability + many requests = VeryHigh)
+    /// - A single wget request with no threat (high probability but no context = High, not VeryHigh)
+    /// - An automated crawler confirmed in reputation history (confirmed bad = VeryHigh regardless)
+    ///
+    /// VeryHigh without AI requires one of: probability >= 0.85, OR confirmed bad actor, OR
+    /// probability >= 0.70 with active threat OR >= 5 requests.
+    /// </summary>
+    private static (RiskBand Band, string Justification) DetermineRiskBand(
+        double botProbability, double confidence, bool aiRan,
+        double threatScore, bool isConfirmedBad, int sessionRequestCount,
+        string? intentCategory = null)
     {
-        // Low confidence = not enough data to assess. Use probability to disambiguate:
-        // low probability + low confidence = probably fine (Unknown/Low)
-        // high probability + low confidence = uncertain but suspicious (Medium)
+        // Low confidence: not enough data to assess reliably
         if (confidence < 0.3)
-            return botProbability >= 0.5 ? RiskBand.Medium : RiskBand.Unknown;
+            return botProbability >= 0.5
+                ? (RiskBand.Medium, $"Low detection confidence ({confidence:F2}); probability {botProbability:F2}")
+                : (RiskBand.Unknown, "Insufficient data for reliable risk assessment");
 
+        var reasons = new List<string>(4);
+
+        // Dimension 1: bot probability band
+        RiskBand probabilityBand;
         if (aiRan)
-            return botProbability switch
-            {
-                < 0.05 => RiskBand.VeryLow,
-                < 0.2 => RiskBand.Low,
-                < 0.5 => RiskBand.Medium,
-                < 0.8 => RiskBand.High,
-                _ => RiskBand.VeryHigh
-            };
-
-        return botProbability switch
         {
-            < 0.15 => RiskBand.VeryLow,
-            < 0.35 => RiskBand.Low,
-            < 0.55 => RiskBand.Medium,
-            < 0.75 => RiskBand.High,
-            _ => RiskBand.VeryHigh
+            probabilityBand = botProbability switch
+            {
+                >= 0.80 => RiskBand.VeryHigh,
+                >= 0.50 => RiskBand.High,
+                >= 0.20 => RiskBand.Medium,
+                >= 0.05 => RiskBand.Low,
+                _       => RiskBand.VeryLow
+            };
+            if (probabilityBand >= RiskBand.High)
+                reasons.Add($"AI probability {botProbability:F2}");
+        }
+        else
+        {
+            // Without AI, require stronger evidence for VeryHigh:
+            // pure probability alone can reach VeryHigh at 0.85 (matching the middleware threshold).
+            // Below that, persistence or threat must be present to escalate further.
+            probabilityBand = botProbability switch
+            {
+                >= 0.85 => RiskBand.VeryHigh,
+                >= 0.65 => RiskBand.High,
+                >= 0.50 => RiskBand.Medium,
+                >= 0.35 => RiskBand.Elevated,
+                >= 0.15 => RiskBand.Low,
+                _       => RiskBand.VeryLow
+            };
+            if (probabilityBand >= RiskBand.High)
+                reasons.Add($"probability {botProbability:F2}");
+        }
+
+        // Dimension 2: threat score (independent of automation - a human can attack too)
+        var threatBandRisk = threatScore switch
+        {
+            >= 0.80 => RiskBand.VeryHigh,
+            >= 0.55 => RiskBand.High,
+            >= 0.35 => RiskBand.Medium,
+            >= 0.15 => RiskBand.Elevated,
+            _       => RiskBand.VeryLow
+        };
+        if (threatBandRisk >= RiskBand.Medium)
+        {
+            var threatLabel = !string.IsNullOrEmpty(intentCategory) && intentCategory != "browsing"
+                ? $"{intentCategory} activity (threat={threatScore:F2})"
+                : $"threat score {threatScore:F2}";
+            reasons.Add(threatLabel);
+        }
+
+        // Dimension 3: persistence (repeated confirmed behavior adds weight regardless of bot probability)
+        var persistenceBand = RiskBand.VeryLow;
+        if (isConfirmedBad)
+        {
+            persistenceBand = RiskBand.VeryHigh;
+            reasons.Add("confirmed bad actor");
+        }
+        else if (botProbability >= 0.70 && sessionRequestCount >= 5)
+        {
+            // Persistent suspected bot: multiple requests + elevated probability = escalate to VeryHigh
+            persistenceBand = RiskBand.VeryHigh;
+            reasons.Add($"{sessionRequestCount} requests");
+        }
+        else if (sessionRequestCount >= 20)
+        {
+            persistenceBand = RiskBand.High;
+            reasons.Add($"{sessionRequestCount} requests");
+        }
+        else if (sessionRequestCount >= 10)
+        {
+            persistenceBand = RiskBand.Medium;
+            reasons.Add($"{sessionRequestCount} requests");
+        }
+
+        // Final band = max across all three dimensions
+        var finalBand = (RiskBand)new[] { (int)probabilityBand, (int)threatBandRisk, (int)persistenceBand }.Max();
+
+        if (reasons.Count == 0)
+        {
+            var lowLabel = finalBand <= RiskBand.Low ? "No significant indicators" : $"probability {botProbability:F2}";
+            return (finalBand, lowLabel);
+        }
+
+        return (finalBand, string.Join("; ", reasons));
+    }
+
+    private static double ExtractThreatScoreRaw(IReadOnlyDictionary<string, object> signals)
+    {
+        if (!signals.TryGetValue(SignalKeys.IntentThreatScore, out var rawScore)) return 0.0;
+        return rawScore switch
+        {
+            double d => d,
+            float f  => f,
+            int i    => i,
+            _        => 0.0
+        };
+    }
+
+    private static bool IsConfirmedBad(IReadOnlyDictionary<string, object> signals)
+    {
+        if (signals.TryGetValue(SignalKeys.ReputationCanAbort, out var canAbort) && canAbort is true)
+            return true;
+        if (signals.TryGetValue(SignalKeys.ReputationFastAbortActive, out var abortActive) && abortActive is true)
+            return true;
+        return false;
+    }
+
+    private static int ExtractSessionCount(IReadOnlyDictionary<string, object> signals)
+    {
+        if (!signals.TryGetValue(SignalKeys.SessionRequestCount, out var raw)) return 0;
+        return raw switch
+        {
+            int i    => i,
+            long l   => (int)l,
+            double d => (int)d,
+            _        => 0
         };
     }
 

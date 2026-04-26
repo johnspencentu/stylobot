@@ -273,6 +273,9 @@ public static class SignalKeys
     public const string RiskBand = "risk.band";
     public const string RiskScore = "risk.score";
 
+    /// <summary>String: human-readable explanation of why this risk band was assigned</summary>
+    public const string RiskJustification = "risk.justification";
+
     // AI/LLM signals
     public const string AiPrediction = "ai.prediction";
     public const string AiConfidence = "ai.confidence";
@@ -600,6 +603,39 @@ public static class SignalKeys
 
     /// <summary>True once ClickFraudContributor has run (gate for downstream triggers).</summary>
     public const string ClickFraudChecked = "clickfraud.checked";
+
+    // ==========================================
+    // Ad traffic signals (commercial AdTrafficContributor)
+    // Written by Stylobot.Commercial.AdIntelligence.Detection.AdTrafficContributor (priority 47)
+    // Requires: utm.present = true AND clickfraud.checked = true
+    // ==========================================
+
+    /// <summary>Double 0.0-1.0: cross-session campaign abuse score (log-scaled distinct signatures).</summary>
+    public const string AdTrafficCampaignAbuseScore = "adtraffic.campaign_abuse_score";
+
+    /// <summary>Bool: signature arrived from more than N distinct campaigns in 24h (cookie stuffing).</summary>
+    public const string AdTrafficCookieStuffing = "adtraffic.cookie_stuffing";
+
+    /// <summary>Bool: same click ID hash seen from multiple distinct signatures (click ID reuse).</summary>
+    public const string AdTrafficClickIdReuse = "adtraffic.click_id_reuse";
+
+    /// <summary>Bool: source platform changed between sessions for this signature.</summary>
+    public const string AdTrafficAttributionChurn = "adtraffic.attribution_churn";
+
+    /// <summary>String: IAB IVT class -- "GIVT" or "SIVT". Absent if traffic is legitimate.</summary>
+    public const string AdTrafficIvtClass = "adtraffic.ivt_class";
+
+    /// <summary>True once AdTrafficContributor has run (gate for downstream triggers).</summary>
+    public const string AdTrafficChecked = "adtraffic.checked";
+
+    /// <summary>Double 0.0-1.0: likelihood this form submission is fraudulent (conversion endpoints only).</summary>
+    public const string AdTrafficConversionRisk = "adtraffic.conversion_risk";
+
+    /// <summary>Bool: conversion fraud confirmed -- score exceeded configured threshold.</summary>
+    public const string AdTrafficConversionFraud = "adtraffic.conversion_fraud";
+
+    /// <summary>String: conversion endpoint pattern that matched (e.g. "/register").</summary>
+    public const string AdTrafficConversionEndpoint = "adtraffic.conversion_endpoint";
 
     // ==========================================
     // Cluster detection signals

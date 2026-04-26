@@ -55,6 +55,7 @@ public sealed record DashboardDetectionEvent
 
     public double? ThreatScore { get; init; }
     public string? ThreatBand { get; init; }
+    public string? RiskJustification { get; init; }
 
     /// <summary>
     ///     PII-stripped raw User-Agent string for search and analytics.
@@ -112,6 +113,7 @@ public sealed record DashboardSignatureEvent
     public List<string>? TopReasons { get; init; }
     public double? ThreatScore { get; init; }
     public string? ThreatBand { get; init; }
+    public string? RiskJustification { get; init; }
 }
 
 /// <summary>

@@ -233,6 +233,7 @@ public sealed class SignatureDetailModel
     public bool IsBot { get; init; }
     public double? ThreatScore { get; init; }
     public string? ThreatBand { get; init; }
+    public string? RiskJustification { get; init; }
     public List<double>? SparklineData { get; init; }
 
     // From CachedVisitor

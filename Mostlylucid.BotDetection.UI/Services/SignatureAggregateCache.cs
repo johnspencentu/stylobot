@@ -245,6 +245,7 @@ public sealed class SignatureAggregateCache
             existing.IsBot = detection.IsBot;
             existing.ThreatScore = detection.ThreatScore ?? existing.ThreatScore;
             existing.ThreatBand = detection.ThreatBand ?? existing.ThreatBand;
+            existing.RiskJustification = detection.RiskJustification ?? existing.RiskJustification;
 
             existing.ScoreHistory.AddLast(detection.BotProbability);
             while (existing.ScoreHistory.Count > ScoreHistorySize)
@@ -371,6 +372,7 @@ public sealed class SignatureAggregate
     public bool IsBot;
     public double? ThreatScore;
     public string? ThreatBand;
+    public string? RiskJustification;
 
     /// <summary>LFU access counter - incremented on read, periodically aged.</summary>
     public long AccessCount;

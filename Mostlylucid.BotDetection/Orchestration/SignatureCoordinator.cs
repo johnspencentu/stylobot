@@ -91,6 +91,8 @@ public record SignatureRequest
     public required IReadOnlyDictionary<string, object> Signals { get; init; }
     public required HashSet<string> DetectorsRan { get; init; }
     public bool Escalated { get; set; }
+    /// <summary>Bytes sent in response; updated asynchronously after response completes.</summary>
+    public long ResponseBytes { get; set; }
 }
 
 /// <summary>
@@ -119,6 +121,9 @@ public record SignatureBehavior
     public string? ContinentCode { get; init; }
     public string? RegionCode { get; init; }
     public bool IsVpn { get; init; }
+
+    /// <summary>Cumulative response bytes sent to this signature in the tracking window.</summary>
+    public long TotalResponseBytes { get; init; }
 }
 
 /// <summary>
@@ -451,6 +456,22 @@ public class SignatureCoordinator : IAsyncDisposable
     }
 
     /// <summary>
+    ///     Record response bytes for a specific request.
+    ///     Called from OnCompleted after the response finishes, so the request was already recorded.
+    /// </summary>
+    public async Task RecordResponseBytesAsync(
+        string signature,
+        string requestId,
+        long responseBytes,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_signatureCache.TryGet(signature, out var atom) || atom == null)
+            return;
+
+        await atom.UpdateResponseBytesAsync(requestId, responseBytes, cancellationToken);
+    }
+
+    /// <summary>
     ///     Get behavior analysis for a signature across all tracked requests.
     /// </summary>
     public async Task<SignatureBehavior?> GetSignatureBehaviorAsync(
@@ -739,6 +760,7 @@ internal class SignatureTrackingAtom : IDisposable
     // Sliding window of requests (bounded by MaxRequestsPerSignature)
     private readonly LinkedList<SignatureRequest> _requests;
     private readonly string _signature;
+    private long _totalResponseBytes;
 
     // Cached behavior (recomputed on each request)
     private SignatureBehavior? _cachedBehavior;
@@ -762,6 +784,30 @@ internal class SignatureTrackingAtom : IDisposable
         _lock.Dispose();
     }
 
+    public async Task UpdateResponseBytesAsync(
+        string requestId,
+        long responseBytes,
+        CancellationToken cancellationToken)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            foreach (var req in _requests)
+            {
+                if (req.RequestId == requestId)
+                {
+                    req.ResponseBytes = responseBytes;
+                    _totalResponseBytes += responseBytes;
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task RecordRequestAsync(
         SignatureRequest request,
         CancellationToken cancellationToken)
@@ -769,7 +815,7 @@ internal class SignatureTrackingAtom : IDisposable
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            // Add to windowUse 
+            // Add to windowUse
             _requests.AddLast(request);
 
             // Evict old requests (outside window)
@@ -820,7 +866,8 @@ internal class SignatureTrackingAtom : IDisposable
                 TimingCoefficient = 0,
                 AverageBotProbability = 0,
                 AberrationScore = 0,
-                IsAberrant = false
+                IsAberrant = false,
+                TotalResponseBytes = _totalResponseBytes
             };
 
         var requestList = _requests.ToList();
@@ -882,7 +929,8 @@ internal class SignatureTrackingAtom : IDisposable
             TimingCoefficient = timingCV,
             AverageBotProbability = avgBotProb,
             AberrationScore = aberrationScore,
-            IsAberrant = isAberrant
+            IsAberrant = isAberrant,
+            TotalResponseBytes = _totalResponseBytes
         };
     }
 

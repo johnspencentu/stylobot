@@ -309,19 +309,26 @@ public class BotDetectionMiddleware(
             if (auditProcessorDispatcher?.HasProcessors == true)
                 await auditProcessorDispatcher.DispatchAsync(context, finalEvidence);
 
-            // Record 4xx/5xx responses for reactive pattern analysis (including bot-detection-triggered ones).
-            // This intentionally captures our own 429s and 403s: those are exactly what bots react to.
-            if (_reactiveTracker != null && context.Response.StatusCode >= 400)
+            // Update response bytes in the signature coordinator now that the response is complete.
+            // ContentLength may be null for chunked responses; we record 0 in that case.
+            var responseSig = context.Items["BotDetection:Signature"] as string;
+            if (!string.IsNullOrEmpty(responseSig))
             {
-                var sig = context.Items["BotDetection:Signature"] as string;
-                if (!string.IsNullOrEmpty(sig))
+                var responseBytes = context.Response.ContentLength ?? 0;
+                var sigCoordinator = context.RequestServices.GetService<SignatureCoordinator>();
+                if (sigCoordinator != null)
+                    _ = sigCoordinator.RecordResponseBytesAsync(responseSig, context.TraceIdentifier, responseBytes);
+
+                // Record 4xx/5xx responses for reactive pattern analysis (including bot-detection-triggered ones).
+                // This intentionally captures our own 429s and 403s: those are exactly what bots react to.
+                if (_reactiveTracker != null && context.Response.StatusCode >= 400)
                 {
                     int? retryAfter = null;
                     if (context.Response.Headers.TryGetValue("Retry-After", out var raVal)
                         && int.TryParse(raVal.ToString(), out var parsed))
                         retryAfter = parsed;
                     _reactiveTracker.RecordErrorServed(
-                        sig, context.Response.StatusCode,
+                        responseSig, context.Response.StatusCode,
                         context.Request.Path.Value ?? "/", retryAfter);
                 }
             }
