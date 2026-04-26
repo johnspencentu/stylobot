@@ -3408,6 +3408,7 @@ public class StyloBotDashboardMiddleware
         }
 
         var basePath = _options.BasePath.TrimEnd('/');
+        var navBasePath = (_options.NavBasePath ?? _options.BasePath).TrimEnd('/');
         var cspNonce = context.Items.TryGetValue("CspNonce", out var nonceObj) && nonceObj is string s && s.Length > 0
             ? s
             : Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
@@ -3538,6 +3539,7 @@ public class StyloBotDashboardMiddleware
             {
                 SignatureId = decodedSignature,
                 BasePath = basePath,
+                NavBasePath = navBasePath,
                 CspNonce = cspNonce,
                 HubPath = _options.HubPath,
                 Found = true,
@@ -3675,6 +3677,7 @@ public class StyloBotDashboardMiddleware
                     {
                         SignatureId = decodedSignature,
                         BasePath = basePath,
+                        NavBasePath = navBasePath,
                         CspNonce = cspNonce,
                         HubPath = _options.HubPath,
                         Found = false

@@ -71,7 +71,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 threat_score REAL DEFAULT 0,
                 threat_band TEXT,
                 status_code INTEGER DEFAULT 0,
-                user_agent_raw TEXT
+                user_agent_raw TEXT,
+                risk_justification TEXT
             );
 
             CREATE TABLE IF NOT EXISTS signatures (
@@ -91,7 +92,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 threat_score REAL DEFAULT 0,
                 threat_band TEXT,
                 narrative TEXT,
-                metadata_json TEXT
+                metadata_json TEXT,
+                risk_justification TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_det_timestamp ON detections(timestamp DESC);
@@ -132,6 +134,22 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 }
             }
 
+            // Migrate: add risk_justification column if absent (idempotent)
+            foreach (var migration in new[]
+            {
+                "ALTER TABLE detections ADD COLUMN IF NOT EXISTS risk_justification TEXT",
+                "ALTER TABLE signatures ADD COLUMN IF NOT EXISTS risk_justification TEXT"
+            })
+            {
+                try
+                {
+                    await using var mc = conn.CreateCommand();
+                    mc.CommandText = migration;
+                    await mc.ExecuteNonQueryAsync(ct);
+                }
+                catch { /* column already exists */ }
+            }
+
             // Prune old detections (keep last 7 days)
             await using var pruneCmd = conn.CreateCommand();
             pruneCmd.CommandText = "DELETE FROM detections WHERE timestamp < @cutoff";
@@ -160,8 +178,10 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 INSERT INTO detections (timestamp, signature, method, path, is_bot, bot_probability, confidence,
-                    risk_band, bot_name, bot_type, action, country_code, processing_time_ms, threat_score, threat_band, status_code, user_agent_raw)
-                VALUES (@ts, @sig, @method, @path, @isBot, @prob, @conf, @risk, @name, @type, @action, @country, @ms, @threat, @band, @status, @uaRaw)
+                    risk_band, bot_name, bot_type, action, country_code, processing_time_ms, threat_score, threat_band,
+                    status_code, user_agent_raw, risk_justification)
+                VALUES (@ts, @sig, @method, @path, @isBot, @prob, @conf, @risk, @name, @type, @action, @country, @ms,
+                    @threat, @band, @status, @uaRaw, @justification)
                 """;
             cmd.Parameters.AddWithValue("@ts", detection.Timestamp.ToString("O"));
             cmd.Parameters.AddWithValue("@sig", detection.PrimarySignature ?? "unknown");
@@ -181,6 +201,7 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             cmd.Parameters.AddWithValue("@status", (int)detection.StatusCode);
             var strippedUa = UaPiiStripper.Strip(detection.UserAgentRaw);
             cmd.Parameters.AddWithValue("@uaRaw", string.IsNullOrEmpty(strippedUa) ? (object)DBNull.Value : strippedUa);
+            cmd.Parameters.AddWithValue("@justification", (object?)detection.RiskJustification ?? DBNull.Value);
             await cmd.ExecuteNonQueryAsync();
 
             // Upsert UA stats for analytics
@@ -204,8 +225,10 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 INSERT INTO signatures (signature, bot_name, bot_type, is_bot, bot_probability, confidence,
-                    risk_band, action, country_code, hit_count, first_seen, last_seen, processing_time_ms, threat_score, threat_band, narrative)
-                VALUES (@sig, @name, @type, @isBot, @prob, @conf, @risk, @action, @country, 1, @now, @now, @ms, @threat, @band, @narrative)
+                    risk_band, action, country_code, hit_count, first_seen, last_seen, processing_time_ms,
+                    threat_score, threat_band, narrative, risk_justification)
+                VALUES (@sig, @name, @type, @isBot, @prob, @conf, @risk, @action, @country, 1, @now, @now, @ms,
+                    @threat, @band, @narrative, @justification)
                 ON CONFLICT(signature) DO UPDATE SET
                     bot_name = COALESCE(@name, bot_name),
                     bot_type = COALESCE(@type, bot_type),
@@ -220,7 +243,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                     processing_time_ms = @ms,
                     threat_score = @threat,
                     threat_band = @band,
-                    narrative = COALESCE(@narrative, narrative)
+                    narrative = COALESCE(@narrative, narrative),
+                    risk_justification = COALESCE(@justification, risk_justification)
                 RETURNING hit_count
                 """;
             cmd.Parameters.AddWithValue("@sig", signature.PrimarySignature ?? "unknown");
@@ -236,6 +260,7 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             cmd.Parameters.AddWithValue("@threat", (double)(signature.ThreatScore ?? 0));
             cmd.Parameters.AddWithValue("@band", (object?)signature.ThreatBand ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@narrative", (object?)signature.Narrative ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@justification", (object?)signature.RiskJustification ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("O"));
 
             var hitCount = await cmd.ExecuteScalarAsync();
@@ -272,6 +297,11 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             conditions.Add("is_bot = @isBot");
             cmd.Parameters.AddWithValue("@isBot", filter.IsBot.Value ? 1 : 0);
         }
+        if (!string.IsNullOrEmpty(filter?.SignatureId))
+        {
+            conditions.Add("signature = @sig");
+            cmd.Parameters.AddWithValue("@sig", filter.SignatureId);
+        }
 
         if (conditions.Count > 0)
             sql += " WHERE " + string.Join(" AND ", conditions);
@@ -303,7 +333,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 ThreatScore = reader.GetDouble(reader.GetOrdinal("threat_score")),
                 ThreatBand = reader.IsDBNull(reader.GetOrdinal("threat_band")) ? null : reader.GetString(reader.GetOrdinal("threat_band")),
                 StatusCode = reader.GetInt32(reader.GetOrdinal("status_code")),
-                UserAgentRaw = SafeGetString(reader, "user_agent_raw")
+                UserAgentRaw = SafeGetString(reader, "user_agent_raw"),
+                RiskJustification = SafeGetString(reader, "risk_justification")
             });
         }
         return results;
@@ -706,7 +737,8 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
             ProcessingTimeMs = reader.GetDouble(reader.GetOrdinal("processing_time_ms")),
             ThreatScore = reader.IsDBNull(reader.GetOrdinal("threat_score")) ? 0 : reader.GetDouble(reader.GetOrdinal("threat_score")),
             ThreatBand = reader.IsDBNull(reader.GetOrdinal("threat_band")) ? null : reader.GetString(reader.GetOrdinal("threat_band")),
-            Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative"))
+            Narrative = reader.IsDBNull(reader.GetOrdinal("narrative")) ? null : reader.GetString(reader.GetOrdinal("narrative")),
+            RiskJustification = SafeGetString(reader, "risk_justification")
         };
     }
 

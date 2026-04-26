@@ -212,6 +212,8 @@ public sealed class SignatureDetailModel
 {
     public required string SignatureId { get; init; }
     public required string BasePath { get; init; }
+    public string NavBasePath { get; init; } = "";
+    public string ResolvedNavBasePath => string.IsNullOrEmpty(NavBasePath) ? BasePath : NavBasePath;
     public required string CspNonce { get; init; }
     public required string HubPath { get; init; }
     public bool Found { get; init; }
