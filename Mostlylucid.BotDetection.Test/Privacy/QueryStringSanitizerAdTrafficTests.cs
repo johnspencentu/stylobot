@@ -62,6 +62,23 @@ public class QueryStringSanitizerAdTrafficTests
     }
 
     [Fact]
+    public void DetectAdTrafficParams_UtmMediumOnly_SetsUtmPresent()
+    {
+        var result = QueryStringSanitizer.DetectAdTrafficParams(
+            "?utm_medium=cpc", null, TestKey);
+        Assert.True(result.UtmPresent);
+        Assert.NotEqual("organic", result.SourcePlatform);
+    }
+
+    [Fact]
+    public void DetectAdTrafficParams_MalformedPercentEncoding_DoesNotThrow()
+    {
+        var ex = Record.Exception(() =>
+            QueryStringSanitizer.DetectAdTrafficParams("?utm_source=google&bad=%C0%80%FE", null, TestKey));
+        Assert.Null(ex);
+    }
+
+    [Fact]
     public void DetectAdTrafficParams_ReferrerMismatch_GclidNoReferer()
     {
         var result = QueryStringSanitizer.DetectAdTrafficParams(

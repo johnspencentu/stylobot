@@ -83,8 +83,8 @@ public class ClickFraudContributor : ConfiguredContributorBase
         var protocolClass = state.GetSignal<string>(SignalKeys.TransportProtocolClass);
 
         // Derived booleans
-        var isPaidTraffic = utmPresent && (hasGclid || hasFbclid || hasMsclkid || hasTtclid);
         var hasClickId = hasGclid || hasFbclid || hasMsclkid || hasTtclid;
+        var isPaidTraffic = utmPresent || hasClickId;
         var isHeadless = headlessScore > 0.5;
 
         state.WriteSignal(SignalKeys.ClickFraudIsPaidTraffic, isPaidTraffic);
