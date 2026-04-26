@@ -16,4 +16,103 @@ public class LicenseStateTests
         Assert.Null(state.ExpiresAt);
         Assert.Null(state.GraceEndsAt);
     }
+
+    [Fact]
+    public void Snapshot_ActiveLicense_NotFrozen()
+    {
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddDays(30),
+            graceEligible: true,
+            graceStartedAt: null);
+
+        Assert.True(snapshot.IsActive);
+        Assert.False(snapshot.IsInGrace);
+        Assert.False(snapshot.LearningFrozen);
+        Assert.False(snapshot.LogOnly);
+    }
+
+    [Fact]
+    public void Snapshot_ExpiredGraceEligible_InGrace_LearningFrozen_NotLogOnly()
+    {
+        var graceStartedAt = DateTimeOffset.UtcNow.AddDays(-5);
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddDays(-1),
+            graceEligible: true,
+            graceStartedAt: graceStartedAt);
+
+        Assert.False(snapshot.IsActive);
+        Assert.True(snapshot.IsInGrace);
+        Assert.True(snapshot.LearningFrozen);
+        Assert.False(snapshot.LogOnly);
+        Assert.NotNull(snapshot.GraceEndsAt);
+    }
+
+    [Fact]
+    public void Snapshot_ExpiredGraceConsumed_LogOnly()
+    {
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddDays(-40),
+            graceEligible: true,
+            graceStartedAt: DateTimeOffset.UtcNow.AddDays(-31));
+
+        Assert.False(snapshot.IsActive);
+        Assert.False(snapshot.IsInGrace);
+        Assert.True(snapshot.LearningFrozen);
+        Assert.True(snapshot.LogOnly);
+    }
+
+    [Fact]
+    public void Snapshot_ExpiredNotGraceEligible_ImmediatelyLogOnly()
+    {
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddDays(-1),
+            graceEligible: false,
+            graceStartedAt: null);
+
+        Assert.False(snapshot.IsActive);
+        Assert.False(snapshot.IsInGrace);
+        Assert.True(snapshot.LearningFrozen);
+        Assert.True(snapshot.LogOnly);
+    }
+
+    [Fact]
+    public void TokenParser_NullToken_ReturnsNull()
+    {
+        Assert.Null(LicenseTokenParser.TryParse(null));
+        Assert.Null(LicenseTokenParser.TryParse(""));
+        Assert.Null(LicenseTokenParser.TryParse("not.a.jwt"));
+    }
+
+    [Fact]
+    public void TokenParser_ValidPayload_ExtractsExpAndGraceEligible()
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            exp = 9999999999L,
+            grace_eligible = false
+        });
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payload))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var fakeJwt = $"header.{encoded}.signature";
+
+        var claims = LicenseTokenParser.TryParse(fakeJwt);
+
+        Assert.NotNull(claims);
+        Assert.False(claims!.GraceEligible);
+        Assert.NotNull(claims.ExpiresAt);
+    }
+
+    [Fact]
+    public void TokenParser_MissingGraceEligible_DefaultsToTrue()
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { exp = 9999999999L });
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payload))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var fakeJwt = $"header.{encoded}.signature";
+
+        var claims = LicenseTokenParser.TryParse(fakeJwt);
+
+        Assert.NotNull(claims);
+        Assert.True(claims!.GraceEligible);
+    }
 }
