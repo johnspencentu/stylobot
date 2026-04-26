@@ -55,7 +55,7 @@ services:
 
 ### 1. Switches to 'demo' Policy
 
-Automatically activates the `demo` policy. The pipeline has **47 detectors** across 4 waves; the orchestrator runs only as many as needed — confidence gating and trigger conditions mean a typical request runs 5-15 detectors, not all 47:
+Automatically activates the `demo` policy. The pipeline has **49 detectors** across 4 waves; the orchestrator runs only as many as needed — confidence gating and trigger conditions mean a typical request runs 5-15 detectors, not all 49:
 
 **Fast Path Detectors (Wave 0-1):**
 - FastPathReputation - Cached reputation

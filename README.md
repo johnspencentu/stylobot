@@ -1,6 +1,6 @@
 # StyloBot
 
-**Self-hosted bot detection and anonymous entity resolution for ASP.NET Core.** 47 detectors across 4 waves, sub-millisecond inference, progressive identity that survives rotation. One binary. No cloud scoring dependency.
+**Self-hosted bot detection and anonymous entity resolution for ASP.NET Core.** 49 detectors across 4 waves, sub-millisecond inference, progressive identity that survives rotation. One binary. No cloud scoring dependency.
 
 [![NuGet](https://img.shields.io/nuget/v/mostlylucid.botdetection)](https://www.nuget.org/packages/mostlylucid.botdetection)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
@@ -62,7 +62,7 @@ Dashboard at `/_stylobot`. Detection at `~150µs` per request from first request
 
 ## Architecture
 
-### Detector pipeline: 47 detectors, 4 waves
+### Detector pipeline: 49 detectors, 4 waves
 
 ```
 Request -> Wave 0 (< 1ms)          -> Wave 1 (behavioral)    -> Wave 2 (AI)         -> Verdict
@@ -81,8 +81,9 @@ Request -> Wave 0 (< 1ms)          -> Wave 1 (behavioral)    -> Wave 2 (AI)     
 | **Content** | UserAgent, Header, AiScraper, Haxxor, SecurityTool, VersionAge | Known bots, attack payloads, impossible browser versions |
 | **Network** | IP, GeoChange, ResponseBehavior, MultiLayerCorrelation, CveProbe | Datacenter IPs, impossible travel, CVE scanning, cross-layer mismatches |
 | **Intelligence** | FastPathReputation, ReputationBias, TimescaleReputation, Cluster, Similarity, Intent | Historical reputation, Leiden clustering, HNSW similarity, threat scoring |
+| **Ad Fraud** | ClickFraud, PiiQueryString | IAB SIVT: datacenter/VPN/headless on paid traffic, referrer spoofing, immediate bounce |
 | **AI** | Heuristic, HeuristicLate, LLM | 50-feature model (<1ms), optional LLM for ambiguous cases |
-| **Client** | ClientSide, FingerprintApproval, ChallengeVerification, PiiQueryString | JS timing probes, headless detection, PoW challenges |
+| **Client** | ClientSide, FingerprintApproval, ChallengeVerification | JS timing probes, headless detection, PoW challenges |
 
 ### Identity model
 
@@ -159,7 +160,7 @@ Blackboard is ephemeral per-request. Signals are hierarchical keys (`request.ip.
 - **Web scraping**: sequence divergence catches scrapers that skip the asset burst and jump straight to API endpoints; UA + TLS mismatch catches headless frameworks claiming to be Chrome
 - **Credential stuffing**: velocity detection via inter-session L2 distance; session vector clustering groups attack waves by shared behavioural signature even when IPs rotate
 - **API abuse**: no document request means no sequence context, so the full deferred detector stack always runs; machine-speed timing detected regardless of IP
-- **Click fraud**: behavioural waveform catches bots with suspiciously regular inter-click timing; periodicity detector flags rotation cadence
+- **Click fraud**: dedicated `ClickFraudContributor` scores IAB SIVT patterns - datacenter/VPN/headless on paid-ad landings, referrer spoofing, immediate bounce fraud; UTM and click-ID signals extracted and hashed by `PiiQueryStringContributor` before any PII reaches the blackboard
 - **Automated account creation**: client-side fingerprinting detects missing JS APIs (canvas, WebGL, audio) and Puppeteer/Playwright named by timing characteristics
 - **CVE probing**: simulation packs serve fake vulnerable endpoints; canary-embedded responses link probe attempts to the same actor across IP rotation
 
@@ -210,7 +211,7 @@ Two products, same detection engine. FOSS is complete for detection, entity reso
 
 ### What's in FOSS (this repo)
 
-- All 47 detectors, same pipeline as commercial
+- All 49 detectors, same pipeline as commercial
 - Anonymous entity resolution (merge/split/rewind, L0-L5 confidence)
 - Real-time dashboard (Overview, Visitors, Sessions, Threats, Clusters, User Agents, Configuration)
 - Session vectors, Markov chains, behavioral radar charts
@@ -262,6 +263,7 @@ docs/                                   Architecture + specs
 - [Action policies](Mostlylucid.BotDetection/docs/action-policies.md)
 - [Content sequence detection](Mostlylucid.BotDetection/docs/content-sequence-detection.md)
 - [Centroid freshness](Mostlylucid.BotDetection/docs/centroid-freshness.md)
+- [Click fraud detection](Mostlylucid.BotDetection/docs/click-fraud-detection.md)
 - [Local GPU tunnel](Mostlylucid.BotDetection/docs/local-llm-tunnel.md)
 - [CHANGELOG](CHANGELOG.md)
 

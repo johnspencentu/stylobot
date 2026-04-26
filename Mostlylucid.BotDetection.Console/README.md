@@ -32,7 +32,7 @@ stylobot 5080 http://localhost:3000 --llm openai --llm-key sk-...
 stylobot 5080 http://localhost:3000 --llm ollama
 ```
 
-The current detector set is 47 detectors total, including the `Threat Intelligence` detector.
+The current detector set is 49 detectors total, including the `Threat Intelligence` detector.
 
 ## Threat Intelligence
 

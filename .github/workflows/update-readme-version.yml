@@ -1,0 +1,53 @@
+name: Update README version badge
+
+on:
+  push:
+    tags:
+      - 'allbot-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: ver
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/allbot-v}"
+          # Validate semver-ish to prevent injection (digits, dots, hyphens, alphanumerics only)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Unexpected version format: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update version badge and Cloudsmith install in README
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # shields.io uses -- for a literal - in badge labels
+          BADGE_VERSION="${VERSION//-/--}"
+          sed -i "s|version-[^)]*-blue|version-${BADGE_VERSION}-blue|g" README.md
+          # Update any pinned apt/yum version, e.g. stylobot=6.0.4-rc0
+          sed -i "s|stylobot=[0-9][^ ]*|stylobot=${VERSION}|g" README.md
+
+      - name: Commit and push if changed
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if git diff --staged --quiet; then
+            echo "No README changes to commit"
+          else
+            git commit -m "chore: bump README badge to ${VERSION}"
+            git push origin HEAD:main
+          fi

@@ -3567,7 +3567,8 @@ public class StyloBotDashboardMiddleware
                 ProcessingTimeHistory = procTimeHistory,
                 RecentDetections = recentDetections,
                 DetectorContributions = detectorContributions,
-                SignalCategories = signalCategories
+                SignalCategories = signalCategories,
+                TunerEnabled = _options.EnableTuner
             };
         }
         else
@@ -3662,7 +3663,8 @@ public class StyloBotDashboardMiddleware
                         ProcessingTimeHistory = detections.Select(d => (double)d.ProcessingTimeMs).ToList(),
                         RecentDetections = recentDetections,
                         DetectorContributions = latestContributions,
-                        SignalCategories = signalCategories
+                        SignalCategories = signalCategories,
+                        TunerEnabled = _options.EnableTuner
                     };
                 }
                 else

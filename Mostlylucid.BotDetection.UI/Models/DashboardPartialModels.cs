@@ -252,6 +252,13 @@ public sealed class SignatureDetailModel
 
     // Signal intelligence (grouped by prefix)
     public Dictionary<string, Dictionary<string, string>> SignalCategories { get; init; } = new();
+
+    /// <summary>
+    ///     When true, the Tuner action surface is shown in the detector contributions table.
+    ///     Set from <see cref="Mostlylucid.BotDetection.UI.Configuration.StyloBotDashboardOptions.EnableTuner"/>
+    ///     by the dashboard middleware. Only paid tiers with the <c>stylobot.tuner</c> feature enable this.
+    /// </summary>
+    public bool TunerEnabled { get; init; }
 }
 
 /// <summary>

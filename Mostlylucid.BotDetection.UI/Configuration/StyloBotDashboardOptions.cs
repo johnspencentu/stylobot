@@ -121,4 +121,12 @@ public sealed class StyloBotDashboardOptions
     ///     Default: "throttle-stealth"
     /// </summary>
     public string DataApiActionPolicyName { get; set; } = "throttle-stealth";
+
+    /// <summary>
+    ///     When true, the Tuner action surface is shown in the detection detail view.
+    ///     Requires a paid StyloBot license with the <c>stylobot.tuner</c> feature flag.
+    ///     Set by the commercial gateway plugin via <c>AddStyloBotCommercialPlugin()</c>.
+    ///     Default: false.
+    /// </summary>
+    public bool EnableTuner { get; set; }
 }

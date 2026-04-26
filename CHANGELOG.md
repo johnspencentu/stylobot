@@ -5,6 +5,63 @@ All notable changes to StyloBot are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.4-rc0] - 2026-04-26
+
+### Added
+
+#### Click Fraud Detection (IAB SIVT)
+- **`ClickFraudContributor`** (Priority 38) — scores paid-ad traffic for IAB Sophisticated Invalid Traffic (SIVT) patterns using 7 detection signals
+  - Datacenter IP on paid landing (gclid/fbclid/msclkid/ttclid + UTM): +0.50
+  - VPN/anonymizer on paid landing: +0.25
+  - Open proxy on paid landing: +0.20
+  - Referrer mismatch with click ID present (referrer spoofing): +0.40
+  - Referrer mismatch on UTM-only paid landing: +0.25
+  - Single-page session (immediate bounce on paid traffic): +0.20
+  - Headless browser on paid landing: +0.40
+  - All weights configurable via `clickfraud.detector.yaml` / appsettings.json `BotDetection:Detectors:ClickFraudContributor`
+  - Writes `clickfraud.*` signals: `clickfraud.score`, `clickfraud.pattern`, `clickfraud.confidence`, `clickfraud.is_paid_traffic`, `clickfraud.checked`
+  - Triggers on `utm.present` OR (`session.request_count` AND `ip.is_datacenter`)
+- **`PiiQueryStringContributor`** (Priority 19) — extracts UTM parameters and click IDs from query strings, emits hashed signals pre-sanitization
+  - Detects: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `gclid`, `fbclid`, `msclkid`, `ttclid`
+  - All values HMAC-SHA256 hashed via `PiiHasher` — raw ad parameters never on the blackboard
+  - Referrer mismatch detection: click ID present but referrer absent or mismatched platform domain
+  - Writes `utm.*` signals: `utm.present`, `utm.source_hash`, `utm.medium_hash`, `utm.campaign_hash`, `utm.click_id_hash`, `utm.has_gclid`, `utm.has_fbclid`, `utm.has_msclkid`, `utm.has_ttclid`, `utm.referrer_mismatch`, `utm.referrer_present`, `utm.source_platform`
+- **`BotType.ClickFraud`** — new bot type classification for IAB SIVT
+- **`QueryStringSanitizer.DetectAdTrafficParams`** — static method for UTM/click-ID extraction with HMAC-SHA256 hashing and referrer mismatch analysis; malformed percent-encoding is skipped rather than thrown
+- **`AdTrafficDetectionResult`** record — carries all hashed ad signal values with `SourcePlatform` inference (google, meta, microsoft, tiktok, paid_other, organic)
+- Click-fraud signals wired into `IntentContributor`, `HeuristicFeatureExtractor` (5 new ML features), and `ReputationBiasContributor` (paid-traffic bias multiplier)
+- **Docs**: `Mostlylucid.BotDetection/docs/click-fraud-detection.md` — IAB IVT taxonomy, signal flow, detection pattern table, YAML configuration reference, custom filter examples
+
+#### License Expiry Freeze
+- **`ILicenseState`** interface + **`FossLicenseState`** (always-active FOSS implementation) + **`LicenseState`** (commercial JWT-based)
+- **`LicenseStateRefreshService`** — 60-second background refresh for commercial license tokens
+- **`SqliteLicenseGraceStore`** — persists `grace_started_at` to `botdetection.db`; grace period survives restarts
+- **`LicenseTokenParser`** + **`LicenseStateSnapshot`** state machine: `Active` → `Grace` (30-day) → `Expired` transitions
+- **Freeze guards** in `ReputationMaintenance`, `LearningBackground`, `BotCluster`, `CentroidRebuild` — learning freezes on grace/expired; all services log freeze state at startup
+
+### Changed
+
+- **`ReputationBiasContributor`** — bias-only mode always active; paid-traffic amplifier multiplies bias score when `utm.present` is set
+- **`PiiHasher.GetKey()`** — returns `(byte[])_key.Clone()` instead of direct array reference to prevent key mutation by callers
+
+### Fixed
+
+- **`QueryStringSanitizer.DetectAdTrafficParams`** — `utmPresent` check now includes `utm_medium` (previously utm_medium-only traffic was silently treated as organic)
+- **`ClickFraudContributor`** — `isPaidTraffic` now `utmPresent || hasClickId` (previously required a click ID even when UTM-only present)
+- Removed dead code: `UtmKeys`, `ClickIdKeys` static HashSets and `clickIdKey` variable (declared but never used)
+
+### Accessibility
+
+- **Full dark mode contrast pass** on dashboard: all low-contrast text updated to WCAG AA/AAA targets
+  - `--sb-brand-muted` dark: `#6b7280` (4:1) → `#8b9eb8` (7.1:1)
+  - `--sb-text-faint` dark: `#64748b` → `#8b9eb8`
+  - Tailwind opacity floor overrides for `[data-theme="dark"]`: `/20`→45%, `/30`→52%, `/40`→60%, `/50`→68%
+  - `bot-detection-details.css`: comprehensive `[data-theme="dark"]` block for `<bot-detection-details>` component
+  - Detection ticker/bar: `#555` → `#8b9eb8`, `#888` → `#a0b2c8`
+- **`sb-components.css`** was not imported anywhere — added `@import "./sb-components.css"` to `tailwind-input.css`
+
+---
+
 ## [6.0.1-beta1] - 2026-04-23
 
 ### Added
