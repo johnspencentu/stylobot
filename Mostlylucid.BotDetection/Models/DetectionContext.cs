@@ -545,6 +545,62 @@ public static class SignalKeys
     /// <summary>String: Category of the AI bot (Training, Search, Assistant, ScrapingService)</summary>
     public const string AiScraperCategory = "aiscraper.category";
 
+    // ============================================================
+    // UTM / Ad Traffic signals - set by PiiQueryStringContributor
+    // ============================================================
+
+    /// <summary>True if any UTM parameter or click ID is present in the query string.</summary>
+    public const string UtmPresent = "utm.present";
+
+    /// <summary>HMAC-SHA256 hash of utm_source value (truncated, URL-safe base64).</summary>
+    public const string UtmSourceHash = "utm.source_hash";
+
+    /// <summary>HMAC-SHA256 hash of utm_medium value.</summary>
+    public const string UtmMediumHash = "utm.medium_hash";
+
+    /// <summary>HMAC-SHA256 hash of utm_campaign value.</summary>
+    public const string UtmCampaignHash = "utm.campaign_hash";
+
+    /// <summary>True if gclid (Google Ads click ID) is present.</summary>
+    public const string UtmHasGclid = "utm.has_gclid";
+
+    /// <summary>True if fbclid (Meta Ads click ID) is present.</summary>
+    public const string UtmHasFbclid = "utm.has_fbclid";
+
+    /// <summary>True if msclkid (Microsoft Ads click ID) is present.</summary>
+    public const string UtmHasMsclkid = "utm.has_msclkid";
+
+    /// <summary>True if ttclid (TikTok Ads click ID) is present.</summary>
+    public const string UtmHasTtclid = "utm.has_ttclid";
+
+    /// <summary>HMAC-SHA256 hash of whichever click ID is present.</summary>
+    public const string UtmClickIdHash = "utm.click_id_hash";
+
+    /// <summary>Inferred ad platform: "google", "meta", "microsoft", "tiktok", "paid_other", "organic".</summary>
+    public const string UtmSourcePlatform = "utm.source_platform";
+
+    /// <summary>True if Referer header is present and non-empty.</summary>
+    public const string UtmReferrerPresent = "utm.referrer_present";
+
+    /// <summary>True when click ID present but Referer absent or domain doesn't match source platform.</summary>
+    public const string UtmReferrerMismatch = "utm.referrer_mismatch";
+
+    // ============================================================
+    // Click Fraud signals - set by ClickFraudContributor
+    // ============================================================
+
+    /// <summary>Weighted confidence score 0.0-1.0 that this is click fraud traffic.</summary>
+    public const string ClickFraudConfidence = "clickfraud.confidence";
+
+    /// <summary>Comma-separated pattern names: datacenter_paid, referrer_spoof, immediate_bounce, engagement_void, headless_paid.</summary>
+    public const string ClickFraudPattern = "clickfraud.pattern";
+
+    /// <summary>True if the request arrived via a paid ad (UTM or click ID present).</summary>
+    public const string ClickFraudIsPaidTraffic = "clickfraud.is_paid_traffic";
+
+    /// <summary>True once ClickFraudContributor has run (gate for downstream triggers).</summary>
+    public const string ClickFraudChecked = "clickfraud.checked";
+
     // ==========================================
     // Cluster detection signals
     // Set by ClusterContributor when signature belongs to a discovered cluster
