@@ -302,6 +302,23 @@ public static class ServiceCollectionExtensions
         // No-op when BotDetection:Licensing:Domains is empty (OSS / unconfigured default).
         services.AddDomainEntitlement();
 
+        // License state: FossLicenseState when no token, real enforcement when token present
+        services.AddSingleton<SqliteLicenseGraceStore>();
+        services.AddSingleton<LicenseState>();
+        services.AddSingleton<ILicenseState>(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<BotDetectionOptions>>().Value;
+            if (!string.IsNullOrWhiteSpace(opts.Licensing?.Token))
+                return sp.GetRequiredService<LicenseState>();
+            return new FossLicenseState();
+        });
+        services.AddHostedService<LicenseStateRefreshService>(sp =>
+            new LicenseStateRefreshService(
+                sp.GetRequiredService<LicenseState>(),
+                sp.GetRequiredService<IOptionsMonitor<BotDetectionOptions>>(),
+                sp.GetRequiredService<SqliteLicenseGraceStore>(),
+                sp.GetRequiredService<ILogger<LicenseStateRefreshService>>()));
+
         // Register bot list update background service
         services.AddHostedService<BotListUpdateService>();
 
