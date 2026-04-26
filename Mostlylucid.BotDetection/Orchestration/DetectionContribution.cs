@@ -58,9 +58,15 @@ public sealed record AggregatedEvidence
     public required double Confidence { get; init; }
 
     /// <summary>
-    /// Risk band based on bot probability.
+    /// Risk band based on probability, threat score, and persistence.
     /// </summary>
     public required RiskBand RiskBand { get; init; }
+
+    /// <summary>
+    /// Human-readable explanation of why this risk band was assigned.
+    /// Covers probability, threat indicators, and persistence signals.
+    /// </summary>
+    public string RiskJustification { get; init; } = string.Empty;
 
     /// <summary>
     /// Whether an early exit was triggered.

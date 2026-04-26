@@ -30,6 +30,13 @@ public sealed class StyloBotDashboardOptions
     public string BasePath { get; set; } = "/stylobot";
 
     /// <summary>
+    ///     URL used for back-navigation links (e.g. the back arrow on signature detail).
+    ///     Defaults to <see cref="BasePath" />. Override to point users to a host dashboard
+    ///     (e.g. "/Dashboard") while keeping the FOSS middleware mounted at its own path.
+    /// </summary>
+    public string? NavBasePath { get; set; }
+
+    /// <summary>
     ///     SignalR hub path for real-time updates.
     ///     Default: "/stylobot/hub"
     /// </summary>

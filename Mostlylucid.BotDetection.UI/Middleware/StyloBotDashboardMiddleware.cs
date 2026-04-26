@@ -3408,6 +3408,7 @@ public class StyloBotDashboardMiddleware
         }
 
         var basePath = _options.BasePath.TrimEnd('/');
+        var navBasePath = (_options.NavBasePath ?? _options.BasePath).TrimEnd('/');
         var cspNonce = context.Items.TryGetValue("CspNonce", out var nonceObj) && nonceObj is string s && s.Length > 0
             ? s
             : Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
@@ -3538,6 +3539,7 @@ public class StyloBotDashboardMiddleware
             {
                 SignatureId = decodedSignature,
                 BasePath = basePath,
+                NavBasePath = navBasePath,
                 CspNonce = cspNonce,
                 HubPath = _options.HubPath,
                 Found = true,
@@ -3557,6 +3559,7 @@ public class StyloBotDashboardMiddleware
                 IsBot = agg.IsBot,
                 ThreatScore = agg.ThreatScore,
                 ThreatBand = agg.ThreatBand,
+                RiskJustification = agg.RiskJustification,
                 SparklineData = sparkline,
                 Paths = paths,
                 UserAgent = userAgent,
@@ -3653,6 +3656,7 @@ public class StyloBotDashboardMiddleware
                         IsBot = latest.IsBot,
                         ThreatScore = latest.ThreatScore,
                         ThreatBand = latest.ThreatBand,
+                        RiskJustification = latest.RiskJustification,
                         SparklineData = detections.Select(d => d.BotProbability).ToList(),
                         Paths = detections.Where(d => d.Path != null).Select(d => d.Path!).Distinct().ToList(),
                         UserAgent = null, // Not available from event store (PII-hashed)
@@ -3673,6 +3677,7 @@ public class StyloBotDashboardMiddleware
                     {
                         SignatureId = decodedSignature,
                         BasePath = basePath,
+                        NavBasePath = navBasePath,
                         CspNonce = cspNonce,
                         HubPath = _options.HubPath,
                         Found = false
