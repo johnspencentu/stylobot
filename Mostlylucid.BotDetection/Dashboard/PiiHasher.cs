@@ -134,6 +134,9 @@ public sealed class PiiHasher
         return ComputeHash(subnet);
     }
 
+    /// <summary>Returns the raw key bytes for use with external HMAC operations.</summary>
+    public byte[] GetKey() => _key;
+
     private string ComputeHash(string input)
     {
         using var hmac = new HMACSHA256(_key);
