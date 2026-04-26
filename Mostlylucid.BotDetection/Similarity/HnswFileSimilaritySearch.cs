@@ -46,8 +46,9 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
         IOptions<BotDetectionOptions> options)
     {
         _logger = logger;
-        var basePath = options.Value.DatabasePath
-                       ?? BotDetectionOptions.ResolveDataDirectory();
+        var dbPath = options.Value.DatabasePath
+                     ?? Path.Combine(BotDetectionOptions.ResolveDataDirectory(), "botdetection.db");
+        var basePath = Path.GetDirectoryName(dbPath) ?? BotDetectionOptions.ResolveDataDirectory();
         _databasePath = Path.Combine(basePath, "hnsw-index");
         Directory.CreateDirectory(_databasePath);
 

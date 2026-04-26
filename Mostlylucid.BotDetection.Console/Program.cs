@@ -507,7 +507,8 @@ try
         if (botThreshold.HasValue) opts.BotThreshold = botThreshold.Value;
         if (llmProvider != null) opts.EnableLlmDetection = true;
         // Ensure a writable data directory even when installed to a root-owned path (e.g. apt install)
-        opts.DatabasePath ??= Mostlylucid.BotDetection.Models.BotDetectionOptions.ResolveDataDirectory();
+        opts.DatabasePath ??= Path.Combine(
+            Mostlylucid.BotDetection.Models.BotDetectionOptions.ResolveDataDirectory(), "botdetection.db");
     });
 
     builder.Services.AddBotDetectionTelemetry();
