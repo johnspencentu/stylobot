@@ -505,18 +505,9 @@ jobs:
           printf '#!/bin/sh\nset -e\nldconfig\n' > "$PKG_DIR/DEBIAN/postrm"
           chmod 755 "$PKG_DIR/DEBIAN/postrm"
 
-          cat > "$PKG_DIR/DEBIAN/control" <<CONTROL
-Package: stylobot
-Version: ${DEB_VERSION}
-Architecture: ${ARCH}
-Maintainer: Scott Galloway <scott@mostlylucid.net>
-Description: StyloBot - self-hosted bot detection gateway
- YARP reverse proxy with bot detection middleware. Blocks scrapers,
- AI crawlers, and malicious bots with <1ms overhead. Native AOT binary.
-Homepage: https://github.com/scottgal/stylobot
-Section: net
-Priority: optional
-CONTROL
+          # Write control file without heredoc (heredoc terminators at col 0 break YAML parsing)
+          printf 'Package: stylobot\nVersion: %s\nArchitecture: %s\nMaintainer: Scott Galloway <scott@mostlylucid.net>\nDescription: StyloBot - self-hosted bot detection gateway\n YARP reverse proxy with bot detection middleware. Blocks scrapers,\n AI crawlers, and malicious bots with <1ms overhead. Native AOT binary.\nHomepage: https://github.com/scottgal/stylobot\nSection: net\nPriority: optional\n' \
+            "${DEB_VERSION}" "${ARCH}" > "$PKG_DIR/DEBIAN/control"
 
           dpkg-deb --build --root-owner-group "$PKG_DIR" "debs/stylobot_${DEB_VERSION}_${ARCH}.deb"
           echo "Built: debs/stylobot_${DEB_VERSION}_${ARCH}.deb"

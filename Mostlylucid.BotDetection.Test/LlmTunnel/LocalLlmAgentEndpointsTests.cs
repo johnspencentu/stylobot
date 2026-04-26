@@ -62,7 +62,7 @@ public class LocalLlmAgentEndpointsTests : IAsyncDisposable
             KeyId = KeyId,
             Nonce = LocalLlmTunnelCrypto.ToBase64Url(RandomNumberGenerator.GetBytes(16)),
             IssuedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddSeconds(30),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
             Payload = new LlmTunnelCompletionRequest
             {
                 Model = model,
