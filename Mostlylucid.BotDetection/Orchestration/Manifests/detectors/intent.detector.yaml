@@ -57,6 +57,9 @@ input:
     - stream.abuse_checked
     - ato.brute_force
     - ato.credential_stuffing
+    - clickfraud.confidence
+    - clickfraud.is_paid_traffic
+    - clickfraud.checked
 
 output:
   produces:
@@ -171,6 +174,9 @@ defaults:
     fallback_honeypot: 0.9
     fallback_auth_abuse: 0.7
     fallback_clean: 0.05
+    # Click fraud integration
+    clickfraud_weight: 0.35
+    clickfraud_threshold: 0.55
 
 tags:
   - wave-1
