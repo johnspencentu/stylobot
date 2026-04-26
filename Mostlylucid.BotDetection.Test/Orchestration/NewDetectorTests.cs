@@ -1012,8 +1012,9 @@ public class NewDetectorTests
     [Fact]
     public async Task PiiQueryString_EmailInQuery_DetectsPii()
     {
+        var hasher = new PiiHasher(new byte[32]);
         var contributor = new PiiQueryStringContributor(
-            NullLogger<PiiQueryStringContributor>.Instance);
+            NullLogger<PiiQueryStringContributor>.Instance, hasher);
 
         var state = CreateState(
             configureHttp: ctx =>
@@ -1032,8 +1033,9 @@ public class NewDetectorTests
     [Fact]
     public async Task PiiQueryString_CleanQuery_NoPii()
     {
+        var hasher = new PiiHasher(new byte[32]);
         var contributor = new PiiQueryStringContributor(
-            NullLogger<PiiQueryStringContributor>.Instance);
+            NullLogger<PiiQueryStringContributor>.Instance, hasher);
 
         var state = CreateState(
             configureHttp: ctx =>
