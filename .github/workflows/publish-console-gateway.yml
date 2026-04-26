@@ -412,7 +412,7 @@ jobs:
   #   3. On the service account, add an OIDC policy:
   #        Provider URL: https://token.actions.githubusercontent.com
   #        Audience:     https://github.com/scottgal
-  #        Subject:      repo:scottgal/stylobot:*
+  #        Subject:      repo:scottgal/stylobot:environment:production
   #   4. Grant the service account "Write" on the stylobot repo
   #
   # Required GitHub variables (Settings → Variables → Repository):
@@ -424,6 +424,7 @@ jobs:
     needs: build-binaries
     runs-on: ubuntu-latest
     # TEST: running on all tags to verify Cloudsmith OIDC; restore stable-only after confirmed
+    environment: production   # locks OIDC sub to repo:scottgal/stylobot:environment:production
 
     permissions:
       contents: read
