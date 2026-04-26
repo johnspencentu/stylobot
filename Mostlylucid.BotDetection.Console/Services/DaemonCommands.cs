@@ -17,7 +17,8 @@ public static class DaemonCommands
     private static string PidFile => Path.Combine(PidDir, "stylobot.pid");
     private static string PortFile => Path.Combine(PidDir, "stylobot.port");
 
-    private static string DefaultLogDir => Path.Combine(AppContext.BaseDirectory, "logs");
+    private static string DefaultLogDir => Path.Combine(
+        Mostlylucid.BotDetection.Models.BotDetectionOptions.ResolveDataDirectory(), "logs");
 
     /// <summary>
     ///     Start stylobot as a background process. Writes PID file.

@@ -1182,6 +1182,23 @@ public static class SignalKeys
     public const string ReactiveCoRetryerCount = "reactive.co_retryer_count";
 
     // ==========================================
+    // Claimed Identity signals
+    // Set by ClaimedIdentityContributor
+    // ==========================================
+
+    /// <summary>String: canonical UA family name resolved against profile centroids</summary>
+    public const string ClaimedIdentityFamily = "claimed_identity.family";
+
+    /// <summary>String: profile tier for the resolved family (browser, crawler, tool, reader, unknown)</summary>
+    public const string ClaimedIdentityTier = "claimed_identity.tier";
+
+    /// <summary>Double [0,1]: weighted similarity between observed signals and UA family centroid (low = mismatch)</summary>
+    public const string ClaimedIdentityConsistencyScore = "claimed_identity.consistency_score";
+
+    /// <summary>Bool: false when no seed profile exists for this UA family</summary>
+    public const string ClaimedIdentityHasProfile = "claimed_identity.has_profile";
+
+    // ==========================================
     // Intent / Threat scoring signals
     // Set by IntentContributor from session activity analysis
     // ==========================================

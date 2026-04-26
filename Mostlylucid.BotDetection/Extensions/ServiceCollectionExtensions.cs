@@ -598,6 +598,9 @@ public static class ServiceCollectionExtensions
         // Reactive pattern detection - post-error client behavior (backoff, compliance, coordinated retry)
         services.TryAddSingleton<ReactiveSignalTracker>();
         services.AddSingleton<IContributingDetector, ReactivePatternContributor>();
+        // Claimed identity - UA family behavioral consistency via centroid matching
+        services.TryAddSingleton<Services.UaProfileStore>();
+        services.AddSingleton<IContributingDetector, ClaimedIdentityContributor>();
         // Session persistence - SQLite-backed session store (replaces TimescaleDB for core product)
         // Factory registration so ISessionVectorSearch (registered later) can be injected optionally.
         services.TryAddSingleton<Data.ISessionStore>(sp =>

@@ -25,6 +25,22 @@ public static class ConfigValidator
             // FAIL-FAST in production mode
             if (mode.Equals("production", StringComparison.OrdinalIgnoreCase))
             {
+                System.Console.Error.WriteLine();
+                System.Console.Error.WriteLine("  ERROR: Cannot start in production mode with the default HMAC key.");
+                System.Console.Error.WriteLine();
+                System.Console.Error.WriteLine("  Fix: create appsettings.json in the current directory:");
+                System.Console.Error.WriteLine();
+                System.Console.Error.WriteLine("    {");
+                System.Console.Error.WriteLine("      \"SignatureLogging\": {");
+                System.Console.Error.WriteLine("        \"SignatureHashKey\": \"<key>\"");
+                System.Console.Error.WriteLine("      }");
+                System.Console.Error.WriteLine("    }");
+                System.Console.Error.WriteLine();
+                System.Console.Error.WriteLine("  Generate a key:  openssl rand -base64 32");
+                System.Console.Error.WriteLine();
+                System.Console.Error.WriteLine("  Or run in demo mode (no key needed):");
+                System.Console.Error.WriteLine("    stylobot <port> <upstream> --mode demo");
+                System.Console.Error.WriteLine();
                 Log.Fatal("Cannot use default HMAC key in production mode - TERMINATING");
                 throw new InvalidOperationException(
                     "Cannot use default HMAC key in production mode. " +

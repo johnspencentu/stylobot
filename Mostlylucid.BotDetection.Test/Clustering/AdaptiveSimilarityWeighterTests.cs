@@ -11,35 +11,35 @@ public class AdaptiveSimilarityWeighterTests
     [Fact]
     public void GetDefaultWeights_SumsToOne()
     {
-        var weights = AdaptiveSimilarityWeighter.GetDefaultWeights();
+        var weights = CreateWeighter().GetDefaultWeights();
         var sum = weights.Values.Sum();
         Assert.Equal(1.0, sum, precision: 6);
     }
 
     [Fact]
-    public void GetDefaultWeights_Has18Features()
+    public void GetDefaultWeights_Has20Features()
     {
-        var weights = AdaptiveSimilarityWeighter.GetDefaultWeights();
-        Assert.Equal(18, weights.Count);
+        var weights = CreateWeighter().GetDefaultWeights();
+        Assert.Equal(20, weights.Count);
     }
 
     [Fact]
     public void GetDefaultWeights_AllPositive()
     {
-        var weights = AdaptiveSimilarityWeighter.GetDefaultWeights();
+        var weights = CreateWeighter().GetDefaultWeights();
         Assert.All(weights, w => Assert.True(w.Value > 0, $"Weight {w.Key} = {w.Value} should be > 0"));
     }
 
     [Fact]
     public void GetDefaultWeights_ContainsExpectedFeatures()
     {
-        var weights = AdaptiveSimilarityWeighter.GetDefaultWeights();
+        var weights = CreateWeighter().GetDefaultWeights();
         var expected = new[]
         {
             "timing", "rate", "pathDiv", "entropy", "botProb", "geo",
             "datacenter", "asn", "spectralEntropy", "harmonic", "peakToAvg",
             "dominantFreq", "selfDrift", "humanDrift", "loopScore",
-            "surprise", "novelty", "entropyDelta"
+            "surprise", "novelty", "entropyDelta", "uaFamily", "claimedId"
         };
 
         foreach (var key in expected)
@@ -61,7 +61,7 @@ public class AdaptiveSimilarityWeighterTests
         };
 
         var weights = weighter.ComputeWeights(features);
-        Assert.Equal(AdaptiveSimilarityWeighter.GetDefaultWeights(), weights);
+        Assert.Equal(weighter.GetDefaultWeights(), weights);
     }
 
     [Fact]

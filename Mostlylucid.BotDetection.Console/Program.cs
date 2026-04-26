@@ -233,7 +233,8 @@ if (logLevel != null && Enum.TryParse<LogEventLevel>(logLevel, true, out var par
 
 // Configure Serilog (console + file logging for errors/warnings only)
 // File logging can be configured via appsettings.json Serilog section
-var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
+var logsDir = Path.Combine(
+    Mostlylucid.BotDetection.Models.BotDetectionOptions.ResolveDataDirectory(), "logs");
 Directory.CreateDirectory(logsDir);
 
 // Build initial configuration from code (will be enriched by appsettings.json)
@@ -505,6 +506,8 @@ try
         opts.DefaultActionPolicyName = actionPolicy;
         if (botThreshold.HasValue) opts.BotThreshold = botThreshold.Value;
         if (llmProvider != null) opts.EnableLlmDetection = true;
+        // Ensure a writable data directory even when installed to a root-owned path (e.g. apt install)
+        opts.DatabasePath ??= Mostlylucid.BotDetection.Models.BotDetectionOptions.ResolveDataDirectory();
     });
 
     builder.Services.AddBotDetectionTelemetry();
@@ -936,6 +939,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application startup or configuration failed");
+    Console.Error.WriteLine($"  Startup failed: {ex.Message}");
     return 1;
 }
 finally

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Mostlylucid.BotDetection.Orchestration.Manifests;
 using Mostlylucid.BotDetection.Services;
 
 namespace Mostlylucid.BotDetection.Clustering;
@@ -12,20 +13,26 @@ namespace Mostlylucid.BotDetection.Clustering;
 ///     For categorical features: uses Shannon entropy (high entropy = good discriminator).
 ///
 ///     Recalculated every clustering cycle (30s) so weights adapt to traffic mix.
+///     Default weights come from cluster.detector.yaml parameters (weight_* keys).
 /// </summary>
 public sealed class AdaptiveSimilarityWeighter
 {
     private const double WeightFloor = 0.02;
     private const double WeightCeiling = 0.20;
+    private const string DetectorName = "ClusterContributor";
 
     private readonly ILogger<AdaptiveSimilarityWeighter> _logger;
+    private readonly IDetectorConfigProvider? _configProvider;
 
     // Previous weights for change detection
     private Dictionary<string, double>? _previousWeights;
 
-    public AdaptiveSimilarityWeighter(ILogger<AdaptiveSimilarityWeighter> logger)
+    public AdaptiveSimilarityWeighter(
+        ILogger<AdaptiveSimilarityWeighter> logger,
+        IDetectorConfigProvider? configProvider = null)
     {
         _logger = logger;
+        _configProvider = configProvider;
     }
 
     /// <summary>
@@ -72,6 +79,10 @@ public sealed class AdaptiveSimilarityWeighter
         diagnosticity["novelty"] = ComputeCV(features, f => f.TransitionNovelty);
         diagnosticity["entropyDelta"] = ComputeCV(features,
             f => Math.Abs(f.EntropyDelta));
+
+        // Claimed identity features
+        diagnosticity["uaFamily"] = ComputeCategoricalEntropy(features, f => f.UaFamily ?? "?");
+        diagnosticity["claimedId"] = ComputeCV(features, f => f.ClaimedIdentityScore);
 
         // Normalize to sum to 1.0 with floor and ceiling
         var weights = NormalizeWithBounds(diagnosticity);
@@ -191,28 +202,41 @@ public sealed class AdaptiveSimilarityWeighter
     }
 
     /// <summary>
-    ///     Fallback weights when insufficient data for adaptive computation.
-    ///     Matches the original hardcoded weights from ComputeSimilarity().
+    ///     Returns similarity weights read from cluster.detector.yaml (weight_* parameters).
+    ///     Used as fallback when insufficient traffic data for adaptive computation.
+    ///     All values come from YAML config; no weights are hardcoded here.
     /// </summary>
-    public static Dictionary<string, double> GetDefaultWeights() => new()
+    public Dictionary<string, double> GetDefaultWeights()
     {
-        ["timing"] = 0.08,
-        ["rate"] = 0.07,
-        ["pathDiv"] = 0.05,
-        ["entropy"] = 0.05,
-        ["botProb"] = 0.08,
-        ["geo"] = 0.08,
-        ["datacenter"] = 0.05,
-        ["asn"] = 0.06,
-        ["spectralEntropy"] = 0.06,
-        ["harmonic"] = 0.04,
-        ["peakToAvg"] = 0.05,
-        ["dominantFreq"] = 0.03,
-        ["selfDrift"] = 0.06,
-        ["humanDrift"] = 0.06,
-        ["loopScore"] = 0.05,
-        ["surprise"] = 0.05,
-        ["novelty"] = 0.04,
-        ["entropyDelta"] = 0.04
-    };
+        T W<T>(string key, T fallback) => _configProvider != null
+            ? _configProvider.GetParameter(DetectorName, key, fallback)
+            : fallback;
+
+        // The canonical values for these are in cluster.detector.yaml under defaults.parameters.
+        // The fallback values here are only used if the config system cannot load the manifest
+        // (e.g., embedded resource missing). They must match the YAML values.
+        return new Dictionary<string, double>
+        {
+            ["timing"]          = W("weight_timing",          0.07),
+            ["rate"]            = W("weight_rate",            0.06),
+            ["pathDiv"]         = W("weight_path_div",        0.05),
+            ["entropy"]         = W("weight_entropy",         0.05),
+            ["botProb"]         = W("weight_bot_prob",        0.07),
+            ["geo"]             = W("weight_geo",             0.07),
+            ["datacenter"]      = W("weight_datacenter",      0.05),
+            ["asn"]             = W("weight_asn",             0.05),
+            ["spectralEntropy"] = W("weight_spectral_entropy",0.05),
+            ["harmonic"]        = W("weight_harmonic",        0.04),
+            ["peakToAvg"]       = W("weight_peak_to_avg",     0.05),
+            ["dominantFreq"]    = W("weight_dominant_freq",   0.03),
+            ["selfDrift"]       = W("weight_self_drift",      0.05),
+            ["humanDrift"]      = W("weight_human_drift",     0.05),
+            ["loopScore"]       = W("weight_loop_score",      0.04),
+            ["surprise"]        = W("weight_surprise",        0.04),
+            ["novelty"]         = W("weight_novelty",         0.04),
+            ["entropyDelta"]    = W("weight_entropy_delta",   0.04),
+            ["uaFamily"]        = W("weight_ua_family",       0.05),
+            ["claimedId"]       = W("weight_claimed_id",      0.05),
+        };
+    }
 }

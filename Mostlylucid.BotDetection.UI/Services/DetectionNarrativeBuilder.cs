@@ -60,7 +60,8 @@ public static class DetectionNarrativeBuilder
         ["CookieBehavior"] = "cookie behavior analysis",
         ["ResourceWaterfall"] = "resource loading pattern analysis",
         ["HeaderCorrelation"] = "UA rotation detection via header correlation",
-        ["ReactivePattern"] = "retry behavior analysis"
+        ["ReactivePattern"] = "retry behavior analysis",
+        ["ClaimedIdentity"] = "UA behavioral profile consistency"
     };
 
     private static readonly Dictionary<string, string> DetectorCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -115,7 +116,8 @@ public static class DetectionNarrativeBuilder
         ["CookieBehavior"] = "Behavioral",
         ["HeaderCorrelation"] = "Identity",
         ["ResourceWaterfall"] = "Behavioral",
-        ["ReactivePattern"] = "Behavioral"
+        ["ReactivePattern"] = "Behavioral",
+        ["ClaimedIdentity"] = "Identity"
     };
 
     private static readonly Dictionary<string, string> BotTypeFriendlyNames = new(StringComparer.OrdinalIgnoreCase)

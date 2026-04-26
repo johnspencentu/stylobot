@@ -145,3 +145,28 @@ defaults:
     country_high_delta: 0.1
     country_very_high_delta: 0.2
     convergence_family_boost: 0.05
+
+    # Similarity feature weights - must sum to 1.0
+    # These are the fallback defaults used when insufficient data for adaptive computation.
+    # Adaptive weights override these each clustering cycle based on feature diagnosticity.
+    # Override via appsettings.json: BotDetection:Detectors:ClusterContributor:weight_*
+    weight_timing: 0.07
+    weight_rate: 0.06
+    weight_path_div: 0.05
+    weight_entropy: 0.05
+    weight_bot_prob: 0.07
+    weight_geo: 0.07
+    weight_datacenter: 0.05
+    weight_asn: 0.05
+    weight_spectral_entropy: 0.05
+    weight_harmonic: 0.04
+    weight_peak_to_avg: 0.05
+    weight_dominant_freq: 0.03
+    weight_self_drift: 0.05
+    weight_human_drift: 0.05
+    weight_loop_score: 0.04
+    weight_surprise: 0.04
+    weight_novelty: 0.04
+    weight_entropy_delta: 0.04
+    weight_ua_family: 0.05
+    weight_claimed_id: 0.05

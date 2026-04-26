@@ -43,6 +43,7 @@ public class BotClusterService : BackgroundService
     private readonly IEmbeddingProvider? _embeddingProvider;
     private readonly MarkovTracker? _markovTracker;
     private readonly AdaptiveSimilarityWeighter? _adaptiveWeighter;
+    private readonly UaProfileStore? _uaProfileStore;
 
     // Event-driven trigger: counts new bot detections since last clustering run
     private int _botDetectionsSinceLastRun;
@@ -61,7 +62,8 @@ public class BotClusterService : BackgroundService
         ILicenseState licenseState,
         IEmbeddingProvider? embeddingProvider = null,
         MarkovTracker? markovTracker = null,
-        AdaptiveSimilarityWeighter? adaptiveWeighter = null)
+        AdaptiveSimilarityWeighter? adaptiveWeighter = null,
+        UaProfileStore? uaProfileStore = null)
     {
         _logger = logger;
         _options = options.Value.Cluster;
@@ -70,6 +72,7 @@ public class BotClusterService : BackgroundService
         _embeddingProvider = embeddingProvider;
         _markovTracker = markovTracker;
         _adaptiveWeighter = adaptiveWeighter;
+        _uaProfileStore = uaProfileStore;
 
         if (_options.EnableSemanticEmbeddings && _embeddingProvider != null)
             _logger.LogInformation(
@@ -352,7 +355,7 @@ public class BotClusterService : BackgroundService
             MixedCount = mixedCount,
             SimilarityThreshold = _options.SimilarityThreshold,
             MinClusterSize = _options.MinClusterSize,
-            TopWeights = (_currentWeights ?? AdaptiveSimilarityWeighter.GetDefaultWeights())
+            TopWeights = (_currentWeights ?? _adaptiveWeighter?.GetDefaultWeights() ?? new Dictionary<string, double>())
                 .OrderByDescending(w => w.Value)
                 .Take(6)
                 .ToDictionary(k => k.Key, v => v.Value)
@@ -427,6 +430,11 @@ public class BotClusterService : BackgroundService
         // Intent / Threat signals (from IntentContributor)
         public string? IntentCategory { get; init; }
         public double ThreatScore { get; init; }
+
+        // Claimed identity signals (from ClaimedIdentityContributor via UaProfileStore)
+        public string? UaFamily { get; init; }
+        public string? UaTier { get; init; }
+        public double ClaimedIdentityScore { get; init; }
     }
 
     internal List<FeatureVector> BuildFeatureVectors(IReadOnlyList<SignatureBehavior> behaviors)
@@ -522,7 +530,11 @@ public class BotClusterService : BackgroundService
                 SequenceSurprise = drift.SequenceSurprise,
                 // Intent / Threat signals (populated when intent HNSW has data for this signature)
                 IntentCategory = null,
-                ThreatScore = 0.0
+                ThreatScore = 0.0,
+                // Claimed identity signals from UaProfileStore (updated per-request by ClaimedIdentityContributor)
+                UaFamily = _uaProfileStore?.GetSignatureProfile(b.Signature).Family,
+                UaTier = _uaProfileStore?.GetSignatureProfile(b.Signature).Tier,
+                ClaimedIdentityScore = _uaProfileStore?.GetSignatureProfile(b.Signature).Score ?? 0.5
             };
         }).ToList();
     }
@@ -539,7 +551,8 @@ public class BotClusterService : BackgroundService
 
     internal double ComputeBlendedSimilarity(FeatureVector a, FeatureVector b)
     {
-        var heuristicSim = ComputeSimilarity(a, b, _currentWeights);
+        var weights = _currentWeights ?? _adaptiveWeighter?.GetDefaultWeights();
+        var heuristicSim = ComputeSimilarity(a, b, weights);
 
         // If both have semantic embeddings, blend with heuristic
         if (a.SemanticEmbedding != null && b.SemanticEmbedding != null)
@@ -553,10 +566,19 @@ public class BotClusterService : BackgroundService
         return heuristicSim;
     }
 
+    // Ordered list of all feature dimension keys - used only for equal-weight test fallback
+    private static readonly string[] AllWeightKeys =
+    [
+        "timing", "rate", "pathDiv", "entropy", "botProb", "geo", "datacenter",
+        "asn", "spectralEntropy", "harmonic", "peakToAvg", "dominantFreq", "selfDrift",
+        "humanDrift", "loopScore", "surprise", "novelty", "entropyDelta", "uaFamily", "claimedId"
+    ];
+
     internal static double ComputeSimilarity(FeatureVector a, FeatureVector b,
         Dictionary<string, double>? weights = null)
     {
-        weights ??= AdaptiveSimilarityWeighter.GetDefaultWeights();
+        // Null weights → equal weight across all dimensions (test path only; production always provides weights)
+        weights ??= AllWeightKeys.ToDictionary(k => k, _ => 1.0 / AllWeightKeys.Length);
 
         // Continuous features: normalized absolute difference
         var timingSim = 1.0 - NormalizedDiff(a.TimingRegularity, b.TimingRegularity);
@@ -595,25 +617,37 @@ public class BotClusterService : BackgroundService
         var noveltySim = 1.0 - NormalizedDiff(a.TransitionNovelty, b.TransitionNovelty);
         var entropyDeltaSim = 1.0 - NormalizedDiff(Math.Abs(a.EntropyDelta), Math.Abs(b.EntropyDelta));
 
-        // Weighted sum using adaptive weights (sum to ~1.0)
-        return timingSim * weights.GetValueOrDefault("timing", 0.08) +
-               rateSim * weights.GetValueOrDefault("rate", 0.07) +
-               pathDivSim * weights.GetValueOrDefault("pathDiv", 0.05) +
-               entropySim * weights.GetValueOrDefault("entropy", 0.05) +
-               botProbSim * weights.GetValueOrDefault("botProb", 0.08) +
-               geoSim * weights.GetValueOrDefault("geo", 0.08) +
-               datacenterSim * weights.GetValueOrDefault("datacenter", 0.05) +
-               asnSim * weights.GetValueOrDefault("asn", 0.06) +
-               spectralEntropySim * weights.GetValueOrDefault("spectralEntropy", 0.06) +
-               harmonicSim * weights.GetValueOrDefault("harmonic", 0.04) +
-               peakToAvgSim * weights.GetValueOrDefault("peakToAvg", 0.05) +
-               dominantFreqSim * weights.GetValueOrDefault("dominantFreq", 0.03) +
-               selfDriftSim * weights.GetValueOrDefault("selfDrift", 0.06) +
-               humanDriftSim * weights.GetValueOrDefault("humanDrift", 0.06) +
-               loopScoreSim * weights.GetValueOrDefault("loopScore", 0.05) +
-               surpriseSim * weights.GetValueOrDefault("surprise", 0.05) +
-               noveltySim * weights.GetValueOrDefault("novelty", 0.04) +
-               entropyDeltaSim * weights.GetValueOrDefault("entropyDelta", 0.04);
+        // Claimed identity: same UA family = strong grouping signal (bots with same UA string cluster together)
+        // Both null = identical (unknown vs unknown = same tier), one null = asymmetric = different
+        var bothFamilyKnown = !string.IsNullOrEmpty(a.UaFamily) && !string.IsNullOrEmpty(b.UaFamily);
+        var bothFamilyUnknown = string.IsNullOrEmpty(a.UaFamily) && string.IsNullOrEmpty(b.UaFamily);
+        var uaFamilySim = bothFamilyKnown
+            ? string.Equals(a.UaFamily, b.UaFamily, StringComparison.OrdinalIgnoreCase) ? 1.0 : 0.0
+            : bothFamilyUnknown ? 1.0 : 0.5; // both null = identical, mixed = asymmetric
+        var claimedIdSim = 1.0 - NormalizedDiff(a.ClaimedIdentityScore, b.ClaimedIdentityScore);
+
+        // Weighted sum - all keys come from the weights dict (sourced from cluster.detector.yaml).
+        // 0.0 fallback means "ignore this feature if not in dict" - never happens in production.
+        return timingSim          * weights.GetValueOrDefault("timing",          0.0) +
+               rateSim            * weights.GetValueOrDefault("rate",            0.0) +
+               pathDivSim         * weights.GetValueOrDefault("pathDiv",         0.0) +
+               entropySim         * weights.GetValueOrDefault("entropy",         0.0) +
+               botProbSim         * weights.GetValueOrDefault("botProb",         0.0) +
+               geoSim             * weights.GetValueOrDefault("geo",             0.0) +
+               datacenterSim      * weights.GetValueOrDefault("datacenter",      0.0) +
+               asnSim             * weights.GetValueOrDefault("asn",             0.0) +
+               spectralEntropySim * weights.GetValueOrDefault("spectralEntropy", 0.0) +
+               harmonicSim        * weights.GetValueOrDefault("harmonic",        0.0) +
+               peakToAvgSim       * weights.GetValueOrDefault("peakToAvg",       0.0) +
+               dominantFreqSim    * weights.GetValueOrDefault("dominantFreq",    0.0) +
+               selfDriftSim       * weights.GetValueOrDefault("selfDrift",       0.0) +
+               humanDriftSim      * weights.GetValueOrDefault("humanDrift",      0.0) +
+               loopScoreSim       * weights.GetValueOrDefault("loopScore",       0.0) +
+               surpriseSim        * weights.GetValueOrDefault("surprise",        0.0) +
+               noveltySim         * weights.GetValueOrDefault("novelty",         0.0) +
+               entropyDeltaSim    * weights.GetValueOrDefault("entropyDelta",    0.0) +
+               uaFamilySim        * weights.GetValueOrDefault("uaFamily",        0.0) +
+               claimedIdSim       * weights.GetValueOrDefault("claimedId",       0.0);
     }
 
     /// <summary>

@@ -457,6 +457,41 @@ public class BotDetectionOptions
     public string? DatabasePath { get; set; }
 
     /// <summary>
+    ///     Resolves a writable data directory for SQLite and index files.
+    ///     Falls back through: current working directory, XDG_DATA_HOME/stylobot,
+    ///     ~/.local/share/stylobot, then AppContext.BaseDirectory (install dir, requires write permission).
+    /// </summary>
+    public static string ResolveDataDirectory()
+    {
+        // Try current working directory first (dev/interactive use, Docker volumes)
+        var cwd = Directory.GetCurrentDirectory();
+        if (IsWritable(cwd)) return cwd;
+
+        // Try XDG / ~/.local/share/stylobot (standard for user-installed Linux tools)
+        var xdgBase = Environment.GetEnvironmentVariable("XDG_DATA_HOME")
+                      ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                          ".local", "share");
+        var xdgPath = Path.Combine(xdgBase, "stylobot");
+        try { Directory.CreateDirectory(xdgPath); } catch { /* fall through */ }
+        if (IsWritable(xdgPath)) return xdgPath;
+
+        // Final fallback: install dir (works when run as root or service with correct permissions)
+        return AppContext.BaseDirectory;
+    }
+
+    private static bool IsWritable(string path)
+    {
+        try
+        {
+            var probe = Path.Combine(path, ".stylobot-write-probe");
+            System.IO.File.WriteAllText(probe, "");
+            System.IO.File.Delete(probe);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
     ///     Qdrant vector database configuration for similarity search.
     ///     When enabled, replaces the file-backed HNSW index with Qdrant.
     /// </summary>

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Mostlylucid.BotDetection.Clustering;
 using Mostlylucid.BotDetection.Services;
 
@@ -171,11 +172,12 @@ public class GeoSimilarityTests
 
         var defaultSim = BotClusterService.ComputeSimilarity(a, b);
 
-        // Custom weights: put all weight on geo
+        // Custom weights: put dominant weight on geo
+        var weighter = new AdaptiveSimilarityWeighter(NullLogger<AdaptiveSimilarityWeighter>.Instance);
         var heavyGeoWeights = new Dictionary<string, double>();
-        foreach (var key in AdaptiveSimilarityWeighter.GetDefaultWeights().Keys)
+        foreach (var key in weighter.GetDefaultWeights().Keys)
             heavyGeoWeights[key] = 0.01;
-        heavyGeoWeights["geo"] = 0.83; // Sum to ~1.0
+        heavyGeoWeights["geo"] = 0.83; // dominates with ~83% of total weight
 
         var geoSim = BotClusterService.ComputeSimilarity(a, b, heavyGeoWeights);
 
