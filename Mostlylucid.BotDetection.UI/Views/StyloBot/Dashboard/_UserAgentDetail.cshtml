@@ -7,8 +7,8 @@
     var topVersions = Model.Versions.OrderByDescending(v => v.Value).Take(8).ToList();
     var topCountries = Model.Countries.OrderByDescending(c => c.Value).Take(8).ToList();
     var maxCountryCount = topCountries.Count > 0 ? topCountries[0].Value : 1;
-    static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
-    static string FlagUrl(string code) => $"https://flagcdn.com/w20/{code.ToLowerInvariant()}.png";
+    bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
+    string FlagUrl(string code) => $"https://flagcdn.com/w20/{code.ToLowerInvariant()}.png";
 }
 <div class="p-4">
     <!-- Header -->

@@ -5,8 +5,8 @@
     Layout = null;
     var bp = Model.BasePath;
     var navBp = Model.NavBasePath;
-    static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
-    static string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
+    bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
+    string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 
     string RiskColor(string? risk) => risk switch
     {

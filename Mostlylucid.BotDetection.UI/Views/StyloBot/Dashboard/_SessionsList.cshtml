@@ -3,10 +3,10 @@
 @{
     var bp = Model.BasePath;
     string PageUrl(int page) => $"{bp}/partials/sessions?page={page}&pageSize={Model.PageSize}&filter={Model.Filter}";
-    static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
-    static string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
+    bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
+    string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 
-    static string RiskColor(string risk) => risk switch {
+    string RiskColor(string risk) => risk switch {
         "VeryHigh" => "badge-error",
         "High" => "badge-warning",
         "Medium" => "badge-info",
@@ -15,7 +15,7 @@
         _ => "badge-ghost"
     };
 
-    static string StateIcon(string state) => state switch {
+    string StateIcon(string state) => state switch {
         "PageView" => "&#x1F4C4;",
         "ApiCall" => "&#x26A1;",
         "WebSocket" => "&#x1F50C;",
@@ -29,13 +29,13 @@
         _ => "&#x2753;"
     };
 
-    static string FormatDuration(double minutes) => minutes switch {
+    string FormatDuration(double minutes) => minutes switch {
         < 1 => $"{minutes * 60:F0}s",
         < 60 => $"{minutes:F1}m",
         _ => $"{minutes / 60:F1}h"
     };
 
-    static string EntropyLabel(float entropy) => entropy switch {
+    string EntropyLabel(float entropy) => entropy switch {
         < 0.5f => "very regular",
         < 1.5f => "regular",
         < 2.5f => "moderate",

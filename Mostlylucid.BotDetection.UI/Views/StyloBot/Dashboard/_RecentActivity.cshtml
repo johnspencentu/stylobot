@@ -14,8 +14,8 @@
         ? "text-base-content/70 font-bold"
         : "text-base-content/40 hover:text-base-content/60";
 
-    static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
-    static string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
+    bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
+    string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 }
 @{
     var filter = Model.Filter ?? "all";
@@ -157,20 +157,20 @@
         "Seeker", "Scraper", "Collector", "Watcher", "Trawler", "Requester"
     ];
 
-    static string DeterministicBotName(string sig) {
+    string DeterministicBotName(string sig) {
         if (string.IsNullOrEmpty(sig)) return "Bot";
         var h = Math.Abs(sig.GetHashCode());
         return $"{Adj[h % Adj.Length]} {Noun[(h / Adj.Length) % Noun.Length]}";
     }
 
-    static string DeterministicIntent(double prob) => prob switch {
+    string DeterministicIntent(double prob) => prob switch {
         >= 0.95 => "Automated",
         >= 0.80 => "Scanner",
         >= 0.60 => "Crawler",
         _ => "Probe"
     };
 
-    static string ResolvedThreat(string? band, double prob, bool isBot) {
+    string ResolvedThreat(string? band, double prob, bool isBot) {
         if (!string.IsNullOrEmpty(band) && band != "None") return band;
         if (!isBot) return "";
         return prob switch {

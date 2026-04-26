@@ -3,7 +3,7 @@
 @{
     var bp = Model.BasePath;
 
-    static string RiskColor(string risk) => risk switch {
+    string RiskColor(string risk) => risk switch {
         "VeryHigh" => "text-error",
         "High" => "text-warning",
         "Medium" => "text-info",

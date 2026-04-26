@@ -13,8 +13,8 @@
         ? "text-base-content/70 font-bold"
         : "text-base-content/40 hover:text-base-content/60";
 
-    static bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
-    static string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
+    bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
+    string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 }
 <div id="topbots-list"
      data-sb-widget="topbots"
@@ -142,7 +142,7 @@
     //   3. Behavioural signals from reasons (API-only, rate, depth-first)
     //   4. Generic fallback
     // Country and rate/origin modifiers are prepended where available.
-    static string DescriptiveBotName(DashboardTopBotEntry bot) {
+    string DescriptiveBotName(DashboardTopBotEntry bot) {
         var reasons = bot.TopReasons ?? [];
         var country = (!string.IsNullOrEmpty(bot.CountryCode) && bot.CountryCode.Length == 2 && bot.CountryCode != "XX")
             ? CountryAdjective(bot.CountryCode)
@@ -211,7 +211,7 @@
     }
 
     // Categorise what a bot was scanning for based on the actual path it requested
-    static string CategorizePath(string path) {
+    string CategorizePath(string path) {
         var p = path.ToLowerInvariant();
         if (p.Contains(".env") || p.Contains("env.")) return "ENV Scanner";
         if (p.Contains("wp-config") || p.Contains("config.php") || p.Contains("config.yml") ||
@@ -230,7 +230,7 @@
     }
 
     // Map country codes to adjectives
-    static string CountryAdjective(string code) => code.ToUpperInvariant() switch {
+    string CountryAdjective(string code) => code.ToUpperInvariant() switch {
         "CN" => "Chinese",
         "RU" => "Russian",
         "US" => "US",
@@ -260,14 +260,14 @@
         _ => code
     };
 
-    static string DeterministicIntent(double prob) => prob switch {
+    string DeterministicIntent(double prob) => prob switch {
         >= 0.95 => "Automated",
         >= 0.80 => "Scanner",
         >= 0.60 => "Crawler",
         _ => "Probe"
     };
 
-    static string ResolvedThreat(string? band, double prob) {
+    string ResolvedThreat(string? band, double prob) {
         if (!string.IsNullOrEmpty(band) && band != "None") return band;
         return prob switch {
             >= 0.95 => "High",

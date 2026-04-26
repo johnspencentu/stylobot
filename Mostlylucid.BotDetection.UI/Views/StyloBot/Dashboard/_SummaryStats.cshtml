@@ -61,7 +61,7 @@
 </div>
 
 @functions {
-    static string FormatDuration(double secs)
+    string FormatDuration(double secs)
     {
         if (secs <= 0) return "0s";
         if (secs < 60) return $"{secs:F0}s";
