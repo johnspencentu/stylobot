@@ -44,7 +44,7 @@
         --sb-border: #334155;
         --sb-text: #e2e8f0;
         --sb-text-muted: #94a3b8;
-        --sb-text-faint: #64748b;
+        --sb-text-faint: #8b9eb8;
         --sb-bar-track: #334155;
         --sb-badge-mix-base: #0f172a;
     }
@@ -57,7 +57,7 @@
     --sb-border: #334155;
     --sb-text: #e2e8f0;
     --sb-text-muted: #94a3b8;
-    --sb-text-faint: #64748b;
+    --sb-text-faint: #8b9eb8;
     --sb-bar-track: #334155;
     --sb-badge-mix-base: #0f172a;
 }
@@ -274,3 +274,15 @@
     width: 0;
     overflow: hidden;
 }
+
+/* =============================================
+   Accessibility: contrast floor for dark theme
+   Low-opacity Tailwind text-base-content classes
+   fail WCAG AA for small text (<14px) in dark.
+   These raise the floor without touching light mode.
+   ============================================= */
+
+[data-theme="dark"] .text-base-content\/20 { color: oklch(var(--bc) / 45%); }
+[data-theme="dark"] .text-base-content\/30 { color: oklch(var(--bc) / 52%); }
+[data-theme="dark"] .text-base-content\/40 { color: oklch(var(--bc) / 60%); }
+[data-theme="dark"] .text-base-content\/50 { color: oklch(var(--bc) / 68%); }
