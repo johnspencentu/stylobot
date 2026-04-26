@@ -733,7 +733,7 @@
 .metric-label {
     font-size: 9px;
     text-transform: uppercase;
-    color: #888;
+    color: #a0b2c8;
     letter-spacing: 0.5px;
 }
 
@@ -772,7 +772,7 @@
 
 .detection-bar-signal {
     flex: 1;
-    color: #888;
+    color: #a0b2c8;
     font-style: italic;
     white-space: nowrap;
     overflow: hidden;
@@ -795,7 +795,7 @@
 }
 
 .seen-first {
-    color: #888;
+    color: #a0b2c8;
     background: rgba(91, 163, 163, 0.1);
     padding: 1px 4px;
     border-radius: 2px;
@@ -918,7 +918,7 @@
     background: rgba(91, 163, 163, 0.1);
     padding: 1px 4px;
     border-radius: 2px;
-    color: #888;
+    color: #a0b2c8;
 }
 
 .sig-privacy {
@@ -1083,7 +1083,7 @@
 .ticker-item-risk.risk-veryhigh { background: rgba(220, 53, 69, 0.2); color: #ff6b6b; }
 
 .ticker-item-path {
-    color: #888;
+    color: #a0b2c8;
     font-size: 12px;
     max-width: 140px;
     overflow: hidden;
@@ -1108,7 +1108,7 @@
 .ticker-item-time {
     font-family: monospace;
     font-size: 11px;
-    color: #555;
+    color: #8b9eb8;
 }
 
 /* New entry pulse animation */
@@ -1132,7 +1132,7 @@
 
 .ticker-empty,
 .ticker-connecting {
-    color: #555;
+    color: #8b9eb8;
     font-style: italic;
     font-size: 12px;
 }
@@ -1153,13 +1153,13 @@
 }
 
 .stat-label {
-    color: #555;
+    color: #8b9eb8;
 }
 
 .stat-value {
     font-family: monospace;
     font-weight: 600;
-    color: #888;
+    color: #a0b2c8;
 }
 
 .stat-bot .stat-value { color: #ff6b6b; }
@@ -1181,6 +1181,227 @@
 .ticker-dashboard-link:hover {
     background: rgba(91, 163, 163, 0.2);
     color: #7cc5c5;
+}
+
+/* ===========================================
+   DARK THEME OVERRIDES
+   The card/document components above are light-mode only.
+   These overrides adapt them to data-theme="dark".
+   =========================================== */
+
+[data-theme="dark"] .bot-detection-details {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .bot-detection-no-data {
+    color: #8b9eb8;
+}
+
+[data-theme="dark"] .bot-detection-container {
+    background: #141f33;
+    border-color: rgba(91, 163, 163, 0.28);
+}
+
+[data-theme="dark"] .bot-detection-metadata {
+    background: #0f1a2e;
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="dark"] .metadata-label {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .metadata-value {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .bot-detection-yarp {
+    background: rgba(251, 191, 36, 0.08);
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="dark"] .yarp-label,
+[data-theme="dark"] .yarp-key {
+    color: #fbbf24;
+}
+
+[data-theme="dark"] .yarp-value {
+    color: #fde68a;
+}
+
+[data-theme="dark"] .bot-detection-reasons {
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="dark"] .reasons-title,
+[data-theme="dark"] .contributions-title {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .reason-item {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .bot-detection-contributions {
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="dark"] .contribution-item {
+    background: #0f1a2e;
+    border-color: rgba(91, 163, 163, 0.2);
+}
+
+[data-theme="dark"] .detector-name {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .detector-category {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .contribution-bar-container {
+    background: #334155;
+}
+
+[data-theme="dark"] .contribution-reason {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .contribution-stats {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .bot-detection-footer {
+    background: #0b1220;
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .bot-detection-signatures {
+    background: #0d1f38;
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="dark"] .signatures-title {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .signatures-explanation {
+    color: #94a3b8;
+    background: #141f33;
+    border-left-color: #60a5fa;
+}
+
+[data-theme="dark"] .factors-label {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .factor-item {
+    background: #141f33;
+    border-color: rgba(91, 163, 163, 0.2);
+}
+
+[data-theme="dark"] .factor-item:hover {
+    border-color: #60a5fa;
+    box-shadow: 0 1px 3px rgba(96, 165, 250, 0.1);
+}
+
+[data-theme="dark"] .factor-name {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .factor-hash {
+    background: #0b1220;
+    color: #94a3b8;
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .factor-desc {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .signatures-privacy-note {
+    background: #141f33;
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .bot-detection-summary {
+    background: #0f1a2e;
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .summary-item strong {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .bot-detection-recommendation-detail {
+    background: rgba(251, 191, 36, 0.08);
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+    color: #fbbf24;
+}
+
+[data-theme="dark"] .bot-detection-reasons-compact {
+    background: #0f1a2e;
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .toggle-btn {
+    background: #0b1220;
+    border-bottom-color: rgba(148, 163, 184, 0.15);
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .toggle-btn:hover {
+    background: #141f33;
+}
+
+[data-theme="dark"] .bot-detection-signatures-compact .signatures-content {
+    background: #0d1f38;
+}
+
+[data-theme="dark"] .factor-compact .factor-label {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .factor-compact code {
+    background: #0b1220;
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .privacy-note {
+    color: #4ade80;
+}
+
+[data-theme="dark"] .bot-detection-details-compact .details-content {
+    background: #0f1a2e;
+}
+
+[data-theme="dark"] .contribution-row {
+    border-bottom-color: rgba(148, 163, 184, 0.1);
+}
+
+[data-theme="dark"] .detector-name-compact {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .detector-time-compact {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .detector-reason-compact {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .bot-detection-footer-compact {
+    background: #0b1220;
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .bot-detection-details.collapsed .bot-detection-container::after {
+    background: linear-gradient(to bottom, transparent, #141f33);
 }
 
 /* Responsive */

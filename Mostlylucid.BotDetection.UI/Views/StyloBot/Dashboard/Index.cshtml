@@ -47,7 +47,7 @@
     <style nonce="@Model.CspNonce">
         [x-cloak] { display: none !important; }
         [data-theme="dark"] {
-            --sb-brand-muted: #6b7280;
+            --sb-brand-muted: #8b9eb8;
             --sb-brand-strong: #ffffff;
             --sb-accent: #5ba3a3;
             --sb-accent-alt: #0f4c81;
@@ -115,9 +115,9 @@
                 <span id="sb-connection-status" class="w-2 h-2 rounded-full sb-disconnected" title="SignalR: disconnected"></span>
                 @if (Model.License.Status == LicenseStatusKind.Unconfigured)
                 {
-                    <span class="text-[10px] text-base-content/40 ml-2">OSS tier</span>
+                    <span class="text-[10px] text-base-content/60 ml-2">OSS tier</span>
                     <a href="https://stylobot.net/pricing" target="_blank" rel="noopener"
-                       class="text-[10px] text-base-content/30 hover:text-base-content/60 ml-1">
+                       class="text-[10px] text-base-content/60 hover:text-base-content/80 ml-1">
                         Compare paid tiers →
                     </a>
                 }
