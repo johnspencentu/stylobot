@@ -1312,3 +1312,27 @@ Configure bot network clustering and LLM-based descriptions:
 | `EnableLlmDescriptions` | bool | `false` | Enable background LLM cluster naming/description |
 | `DescriptionModel` | string | `qwen3:0.6b` | Ollama model name for descriptions |
 | `DescriptionEndpoint` | string | `null` | Override Ollama endpoint (defaults to main AI endpoint) |
+
+---
+
+## Licensing
+
+Commercial licenses only. FOSS mode: omit `Token` entirely.
+
+```json
+{
+  "BotDetection": {
+    "Licensing": {
+      "Token": "<your-license-jwt>",
+      "Domains": ["yourdomain.com"]
+    }
+  }
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `BotDetection:Licensing:Token` | string | `null` | Signed license JWT. When absent, FOSS mode (no expiry, no limits). |
+| `BotDetection:Licensing:Domains` | string[] | `[]` | Licensed eTLD+1 domains for domain entitlement validation. |
+
+See [licensing.md](licensing.md) for trial, grace period, and renewal details.
