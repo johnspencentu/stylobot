@@ -462,7 +462,6 @@ jobs:
 
     - name: Build .deb packages
       run: |
-        VERSION="${{ steps.get_version.outputs.VERSION }}"
         DEB_VERSION="${{ steps.get_version.outputs.DEB_VERSION }}"
         mkdir -p debs
 
@@ -475,40 +474,37 @@ jobs:
           tar -xzf "$ARTIFACT_DIR"/stylobot-linux-*.tar.gz -C "extract/$ARCH"
 
           local PKG_DIR="pkg_${ARCH}"
-          mkdir -p "$PKG_DIR/DEBIAN"
-          mkdir -p "$PKG_DIR/usr/local/bin"
-          mkdir -p "$PKG_DIR/usr/local/lib/stylobot"
-          mkdir -p "$PKG_DIR/etc/ld.so.conf.d"
+          mkdir -p "$PKG_DIR/DEBIAN" \
+                   "$PKG_DIR/usr/local/lib/stylobot" \
+                   "$PKG_DIR/usr/local/bin" \
+                   "$PKG_DIR/etc/ld.so.conf.d"
 
-          # Copy binary
-          cp "extract/$ARCH/stylobot" "$PKG_DIR/usr/local/bin/stylobot"
-          chmod 755 "$PKG_DIR/usr/local/bin/stylobot"
+          # Binary goes into /usr/local/lib/stylobot/ so it runs with its
+          # appsettings.json as a sibling (ContentRootPath = binary dir)
+          cp "extract/$ARCH/stylobot" "$PKG_DIR/usr/local/lib/stylobot/stylobot"
+          chmod 755 "$PKG_DIR/usr/local/lib/stylobot/stylobot"
 
-          # Copy native P/Invoke libraries (e_sqlite3.so etc.)
-          # AOT cannot bundle native .so files into the single binary
+          # Native P/Invoke libraries (libe_sqlite3.so, libonnxruntime*.so)
+          # AOT cannot bundle these into the single binary
           find "extract/$ARCH" -maxdepth 1 -name "*.so" \
             -exec cp {} "$PKG_DIR/usr/local/lib/stylobot/" \;
 
-          # Register the lib dir with ldconfig
+          # Config files
+          cp "extract/$ARCH/appsettings.json" "$PKG_DIR/usr/local/lib/stylobot/" || true
+          cp "extract/$ARCH/appsettings.production.json" "$PKG_DIR/usr/local/lib/stylobot/" 2>/dev/null || true
+
+          # Symlink onto PATH
+          ln -sf /usr/local/lib/stylobot/stylobot "$PKG_DIR/usr/local/bin/stylobot"
+
+          # Register lib dir with ldconfig
           echo "/usr/local/lib/stylobot" > "$PKG_DIR/etc/ld.so.conf.d/stylobot.conf"
 
-          # postinst: run ldconfig so the .so is immediately findable
-          cat > "$PKG_DIR/DEBIAN/postinst" <<'POSTINST'
-#!/bin/sh
-set -e
-ldconfig
-POSTINST
+          # postinst / postrm: refresh ldconfig cache
+          printf '#!/bin/sh\nset -e\nldconfig\n' > "$PKG_DIR/DEBIAN/postinst"
           chmod 755 "$PKG_DIR/DEBIAN/postinst"
-
-          # postrm: re-run ldconfig after package removal
-          cat > "$PKG_DIR/DEBIAN/postrm" <<'POSTRM'
-#!/bin/sh
-set -e
-ldconfig
-POSTRM
+          printf '#!/bin/sh\nset -e\nldconfig\n' > "$PKG_DIR/DEBIAN/postrm"
           chmod 755 "$PKG_DIR/DEBIAN/postrm"
 
-          # DEBIAN/control
           cat > "$PKG_DIR/DEBIAN/control" <<CONTROL
 Package: stylobot
 Version: ${DEB_VERSION}
