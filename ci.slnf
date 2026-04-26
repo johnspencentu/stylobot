@@ -7,7 +7,6 @@
       "Mostlylucid.BotDetection.Llm.Holodeck\\Mostlylucid.BotDetection.Llm.Holodeck.csproj",
       "Mostlylucid.BotDetection.Console\\Mostlylucid.BotDetection.Console.csproj",
       "Mostlylucid.BotDetection.UI\\Mostlylucid.BotDetection.UI.csproj",
-      "Mostlylucid.BotDetection.UI.PostgreSQL\\Mostlylucid.BotDetection.UI.PostgreSQL.csproj",
       "Mostlylucid.BotDetection.Test\\Mostlylucid.BotDetection.Test.csproj",
       "Mostlylucid.BotDetection.Orchestration.Tests\\Mostlylucid.BotDetection.Orchestration.Tests.csproj",
       "Mostlylucid.BotDetection.Demo.Tests\\Mostlylucid.BotDetection.Demo.Tests.csproj",
