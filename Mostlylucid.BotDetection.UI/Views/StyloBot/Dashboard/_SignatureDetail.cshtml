@@ -450,30 +450,57 @@ else
     <!-- Detector Contributions -->
     @if (Model.DetectorContributions.Count > 0)
     {
-        var maxContribution = Model.DetectorContributions.Max(d => Math.Abs(d.Contribution));
         <div class="rounded-xl border p-4 mb-4" style="border-color: var(--sb-card-border); background: var(--sb-card-bg);">
-            <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-2">Detector Contributions <span class="text-base-content/40 font-normal">(@Model.DetectorContributions.Count detectors)</span></h3>
-            <div class="space-y-2">
-                @foreach (var det in Model.DetectorContributions)
-                {
-                    var barPct = maxContribution > 0 ? (Math.Abs(det.Contribution) / maxContribution * 100) : 0;
-                    var barColor = det.Contribution > 0 ? "bg-error" : "bg-success";
-                    var deltaSign = det.ConfidenceDelta >= 0 ? "+" : "";
-                    <div class="flex items-center gap-3">
-                        <div class="w-40 text-xs font-medium text-base-content/70 truncate" title="@det.Name">@det.Name.Replace("Contributor", "")</div>
-                        <div class="flex-1">
-                            <div class="impact-bar">
-                                <div class="impact-bar-fill @barColor" style="width: @($"{barPct:F0}")%;"></div>
-                            </div>
-                        </div>
-                        <div class="w-16 text-right text-[10px] font-mono @(det.ConfidenceDelta > 0 ? "text-error" : "text-success")">@($"{deltaSign}{det.ConfidenceDelta:F3}")</div>
-                        <div class="w-20 text-right text-[10px] text-base-content/40 font-mono">@($"{det.ExecutionTimeMs:F1}")ms</div>
-                    </div>
-                    @if (!string.IsNullOrEmpty(det.Reason))
-                    {
-                        <div class="ml-40 pl-3 text-[10px] text-base-content/40 italic -mt-1">@det.Reason</div>
-                    }
-                }
+            <h3 class="text-xs font-semibold text-base-content/70 uppercase mb-3">
+                Detector Contributions
+                <span class="text-base-content/40 font-normal">(@Model.DetectorContributions.Count detectors)</span>
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="table table-xs w-full">
+                    <thead>
+                        <tr class="text-[10px] uppercase tracking-wider text-base-content/40">
+                            <th class="py-1 text-left">Detector</th>
+                            <th class="py-1 text-right">Confidence Delta</th>
+                            <th class="py-1 text-right">Timing (ms)</th>
+                            @if (Model.TunerEnabled)
+                            {
+                                <th class="py-1 text-center">Action</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var det in Model.DetectorContributions)
+                        {
+                            var deltaSign = det.ConfidenceDelta >= 0 ? "+" : "";
+                            var deltaColor = det.ConfidenceDelta > 0 ? "text-error" : "text-success";
+                            var timingDisplay = det.ExecutionTimeMs > 0
+                                ? $"{det.ExecutionTimeMs:F1}"
+                                : "--";
+                            var detectorLabel = det.Name.Replace("Contributor", "", StringComparison.Ordinal);
+                            <tr class="hover:bg-base-200/50">
+                                <td class="py-1.5">
+                                    <div class="text-xs font-medium text-base-content/80 truncate max-w-[220px]" title="@det.Name">@detectorLabel</div>
+                                    @if (!string.IsNullOrEmpty(det.Reason))
+                                    {
+                                        <div class="text-[10px] text-base-content/40 italic">@det.Reason</div>
+                                    }
+                                </td>
+                                <td class="py-1.5 text-right text-[10px] font-mono @deltaColor">@($"{deltaSign}{det.ConfidenceDelta:F3}")</td>
+                                <td class="py-1.5 text-right text-[10px] font-mono text-base-content/50">@timingDisplay</td>
+                                @if (Model.TunerEnabled)
+                                {
+                                    <td class="py-1.5 text-center">
+                                        <a href="/tuner/new?domain=@Uri.EscapeDataString(Model.SignatureId)&triggerType=DetectorFired&detector=@Uri.EscapeDataString(det.Name)"
+                                           class="btn btn-xs btn-ghost text-[10px]"
+                                           title="Create a Tuner session to analyse and adjust @detectorLabel thresholds">
+                                            Tune
+                                        </a>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
     }
