@@ -423,8 +423,7 @@ jobs:
     name: Publish Linux .deb to Cloudsmith
     needs: build-binaries
     runs-on: ubuntu-latest
-    # Only publish stable releases (not betas/pre-releases)
-    if: ${{ !contains(github.ref, '-') }}
+    # TEST: guard removed for sqlite .so fix verification; restore after confirmed
     environment: production   # locks OIDC sub to repo:scottgal/stylobot:environment:production
 
     permissions:
@@ -478,24 +477,50 @@ jobs:
           local PKG_DIR="pkg_${ARCH}"
           mkdir -p "$PKG_DIR/DEBIAN"
           mkdir -p "$PKG_DIR/usr/local/bin"
+          mkdir -p "$PKG_DIR/usr/local/lib/stylobot"
+          mkdir -p "$PKG_DIR/etc/ld.so.conf.d"
 
           # Copy binary
           cp "extract/$ARCH/stylobot" "$PKG_DIR/usr/local/bin/stylobot"
           chmod 755 "$PKG_DIR/usr/local/bin/stylobot"
 
+          # Copy native P/Invoke libraries (e_sqlite3.so etc.)
+          # AOT cannot bundle native .so files into the single binary
+          find "extract/$ARCH" -maxdepth 1 -name "*.so" \
+            -exec cp {} "$PKG_DIR/usr/local/lib/stylobot/" \;
+
+          # Register the lib dir with ldconfig
+          echo "/usr/local/lib/stylobot" > "$PKG_DIR/etc/ld.so.conf.d/stylobot.conf"
+
+          # postinst: run ldconfig so the .so is immediately findable
+          cat > "$PKG_DIR/DEBIAN/postinst" <<'POSTINST'
+#!/bin/sh
+set -e
+ldconfig
+POSTINST
+          chmod 755 "$PKG_DIR/DEBIAN/postinst"
+
+          # postrm: re-run ldconfig after package removal
+          cat > "$PKG_DIR/DEBIAN/postrm" <<'POSTRM'
+#!/bin/sh
+set -e
+ldconfig
+POSTRM
+          chmod 755 "$PKG_DIR/DEBIAN/postrm"
+
           # DEBIAN/control
           cat > "$PKG_DIR/DEBIAN/control" <<CONTROL
-        Package: stylobot
-        Version: ${DEB_VERSION}
-        Architecture: ${ARCH}
-        Maintainer: Scott Galloway <scott@mostlylucid.net>
-        Description: StyloBot - self-hosted bot detection gateway
-         YARP reverse proxy with bot detection middleware. Blocks scrapers,
-         AI crawlers, and malicious bots with <1ms overhead. Native AOT binary.
-        Homepage: https://github.com/scottgal/stylobot
-        Section: net
-        Priority: optional
-        CONTROL
+Package: stylobot
+Version: ${DEB_VERSION}
+Architecture: ${ARCH}
+Maintainer: Scott Galloway <scott@mostlylucid.net>
+Description: StyloBot - self-hosted bot detection gateway
+ YARP reverse proxy with bot detection middleware. Blocks scrapers,
+ AI crawlers, and malicious bots with <1ms overhead. Native AOT binary.
+Homepage: https://github.com/scottgal/stylobot
+Section: net
+Priority: optional
+CONTROL
 
           dpkg-deb --build --root-owner-group "$PKG_DIR" "debs/stylobot_${DEB_VERSION}_${ARCH}.deb"
           echo "Built: debs/stylobot_${DEB_VERSION}_${ARCH}.deb"
