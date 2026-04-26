@@ -16,19 +16,37 @@ Cloud-based bot services work until your attacker adapts. When a sophisticated s
 StyloBot runs in your process. It knows what a real page-load sequence looks like on *your* site: document, then asset burst in 80-500ms, then API calls, then optionally SignalR. It knows the timing signatures of your real users' sessions compressed into 129-dimensional Markov chain vectors. It tracks identity across rotation attempts using cosine similarity walks across fingerprint neighbours. All of this runs in ~150µs per request on commodity hardware, with no network call and no PII leaving your server.
 
 ---
-claude
+
 ## Quick start
 
+**macOS (Homebrew)**
 ```bash
-# CLI reverse proxy with live detection dashboard
 brew install scottgal/stylobot/stylobot
 stylobot 5080 http://localhost:3000
+```
 
-# Docker
+**Linux (apt - Debian/Ubuntu)**
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/mostlylucid/stylobot/setup.deb.sh' | sudo bash
+sudo apt update && sudo apt install stylobot
+stylobot 5080 http://localhost:3000
+```
+
+**Linux (manual / ARM64)**
+```bash
+# Download from GitHub Releases: stylobot-linux-x64.tar.gz or stylobot-linux-arm64.tar.gz
+tar xzf stylobot-linux-x64.tar.gz && chmod +x stylobot && sudo mv stylobot /usr/local/bin/
+stylobot 5080 http://localhost:3000
+```
+
+**Docker**
+```bash
 docker run --rm -p 8080:8080 -e DEFAULT_UPSTREAM=http://host.docker.internal:3000 \
   scottgal/stylobot-gateway:latest
+```
 
-# NuGet embed as middleware (two lines)
+**NuGet (embed as ASP.NET Core middleware)**
+```bash
 dotnet add package mostlylucid.botdetection
 dotnet add package mostlylucid.botdetection.ui
 ```

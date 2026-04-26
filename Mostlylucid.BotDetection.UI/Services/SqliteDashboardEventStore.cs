@@ -134,20 +134,33 @@ public sealed class SqliteDashboardEventStore : IDashboardEventStore, IAsyncDisp
                 }
             }
 
-            // Migrate: add risk_justification column if absent (idempotent)
-            foreach (var migration in new[]
+            // Migrate: add risk_justification column if absent (idempotent).
+            // SQLite does not support IF NOT EXISTS on ALTER TABLE ADD COLUMN;
+            // use PRAGMA table_info to check first.
+            foreach (var (table, column, colDef) in new (string, string, string)[]
             {
-                "ALTER TABLE detections ADD COLUMN IF NOT EXISTS risk_justification TEXT",
-                "ALTER TABLE signatures ADD COLUMN IF NOT EXISTS risk_justification TEXT"
+                ("detections", "user_agent_raw", "TEXT"),
+                ("detections", "risk_justification", "TEXT"),
+                ("signatures", "risk_justification", "TEXT")
             })
             {
-                try
+                var colExists = false;
+                await using var pragmaCmd = conn.CreateCommand();
+                pragmaCmd.CommandText = $"PRAGMA table_info({table})";
+                await using (var pr = await pragmaCmd.ExecuteReaderAsync(ct))
+                {
+                    while (await pr.ReadAsync(ct))
+                    {
+                        if (string.Equals(pr.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                        { colExists = true; break; }
+                    }
+                }
+                if (!colExists)
                 {
                     await using var mc = conn.CreateCommand();
-                    mc.CommandText = migration;
+                    mc.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {colDef}";
                     await mc.ExecuteNonQueryAsync(ct);
                 }
-                catch { /* column already exists */ }
             }
 
             // Prune old detections (keep last 7 days)
