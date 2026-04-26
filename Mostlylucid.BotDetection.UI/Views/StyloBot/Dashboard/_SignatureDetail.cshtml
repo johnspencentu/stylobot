@@ -4,7 +4,7 @@
 @{
     Layout = null;
     var bp = Model.BasePath;
-    var navBp = Model.NavBasePath;
+    var navBp = Model.ResolvedNavBasePath;
     bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
     string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 
@@ -132,7 +132,7 @@ else
 {
     <!-- Breadcrumb -->
     <div class="flex items-center gap-2 mb-4 text-xs text-base-content/50">
-        <a href="@bp" class="hover:text-base-content/70">&larr; Dashboard</a>
+        <a href="@navBp" class="hover:text-base-content/70">&larr; Dashboard</a>
         <span>/</span>
         <span class="text-base-content/70">Signature Detail</span>
     </div>
