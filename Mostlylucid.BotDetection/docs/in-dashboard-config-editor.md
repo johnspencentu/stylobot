@@ -71,7 +71,7 @@ Save → file write → FileSystemWatcher → ConfigurationWatcher → detectors
 
 The editor sidebar lists three classes of files:
 
-1. **Detector manifests** - the 27 YAML files bundled in `Mostlylucid.BotDetection/Orchestration/Manifests/detectors/`. These are bundled as embedded resources in the assembly. For editing, we export them on first dashboard load to a writable directory (`{ContentRoot}/stylobot-config/detectors/`) so the customer's copies can be edited without touching the shipped defaults. Loading precedence becomes: local overrides → embedded defaults.
+1. **Detector manifests** - the 49 YAML files bundled in `Mostlylucid.BotDetection/Orchestration/Manifests/detectors/`. These are bundled as embedded resources in the assembly. For editing, we export them on first dashboard load to a writable directory (`{ContentRoot}/stylobot-config/detectors/`) so the customer's copies can be edited without touching the shipped defaults. Loading precedence becomes: local overrides → embedded defaults.
 
 2. **App config** - `appsettings.json` and `appsettings.{Environment}.json` in the app's content root. Editor scopes to the `BotDetection:*` subtree - non-StyloBot sections are greyed and read-only.
 

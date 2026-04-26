@@ -19,7 +19,7 @@ Fast-path heuristic detection only. No LLM, no database, no external services. D
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// One line: registers all 33 detectors with sensible defaults
+// One line: registers all 49 detectors with sensible defaults
 builder.Services.AddBotDetection();
 
 var app = builder.Build();
@@ -75,36 +75,60 @@ app.Run();
 
 ### What runs at this tier
 
-All 29 contributing detectors execute in a wave-based pipeline:
+All 49 detectors execute in a wave-based pipeline:
 
 **Pre-Wave 0** (instant abort):
-- `FastPathReputationContributor` - Short-circuits known-bad patterns from reputation cache
+- `FastPathReputationContributor` (priority 3) - Short-circuits known-bad signatures from the reputation cache
+- `VerifiedBotContributor` (priority 4) - Allows verified search engine crawlers; flags UA spoofing of known crawlers
 
-**Wave 0** (parallel, no dependencies):
-- `UserAgentContributor` - Pattern matching against 50K+ known bot signatures
-- `HeaderContributor` - HTTP header consistency (Accept, Accept-Language, Connection)
-- `IpContributor` - Datacenter IP range detection (AWS, GCP, Azure, Cloudflare)
-- `BehavioralContributor` - Request rate and timing analysis
-- `ClientSideContributor` - Browser fingerprint token validation
-- `SecurityToolContributor` - Pen-testing tool signatures (sqlmap, Burp, Nikto)
-- `CacheBehaviorContributor` - Cache header consistency
-- `AdvancedBehavioralContributor` - Behavioral pattern analysis
-- `TlsFingerprintContributor` - JA3/JA4 TLS fingerprinting
-- `TcpIpFingerprintContributor` - p0f TCP/IP fingerprinting
-- `Http2FingerprintContributor` - AKAMAI HTTP/2 fingerprinting
-- `ResponseBehaviorContributor` - Historical response pattern feedback
+**Wave 0** (priority 4-15, parallel, no dependencies):
+- `ContentSequenceContributor` (priority 4) - Tracks document→asset→API page-load order; detects machine-speed timing and phase divergence
+- `MultiLayerCorrelationContributor` (priority 4) - Cross-layer fingerprint correlation (TLS + UA + H2 + TCP)
+- `TransportProtocolContributor` (priority 5) - Classifies transport context (document, API, SignalR, WebSocket, gRPC)
+- `HaxxorContributor` (priority 7) - SQL injection, XSS, path traversal, and attack-payload detection
+- `PiiQueryStringContributor` (priority 8) - PII data harvesting patterns in query strings
+- `SecurityToolContributor` (priority 8) - Pen-testing tool signatures (sqlmap, Burp, Nikto, Metasploit)
+- `AiScraperContributor` (priority 9) - Known AI training crawler signatures (GPTBot, ClaudeBot, etc.)
+- `UserAgentContributor` (priority 10) - Pattern matching against 50K+ known bot signatures
+- `HeaderContributor` (priority 10) - HTTP header consistency and ordering analysis
+- `CveProbeContributor` (priority 11) - CVE-targeting probe patterns (WordPress, Log4j, Spring4Shell, etc.)
+- `TlsFingerprintContributor` (priority 11) - JA3/JA4/JA4+ TLS client fingerprinting
+- `TcpIpFingerprintContributor` (priority 11) - p0f-style TCP/IP OS fingerprinting
+- `IpContributor` (priority 12) - Datacenter IP range detection (AWS, GCP, Azure, Cloudflare) + residential ISP signals
+- `ResponseBehaviorContributor` (priority 12) - Historical response pattern feedback (honeypot hits, auth failures)
+- `Http2FingerprintContributor` (priority 13) - AKAMAI HTTP/2 SETTINGS fingerprinting
+- `Http3FingerprintContributor` (priority 14) - QUIC transport parameter fingerprinting
+- `CacheBehaviorContributor` (priority 15) - Cache-Control / ETag / conditional request consistency
+- `ProjectHoneypotContributor` (priority 15) - DNS-based IP reputation lookup (Project Honey Pot)
+- `TimescaleReputationContributor` (priority 15) - 90-day decayed reputation history per signature
+- `GeoChangeContributor` (priority 16) - Geo-velocity anomaly detection (IP geolocation drift)
+- `BehavioralContributor` (priority 20) - Request rate, timing regularity, and burst pattern analysis
+- `CookieBehaviorContributor` (priority 20) - Cookie lifecycle consistency (missing, stale, replayed)
+- `HeaderCorrelationContributor` (priority 21) - Cross-header correlation (Sec-Fetch-* + Accept + UA family)
+- `ResourceWaterfallContributor` (priority 22) - Asset load sequence consistency (doc → CSS → JS → fonts)
+- `FingerprintApprovalContributor` (priority 24) - Approved fingerprint allowlist (enterprise overrides)
+- `AccountTakeoverContributor` (priority 25) - Credential stuffing, brute-force, and ATO pattern detection
+- `ChallengeVerificationContributor` (priority 25) - PoW challenge / CAPTCHA result verification
+- `PeriodicityContributor` (priority 25) - Rotation cadence and temporal autocorrelation detection
+- `VersionAgeContributor` (priority 25) - Browser/OS/library version staleness scoring
+- `ClientSideContributor` (priority 18) - Browser fingerprint token validation (JS-collected signals)
+- `AdvancedBehavioralContributor` (priority 25) - Advanced multi-session behavioral pattern analysis
+- `SessionVectorContributor` (priority 30) - Markov chain → 129-dim vector; inter-session velocity anomaly
+- `ReactivePatternContributor` (priority 32) - Retry-after compliance, backoff pattern, error event analysis
+- `ClaimedIdentityContributor` (priority 35) - UA family behavioral centroid consistency (spoofing detection)
+- `StreamAbuseContributor` (priority 35) - WebSocket/SSE/gRPC streaming abuse patterns
+- `ClickFraudContributor` (priority 38) - Paid traffic click-fraud signals (bot clicks on ad-landing paths)
+- `IntentContributor` (priority 40) - Semantic intent classification via HNSW embedding similarity
+- `ReputationBiasContributor` (priority 45) - Learned per-signature reputation bias from historical verdicts
+- `HeuristicContributor` (priority 50) - Feature-based heuristic scoring (~50 features, early pass)
+- `InconsistencyContributor` (priority 50) - Cross-signal inconsistency (UA says Chrome, TLS says curl, etc.)
+- `LlmContributor` (priority 55) - Optional LLM escalation for ambiguous edge cases (async, non-blocking)
+- `CveFingerprintContributor` (priority 55) - CVE exploit fingerprint matching from YAML-driven pattern DB
+- `SimilarityContributor` (priority 60) - HNSW cosine similarity to known-bot session vectors
+- `HeuristicLateContributor` (priority 100) - Final heuristic pass consuming all accumulated evidence
 
-**Wave 1+** (triggered by Wave 0 signals):
-- `VersionAgeContributor` - Browser/OS version staleness
-- `InconsistencyContributor` - Cross-signal inconsistency (e.g., UA says Chrome but TLS says curl)
-- `ProjectHoneypotContributor` - DNS-based IP reputation lookup
-- `ReputationBiasContributor` - Learned pattern reputation bias
-- `HeuristicContributor` - Feature-based heuristic scoring (early)
-- `MultiLayerCorrelationContributor` - Cross-layer fingerprint correlation
-- `BehavioralWaveformContributor` - Multi-request behavioral waveform analysis
-
-**Final**:
-- `HeuristicLateContributor` - Final heuristic scoring consuming all evidence
+**Wave 2** (post-signature aggregation):
+- `ClusterContributor` (priority 850) - Leiden community detection across signatures; bot network / product cluster discovery
 
 ### Zero configuration required
 
@@ -988,7 +1012,7 @@ The gateway adds bot intelligence as HTTP headers to every proxied request. Your
 | `GATEWAY_HTTP_PORT` | `8080` | Listen port |
 | `ADMIN_SECRET` | -- | Protects `/admin` endpoints |
 | `ADMIN_BASE_PATH` | `/admin` | Admin API path prefix |
-| `GATEWAY_DEMO_MODE` | `false` | Enable all 33 detectors |
+| `GATEWAY_DEMO_MODE` | `false` | Enable all 49 detectors |
 | `DB_PROVIDER` | `none` | `none`, `postgres`, `sqlserver` |
 | `DB_CONNECTION_STRING` | -- | Database connection string |
 | `YARP_CONFIG_FILE` | `/app/config/yarp.json` | YARP routing config path |
