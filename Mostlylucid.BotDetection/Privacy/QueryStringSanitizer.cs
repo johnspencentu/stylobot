@@ -278,7 +278,15 @@ public static partial class QueryStringSanitizer
             if (eq < 0) continue;
 
             var key = part[..eq];
-            var value = Uri.UnescapeDataString(part[(eq + 1)..]);
+            string value;
+            try
+            {
+                value = Uri.UnescapeDataString(part[(eq + 1)..]);
+            }
+            catch (UriFormatException)
+            {
+                continue;
+            }
 
             if (string.Equals(key, "utm_source", StringComparison.OrdinalIgnoreCase))
                 utmSource = value;
