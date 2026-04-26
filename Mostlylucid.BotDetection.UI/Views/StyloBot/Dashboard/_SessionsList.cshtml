@@ -3,6 +3,9 @@
 @{
     var bp = Model.BasePath;
     string PageUrl(int page) => $"{bp}/partials/sessions?page={page}&pageSize={Model.PageSize}&filter={Model.Filter}";
+}
+
+@functions {
     bool HasFlag(string? code) => !string.IsNullOrEmpty(code) && code.Length == 2 && code != "XX";
     string FlagUrl(string code) => $"https://flagcdn.com/w40/{code.ToLowerInvariant()}.png";
 
