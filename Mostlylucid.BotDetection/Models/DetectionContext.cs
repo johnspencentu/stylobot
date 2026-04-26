@@ -592,7 +592,7 @@ public static class SignalKeys
     /// <summary>Weighted confidence score 0.0-1.0 that this is click fraud traffic.</summary>
     public const string ClickFraudConfidence = "clickfraud.confidence";
 
-    /// <summary>Comma-separated pattern names: datacenter_paid, referrer_spoof, immediate_bounce, engagement_void, headless_paid.</summary>
+    /// <summary>Primary pattern name: datacenter_paid, referrer_spoof, immediate_bounce, engagement_void, or headless_paid.</summary>
     public const string ClickFraudPattern = "clickfraud.pattern";
 
     /// <summary>True if the request arrived via a paid ad (UTM or click ID present).</summary>

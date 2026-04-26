@@ -251,16 +251,6 @@ public static partial class QueryStringSanitizer
         };
     }
 
-    private static readonly HashSet<string> UtmKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"
-    };
-
-    private static readonly HashSet<string> ClickIdKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "gclid", "fbclid", "msclkid", "ttclid"
-    };
-
     /// <summary>
     ///     Detects UTM parameters and click IDs in a query string, returning hashed signals.
     ///     Raw values are never returned - only HMAC-SHA256 (or SHA256 fallback) hashes.
@@ -279,7 +269,7 @@ public static partial class QueryStringSanitizer
             return AdTrafficDetectionResult.Empty;
 
         string? utmSource = null, utmMedium = null, utmCampaign = null;
-        string? clickIdValue = null, clickIdKey = null;
+        string? clickIdValue = null;
         bool hasGclid = false, hasFbclid = false, hasMsclkid = false, hasTtclid = false;
 
         foreach (var part in qs.Split('&'))
@@ -297,16 +287,16 @@ public static partial class QueryStringSanitizer
             else if (string.Equals(key, "utm_campaign", StringComparison.OrdinalIgnoreCase))
                 utmCampaign = value;
             else if (string.Equals(key, "gclid", StringComparison.OrdinalIgnoreCase))
-            { hasGclid = true; clickIdValue = value; clickIdKey = "gclid"; }
+            { hasGclid = true; clickIdValue = value; }
             else if (string.Equals(key, "fbclid", StringComparison.OrdinalIgnoreCase))
-            { hasFbclid = true; clickIdValue ??= value; clickIdKey ??= "fbclid"; }
+            { hasFbclid = true; clickIdValue ??= value; }
             else if (string.Equals(key, "msclkid", StringComparison.OrdinalIgnoreCase))
-            { hasMsclkid = true; clickIdValue ??= value; clickIdKey ??= "msclkid"; }
+            { hasMsclkid = true; clickIdValue ??= value; }
             else if (string.Equals(key, "ttclid", StringComparison.OrdinalIgnoreCase))
-            { hasTtclid = true; clickIdValue ??= value; clickIdKey ??= "ttclid"; }
+            { hasTtclid = true; clickIdValue ??= value; }
         }
 
-        var utmPresent = utmSource != null || utmCampaign != null
+        var utmPresent = utmSource != null || utmMedium != null || utmCampaign != null
                          || hasGclid || hasFbclid || hasMsclkid || hasTtclid;
 
         if (!utmPresent)

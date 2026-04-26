@@ -134,8 +134,8 @@ public sealed class PiiHasher
         return ComputeHash(subnet);
     }
 
-    /// <summary>Returns the raw key bytes for use with external HMAC operations.</summary>
-    public byte[] GetKey() => _key;
+    /// <summary>Returns a copy of the key bytes for use with external HMAC operations.</summary>
+    public byte[] GetKey() => (byte[])_key.Clone();
 
     private string ComputeHash(string input)
     {

@@ -65,7 +65,7 @@ public class QueryStringSanitizerAdTrafficTests
     public void DetectAdTrafficParams_ReferrerMismatch_GclidNoReferer()
     {
         var result = QueryStringSanitizer.DetectAdTrafficParams(
-            "?gclid=abc123", referer: null, TestKey);
+            "?gclid=abc123", referer: null, hmacKey: TestKey);
         Assert.True(result.ReferrerMismatch);
         Assert.False(result.ReferrerPresent);
     }
@@ -76,7 +76,7 @@ public class QueryStringSanitizerAdTrafficTests
         var result = QueryStringSanitizer.DetectAdTrafficParams(
             "?gclid=abc123",
             referer: "https://www.google.com/aclk?sa=l",
-            TestKey);
+            hmacKey: TestKey);
         Assert.False(result.ReferrerMismatch);
         Assert.True(result.ReferrerPresent);
     }
@@ -87,7 +87,7 @@ public class QueryStringSanitizerAdTrafficTests
         var result = QueryStringSanitizer.DetectAdTrafficParams(
             "?gclid=abc123",
             referer: "https://www.someblogsite.com",
-            TestKey);
+            hmacKey: TestKey);
         Assert.True(result.ReferrerMismatch);
     }
 
