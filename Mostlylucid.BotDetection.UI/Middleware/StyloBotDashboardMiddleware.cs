@@ -3410,7 +3410,6 @@ public class StyloBotDashboardMiddleware
         var basePath = _options.BasePath.TrimEnd('/');
         var navBasePath = string.IsNullOrEmpty(_options.NavBasePath) ? _options.BasePath : _options.NavBasePath;
         navBasePath = navBasePath.TrimEnd('/');
-        context.Response.Headers["X-SB-NavBasePath"] = navBasePath;
         var cspNonce = context.Items.TryGetValue("CspNonce", out var nonceObj) && nonceObj is string s && s.Length > 0
             ? s
             : Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
