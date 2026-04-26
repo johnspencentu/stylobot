@@ -250,6 +250,139 @@ public static partial class QueryStringSanitizer
             _ => "sensitive"
         };
     }
+
+    /// <summary>
+    ///     Detects UTM parameters and click IDs in a query string, returning hashed signals.
+    ///     Raw values are never returned - only HMAC-SHA256 (or SHA256 fallback) hashes.
+    ///     Also checks for referrer mismatch: click ID present but referer absent or wrong domain.
+    /// </summary>
+    public static AdTrafficDetectionResult DetectAdTrafficParams(
+        string? queryString,
+        string? referer,
+        byte[]? hmacKey = null)
+    {
+        if (string.IsNullOrEmpty(queryString))
+            return AdTrafficDetectionResult.Empty;
+
+        var qs = queryString.StartsWith('?') ? queryString[1..] : queryString;
+        if (string.IsNullOrEmpty(qs))
+            return AdTrafficDetectionResult.Empty;
+
+        string? utmSource = null, utmMedium = null, utmCampaign = null;
+        string? clickIdValue = null;
+        bool hasGclid = false, hasFbclid = false, hasMsclkid = false, hasTtclid = false;
+
+        foreach (var part in qs.Split('&'))
+        {
+            var eq = part.IndexOf('=');
+            if (eq < 0) continue;
+
+            var key = part[..eq];
+            var value = Uri.UnescapeDataString(part[(eq + 1)..]);
+
+            if (string.Equals(key, "utm_source", StringComparison.OrdinalIgnoreCase))
+                utmSource = value;
+            else if (string.Equals(key, "utm_medium", StringComparison.OrdinalIgnoreCase))
+                utmMedium = value;
+            else if (string.Equals(key, "utm_campaign", StringComparison.OrdinalIgnoreCase))
+                utmCampaign = value;
+            else if (string.Equals(key, "gclid", StringComparison.OrdinalIgnoreCase))
+            { hasGclid = true; clickIdValue = value; }
+            else if (string.Equals(key, "fbclid", StringComparison.OrdinalIgnoreCase))
+            { hasFbclid = true; clickIdValue ??= value; }
+            else if (string.Equals(key, "msclkid", StringComparison.OrdinalIgnoreCase))
+            { hasMsclkid = true; clickIdValue ??= value; }
+            else if (string.Equals(key, "ttclid", StringComparison.OrdinalIgnoreCase))
+            { hasTtclid = true; clickIdValue ??= value; }
+        }
+
+        var utmPresent = utmSource != null || utmMedium != null || utmCampaign != null
+                         || hasGclid || hasFbclid || hasMsclkid || hasTtclid;
+
+        if (!utmPresent)
+            return AdTrafficDetectionResult.Empty;
+
+        var platform = InferSourcePlatform(utmSource, hasGclid, hasFbclid, hasMsclkid, hasTtclid);
+        var sourceHash = utmSource != null ? HashAdValue(utmSource, hmacKey) : null;
+        var mediumHash = utmMedium != null ? HashAdValue(utmMedium, hmacKey) : null;
+        var campaignHash = utmCampaign != null ? HashAdValue(utmCampaign, hmacKey) : null;
+        var clickIdHash = clickIdValue != null ? HashAdValue(clickIdValue, hmacKey) : null;
+
+        var referrerPresent = !string.IsNullOrEmpty(referer);
+        var referrerMismatch = DetectReferrerMismatch(
+            platform, hasGclid || hasFbclid || hasMsclkid || hasTtclid, referrerPresent, referer);
+
+        return new AdTrafficDetectionResult
+        {
+            UtmPresent = true,
+            SourcePlatform = platform,
+            SourceHash = sourceHash,
+            MediumHash = mediumHash,
+            CampaignHash = campaignHash,
+            HasGclid = hasGclid,
+            HasFbclid = hasFbclid,
+            HasMsclkid = hasMsclkid,
+            HasTtclid = hasTtclid,
+            ClickIdHash = clickIdHash,
+            ReferrerPresent = referrerPresent,
+            ReferrerMismatch = referrerMismatch
+        };
+    }
+
+    private static string InferSourcePlatform(
+        string? utmSource, bool hasGclid, bool hasFbclid, bool hasMsclkid, bool hasTtclid)
+    {
+        if (hasGclid) return "google";
+        if (hasFbclid) return "meta";
+        if (hasMsclkid) return "microsoft";
+        if (hasTtclid) return "tiktok";
+        if (utmSource == null) return "paid_other";
+
+        return utmSource.ToLowerInvariant() switch
+        {
+            "google" or "google_ads" => "google",
+            "facebook" or "fb" or "instagram" => "meta",
+            "bing" or "microsoft" => "microsoft",
+            "tiktok" => "tiktok",
+            _ => "paid_other"
+        };
+    }
+
+    private static bool DetectReferrerMismatch(
+        string platform, bool hasClickId, bool referrerPresent, string? referer)
+    {
+        if (!hasClickId) return false;
+        if (!referrerPresent) return true;
+
+        var refererLower = referer!.ToLowerInvariant();
+        return platform switch
+        {
+            "google" => !refererLower.Contains("google.") && !refererLower.Contains("googleadservices"),
+            "meta" => !refererLower.Contains("facebook.com") && !refererLower.Contains("instagram.com"),
+            "microsoft" => !refererLower.Contains("bing.com") && !refererLower.Contains("microsoft.com"),
+            "tiktok" => !refererLower.Contains("tiktok.com"),
+            _ => false
+        };
+    }
+
+    private static string HashAdValue(string value, byte[]? hmacKey)
+    {
+        byte[] hash;
+        if (hmacKey != null && hmacKey.Length >= 16)
+        {
+            using var hmac = new System.Security.Cryptography.HMACSHA256(hmacKey);
+            hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(value));
+        }
+        else
+        {
+            hash = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(value));
+        }
+        return Convert.ToBase64String(hash[..16])
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
 }
 
 /// <summary>
@@ -268,4 +401,26 @@ public sealed record PiiDetectionResult
 
     /// <summary>List of detected PII types (e.g., "email", "token", "credential").</summary>
     public IReadOnlyList<string> DetectedTypes { get; init; } = [];
+}
+
+/// <summary>
+///     Result of ad traffic parameter detection in a query string.
+///     All hashed values use HMAC-SHA256 (or SHA256 fallback) - no raw values stored.
+/// </summary>
+public sealed record AdTrafficDetectionResult
+{
+    public static readonly AdTrafficDetectionResult Empty = new();
+
+    public bool UtmPresent { get; init; }
+    public string SourcePlatform { get; init; } = "organic";
+    public string? SourceHash { get; init; }
+    public string? MediumHash { get; init; }
+    public string? CampaignHash { get; init; }
+    public bool HasGclid { get; init; }
+    public bool HasFbclid { get; init; }
+    public bool HasMsclkid { get; init; }
+    public bool HasTtclid { get; init; }
+    public string? ClickIdHash { get; init; }
+    public bool ReferrerPresent { get; init; }
+    public bool ReferrerMismatch { get; init; }
 }

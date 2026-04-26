@@ -72,5 +72,6 @@ public enum BotType
     VerifiedBot,
     AiBot,
     Tool,
-    ExploitScanner
+    ExploitScanner,
+    ClickFraud
 }

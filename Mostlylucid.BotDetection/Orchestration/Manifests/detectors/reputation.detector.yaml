@@ -157,6 +157,8 @@ defaults:
     # cap ConfirmedBad contribution instead of verified abort.
     browser_attestation_max_confidence: 0.35
     browser_attestation_weight: 0.7
+    # Paid traffic amplification: known-bad fingerprints via paid ads are more suspicious
+    paid_traffic_bias_multiplier: 1.5
     # Pattern matching options
     match_normalized_ua: true
     match_ip_range: true

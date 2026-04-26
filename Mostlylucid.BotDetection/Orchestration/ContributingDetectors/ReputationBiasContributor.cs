@@ -185,14 +185,23 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
         // Calculate contribution based on reputation state and FastPathWeight
         var weight = reputation.FastPathWeight;
 
-        // Determine if this should trigger early exit
+        // ReputationBias is always bias-only (no early exit), regardless of category.
+        // UA, IP, and combined patterns are all too coarse to uniquely identify one client:
+        //   - UA is shared by millions of users (curl, Chrome, etc.)
+        //   - IP conflicts different clients from the same host (curl + browser from localhost)
+        //   - Combined (UA+IP+Path) still lacks TLS/H2/behavioral factors
+        // Only FastPathReputationContributor via PrimarySignature (multi-factor TLS+H2+UA+behavioral)
+        // is specific enough to warrant early exit. All other patterns contribute bias so the
+        // full detector stack can confirm or override.
         if (reputation.CanTriggerFastAbort)
         {
-            // With browser attestation, downgrade from verified abort to mild bias
+            state.WriteSignal(SignalKeys.ReputationCanAbort, true);
+
+            // With browser attestation, downgrade to mild bias
             if (hasBrowserAttestation)
             {
                 _logger.LogInformation(
-                    "Reputation bias downgraded: {PatternId} ({Category}) has Sec-Fetch-Site: same-origin - using mild bias instead of verified abort",
+                    "Reputation bias downgraded: {PatternId} ({Category}) has Sec-Fetch-Site: same-origin - using mild bias",
                     reputation.PatternId, category);
 
                 return new DetectionContribution
@@ -205,16 +214,15 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
                 };
             }
 
-            state.WriteSignal(SignalKeys.ReputationCanAbort, true);
-
-            return DetectionContribution.VerifiedBot(
-                    Name,
-                    reputation.PatternId,
-                    $"[Reputation] {reason}") with
-                {
-                    ConfidenceDelta = reputation.BotScore,
-                    Weight = ConfirmedBadWeight // High weight for confirmed bad patterns
-                };
+            // Strong bot signal - other detectors still run and can override
+            return new DetectionContribution
+            {
+                DetectorName = Name,
+                Category = $"Reputation:{category}",
+                ConfidenceDelta = Math.Min(reputation.BotScore, 0.75),
+                Weight = ConfirmedBadWeight,
+                Reason = $"[Reputation] {reason}"
+            };
         }
 
         // For non-abort cases, return weighted contribution
@@ -228,6 +236,17 @@ public partial class ReputationBiasContributor : ConfiguredContributorBase
         {
             effectiveWeight = Math.Min(effectiveWeight, GetParam("browser_attestation_weight", 0.7));
             reason += " (downgraded - browser attestation present)";
+        }
+
+        // Amplify reputation bias when paid traffic is detected.
+        // A known-bad fingerprint arriving via paid ads is substantially more suspicious
+        // than organic traffic - the attacker is burning ad spend to reach the target.
+        var isPaidTraffic = state.Signals.TryGetValue(SignalKeys.ClickFraudIsPaidTraffic, out var paidObj)
+            && paidObj is true;
+        if (isPaidTraffic && weight > 0)
+        {
+            var multiplier = GetParam("paid_traffic_bias_multiplier", 1.5);
+            effectiveWeight *= multiplier;
         }
 
         string? botType = reputation.State switch

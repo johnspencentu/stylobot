@@ -373,6 +373,10 @@ public static class HeuristicFeatureExtractor
 
         AddStringEnumFeature(signals, features, SignalKeys.IntentThreatBand, "sigv:intent_band");
         AddStringEnumFeature(signals, features, SignalKeys.CveTopSeverity, "sigv:cve_severity");
+
+        // Click fraud signals
+        AddNumericSignalFeature(signals, features, SignalKeys.ClickFraudConfidence, "cf:click_fraud_score");
+        AddBooleanSignalFeature(signals, features, SignalKeys.ClickFraudIsPaidTraffic, "cf:is_paid_traffic");
     }
 
     /// <summary>

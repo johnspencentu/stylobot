@@ -56,7 +56,10 @@ public class IntentContributor : ConfiguredContributorBase
                 Triggers.WhenSignalExists(SignalKeys.ResponseHasHistory)),
             Triggers.AllOf(
                 Triggers.WhenSignalExists(SignalKeys.SessionRequestCount),
-                Triggers.WhenSignalExists(SignalKeys.AttackDetected)))
+                Triggers.WhenSignalExists(SignalKeys.AttackDetected)),
+            Triggers.AllOf(
+                Triggers.WhenSignalExists(SignalKeys.SessionRequestCount),
+                Triggers.WhenSignalExists(SignalKeys.ClickFraudChecked)))
     };
 
     // Config-driven parameters from YAML
@@ -71,6 +74,10 @@ public class IntentContributor : ConfiguredContributorBase
     private double FallbackHoneypot => GetParam("fallback_honeypot", 0.9);
     private double FallbackAuthAbuse => GetParam("fallback_auth_abuse", 0.7);
     private double FallbackClean => GetParam("fallback_clean", 0.05);
+
+    // Click fraud integration parameters
+    private double ClickFraudWeight => GetParam("clickfraud_weight", 0.35);
+    private double ClickFraudThreshold => GetParam("clickfraud_threshold", 0.55);
 
     public override Task<IReadOnlyList<DetectionContribution>> ContributeAsync(
         BlackboardState state,
@@ -327,6 +334,13 @@ public class IntentContributor : ConfiguredContributorBase
         features["reactive:rate_adapted"] = rateAdapted;
         features["reactive:coordinated_retry"] = coordinatedRetry;
 
+        // Click fraud signals from ClickFraudContributor (priority 38)
+        var clickFraudConfidence = state.GetSignal<double?>(SignalKeys.ClickFraudConfidence) ?? 0.0;
+        var clickFraudIsPaidTraffic = state.GetSignal<bool?>(SignalKeys.ClickFraudIsPaidTraffic) ?? false;
+
+        features["clickfraud:confidence"] = (float)Math.Min(clickFraudConfidence, 1.0);
+        features["clickfraud:is_paid_traffic"] = clickFraudIsPaidTraffic ? 1.0f : 0.0f;
+
         // Path classification based on current request path
         ClassifyPath(state.Path, features);
 
@@ -411,7 +425,11 @@ public class IntentContributor : ConfiguredContributorBase
                           || (state.GetSignal<bool?>(SignalKeys.AttackConfigExposure) ?? false)
                           || (state.GetSignal<bool?>(SignalKeys.AttackAdminScan) ?? false);
 
-        // Priority ordering: honeypot > injection > scanning > auth abuse > clean
+        // Click fraud signals from ClickFraudContributor (priority 38)
+        var clickFraudConfidence = state.GetSignal<double?>(SignalKeys.ClickFraudConfidence) ?? 0.0;
+        var clickFraudChecked = state.GetSignal<bool?>(SignalKeys.ClickFraudChecked) ?? false;
+
+        // Priority ordering: honeypot > injection > scanning > auth abuse > click fraud > clean
         if (honeypotHits > 0)
             return (FallbackHoneypot, "attacking");
 
@@ -426,6 +444,12 @@ public class IntentContributor : ConfiguredContributorBase
 
         if (attackDetected)
             return (FallbackScanning, "reconnaissance");
+
+        if (clickFraudChecked && clickFraudConfidence > ClickFraudThreshold)
+        {
+            var fraudScore = Math.Min(clickFraudConfidence * ClickFraudWeight + ClickFraudThreshold, 1.0);
+            return (fraudScore, "ad_fraud");
+        }
 
         return (FallbackClean, "browsing");
     }

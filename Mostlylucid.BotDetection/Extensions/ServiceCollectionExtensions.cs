@@ -544,6 +544,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContributingDetector, StreamAbuseContributor>();
         // Response behavior feedback - runs early to provide historical feedback
         services.AddSingleton<IContributingDetector, ResponseBehaviorContributor>();
+        // Click fraud detection - monitors ad click patterns for fraud signals (priority 38)
+        services.AddSingleton<IContributingDetector, ClickFraudContributor>();
         // Intent / threat scoring - produces unified threat score orthogonal to bot probability
         services.AddSingleton<IContributingDetector, IntentContributor>();
         // Wave 1+ detectors (triggered by signals from Wave 0)
