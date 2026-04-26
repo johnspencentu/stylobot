@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mostlylucid.BotDetection.Events;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Models;
 
 namespace Mostlylucid.BotDetection.Services;
@@ -14,6 +15,7 @@ public class LearningBackgroundService : BackgroundService
 {
     private readonly ILearningEventBus _eventBus;
     private readonly IEnumerable<ILearningEventHandler> _handlers;
+    private readonly ILicenseState _licenseState;
     private readonly ILogger<LearningBackgroundService> _logger;
     private readonly BotDetectionOptions _options;
 
@@ -21,12 +23,14 @@ public class LearningBackgroundService : BackgroundService
         ILearningEventBus eventBus,
         ILogger<LearningBackgroundService> logger,
         IOptions<BotDetectionOptions> options,
-        IEnumerable<ILearningEventHandler> handlers)
+        IEnumerable<ILearningEventHandler> handlers,
+        ILicenseState licenseState)
     {
         _eventBus = eventBus;
         _logger = logger;
         _options = options.Value;
         _handlers = handlers;
+        _licenseState = licenseState;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -55,6 +59,12 @@ public class LearningBackgroundService : BackgroundService
 
     private async Task ProcessEventAsync(LearningEvent evt, CancellationToken ct)
     {
+        if (_licenseState.LearningFrozen)
+        {
+            _logger.LogDebug("Learning frozen, skipping event: {Type}", evt.Type);
+            return;
+        }
+
         _logger.LogDebug("Processing learning event: {Type} from {Source}", evt.Type, evt.Source);
 
         // Find handlers interested in this event type
