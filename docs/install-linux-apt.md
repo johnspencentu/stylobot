@@ -6,7 +6,7 @@ StyloBot is published to a Cloudsmith apt repository on every stable release.
 
 ```bash
 # 1. Add the repository and GPG key (one time)
-curl -1sLf 'https://dl.cloudsmith.io/public/scottgal/stylobot/setup.deb.sh' | sudo bash
+curl -1sLf 'https://dl.cloudsmith.io/public/mostlylucid/stylobot/setup.deb.sh' | sudo bash
 
 # 2. Install
 sudo apt update

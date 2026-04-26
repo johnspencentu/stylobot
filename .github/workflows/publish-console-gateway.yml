@@ -423,7 +423,8 @@ jobs:
     name: Publish Linux .deb to Cloudsmith
     needs: build-binaries
     runs-on: ubuntu-latest
-    # TEST: running on all tags to verify Cloudsmith OIDC; restore stable-only after confirmed
+    # Only publish stable releases (not betas/pre-releases)
+    if: ${{ !contains(github.ref, '-') }}
     environment: production   # locks OIDC sub to repo:scottgal/stylobot:environment:production
 
     permissions:
