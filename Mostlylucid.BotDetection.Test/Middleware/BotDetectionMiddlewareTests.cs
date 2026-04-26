@@ -10,6 +10,7 @@ using Mostlylucid.BotDetection.Models;
 using Mostlylucid.BotDetection.Orchestration;
 using Mostlylucid.BotDetection.Policies;
 using Mostlylucid.BotDetection.Services;
+using Mostlylucid.BotDetection.Licensing;
 using Mostlylucid.BotDetection.Test.Helpers;
 using Mostlylucid.Ephemeral.Atoms.Taxonomy.Ledger;
 
@@ -34,7 +35,8 @@ public class BotDetectionMiddlewareTests
         return new BotDetectionMiddleware(
             next,
             _logger,
-            Options.Create(options ?? new BotDetectionOptions()));
+            Options.Create(options ?? new BotDetectionOptions()),
+            new FossLicenseState());
     }
 
     private static AggregatedEvidence CreateEvidence(

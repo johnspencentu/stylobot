@@ -115,4 +115,52 @@ public class LicenseStateTests
         Assert.NotNull(claims);
         Assert.True(claims!.GraceEligible);
     }
+
+    [Fact]
+    public void Snapshot_JustExpired_GraceNotStarted_StillLogOnly()
+    {
+        // Expired 1 minute ago, grace eligible but grace never started (service hasn't run yet)
+        // Without a graceStartedAt, the system has no active grace period - falls to log-only
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddMinutes(-1),
+            graceEligible: true,
+            graceStartedAt: null);
+
+        Assert.False(snapshot.IsActive);
+        Assert.False(snapshot.IsInGrace);
+        Assert.True(snapshot.LearningFrozen);
+        Assert.True(snapshot.LogOnly);
+    }
+
+    [Fact]
+    public void Snapshot_GraceStartedToday_IsInGrace_NotLogOnly()
+    {
+        // Grace started 2 hours ago - well within the 30-day window
+        var graceStartedAt = DateTimeOffset.UtcNow.AddHours(-2);
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddDays(-1),
+            graceEligible: true,
+            graceStartedAt: graceStartedAt);
+
+        Assert.False(snapshot.IsActive);
+        Assert.True(snapshot.IsInGrace);
+        Assert.True(snapshot.LearningFrozen);
+        Assert.False(snapshot.LogOnly);
+        Assert.NotNull(snapshot.GraceEndsAt);
+        Assert.True(snapshot.GraceEndsAt > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public void Snapshot_GraceEndsAt_Is30DaysAfterGraceStart()
+    {
+        var graceStartedAt = DateTimeOffset.UtcNow.AddDays(-5);
+        var snapshot = LicenseStateSnapshot.Compute(
+            expiresAt: DateTimeOffset.UtcNow.AddDays(-5),
+            graceEligible: true,
+            graceStartedAt: graceStartedAt);
+
+        Assert.NotNull(snapshot.GraceEndsAt);
+        var expectedEnd = graceStartedAt.AddDays(30);
+        Assert.Equal(expectedEnd, snapshot.GraceEndsAt!.Value, TimeSpan.FromSeconds(1));
+    }
 }
