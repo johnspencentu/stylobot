@@ -221,6 +221,67 @@ the compaction boundary.
 
 ---
 
+## HNSW index versioning and resilience
+
+The on-disk HNSW index is fixed-dimension by construction: a serialized graph built for
+129-float vectors cannot load vectors of a different length without corrupting the graph.
+Two mechanisms protect against this:
+
+### IndexManifest
+
+Every save writes `{hnsw-index}/index.manifest.json` alongside the graph files:
+
+```json
+{ "SchemaVersion": 1, "Dimension": 129 }
+```
+
+`LoadAsync` reads this manifest before deserializing anything.
+
+### Dimension growth (zero-padding, no data loss)
+
+When new feature dimensions are **appended** to `SessionVectorizer` (e.g., adding 3 more
+transition timing slots), the saved `Dimension` will be less than `SessionVectorizer.Dimensions`.
+`LoadAsync` zero-pads all loaded vectors to the live size, deletes the serialized graph, and
+triggers a rebuild. Existing behavioral data is preserved; the graph is reconstructed on startup.
+
+This is the expected upgrade path. No version bump required.
+
+### Breaking schema changes (discard and rebuild)
+
+When dimensions are **reordered, removed, or semantically reassigned**, cosine similarity
+results would be meaningless against old vectors. In this case:
+
+1. Increment `CurrentSchemaVersion` in `HnswFileSimilaritySearch.cs` (currently `1`)
+2. On next startup, `LoadAsync` detects `manifest.SchemaVersion != CurrentSchemaVersion`,
+   deletes all index files, and starts accumulating from scratch
+
+Data is lost but correctness is preserved. The HNSW index is a performance cache over the
+behavioral signal: the source of truth is in the SQLite `sessions` table and the warmup
+service (`SessionVectorWarmupService`) will rebuild from SQLite within a few minutes.
+
+### Legacy indices (no manifest)
+
+Indices written before the manifest was introduced have no `index.manifest.json`. `LoadAsync`
+infers the saved dimension from the first loaded vector and proceeds as if `SchemaVersion = 1`.
+If the inferred dimension matches the live size, the existing graph is used unchanged.
+
+### Summary
+
+| Scenario | Manifest state | Action |
+|---|---|---|
+| Normal load | `SchemaVersion` matches, `Dimension` matches | Deserialize graph, done |
+| Dimension grew | `Dimension < SessionVectorizer.Dimensions` | Zero-pad vectors, rebuild graph |
+| Dimension shrank | `Dimension > current vector length` | Discard, start fresh |
+| Breaking schema change | `SchemaVersion` mismatch | Discard all files, start fresh |
+| No manifest (legacy) | Absent | Infer dim from vectors, use graph if present |
+
+### Key file
+
+`Mostlylucid.BotDetection/Similarity/HnswFileSimilaritySearch.cs` -- `CurrentSchemaVersion`
+constant controls when a breaking discard is triggered.
+
+---
+
 ## Signal reference
 
 All signals are emitted by `SessionVectorContributor` (priority 30, after behavioral analysis).

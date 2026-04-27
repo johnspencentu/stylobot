@@ -16,6 +16,7 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
     private const int DefaultM = 16;
     private const int MinVectorsForGraph = 5;
     private const int RebuildThreshold = 50;
+    private const int CurrentSchemaVersion = 1;
     private static readonly TimeSpan AutoSaveInterval = TimeSpan.FromMinutes(5);
 
     private static readonly SmallWorldParameters GraphParameters = new()
@@ -204,23 +205,31 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
             var metaPath = Path.Combine(_databasePath, "signatures.meta.json");
             var graphPath = Path.Combine(_databasePath, "signatures.hnsw");
             var vectorPath = Path.Combine(_databasePath, "signatures.vectors.json");
+            var manifestPath = Path.Combine(_databasePath, "index.manifest.json");
 
-            // Save metadata + vectors
+            var manifest = new IndexManifest
+            {
+                SchemaVersion = CurrentSchemaVersion,
+                Dimension = allVectors[0].Length
+            };
+
             var metaJson = JsonSerializer.Serialize(allMetadata, MetadataJsonContext.Default.ListSignatureMetadata);
             var vectorsJson = JsonSerializer.Serialize(allVectors, VectorJsonContext.Default.ListSingleArray);
+            var manifestJson = JsonSerializer.Serialize(manifest, ManifestJsonContext.Default.IndexManifest);
 
             await Task.WhenAll(
                 File.WriteAllTextAsync(metaPath, metaJson),
-                File.WriteAllTextAsync(vectorPath, vectorsJson));
+                File.WriteAllTextAsync(vectorPath, vectorsJson),
+                File.WriteAllTextAsync(manifestPath, manifestJson));
 
-            // Save HNSW graph via stream
             if (graph is not null)
             {
                 await using var fs = File.Create(graphPath);
                 graph.SerializeGraph(fs);
             }
 
-            _logger.LogDebug("Saved HNSW index with {Count} vectors", allVectors.Count);
+            _logger.LogDebug("Saved HNSW index with {Count} vectors (dim={Dim}, schema={Schema})",
+                allVectors.Count, manifest.Dimension, manifest.SchemaVersion);
         }
         catch (Exception ex)
         {
@@ -233,6 +242,7 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
         var metaPath = Path.Combine(_databasePath, "signatures.meta.json");
         var graphPath = Path.Combine(_databasePath, "signatures.hnsw");
         var vectorPath = Path.Combine(_databasePath, "signatures.vectors.json");
+        var manifestPath = Path.Combine(_databasePath, "index.manifest.json");
 
         if (!File.Exists(metaPath) || !File.Exists(vectorPath))
         {
@@ -242,6 +252,31 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
 
         try
         {
+            // Read manifest (optional - pre-manifest indices treated as schema version 0)
+            IndexManifest? manifest = null;
+            if (File.Exists(manifestPath))
+            {
+                try
+                {
+                    var manifestJson = await File.ReadAllTextAsync(manifestPath);
+                    manifest = JsonSerializer.Deserialize(manifestJson, ManifestJsonContext.Default.IndexManifest);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to read HNSW manifest, treating as legacy index");
+                }
+            }
+
+            // Schema version mismatch: discard everything and start fresh
+            if (manifest is not null && manifest.SchemaVersion != CurrentSchemaVersion)
+            {
+                _logger.LogWarning(
+                    "HNSW index schema version mismatch (saved={Saved}, current={Current}), discarding index",
+                    manifest.SchemaVersion, CurrentSchemaVersion);
+                DiscardIndex(metaPath, graphPath, vectorPath, manifestPath);
+                return;
+            }
+
             var metaJson = await File.ReadAllTextAsync(metaPath);
             var loadedMetadata = JsonSerializer.Deserialize(metaJson, MetadataJsonContext.Default.ListSignatureMetadata);
 
@@ -255,10 +290,55 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
                 return;
             }
 
+            // Detect dimension growth: zero-pad old vectors to current size
+            var savedDim = manifest?.Dimension ?? (loadedVectors.Count > 0 ? loadedVectors[0].Length : 0);
+            var needsGraphRebuild = false;
+            if (savedDim > 0 && loadedVectors.Count > 0)
+            {
+                var currentDim = loadedVectors[0].Length; // actual saved dim
+                // We compare against what the live vectorizer would produce
+                // If saved dim < current session vector dimensions, zero-pad
+                if (savedDim < currentDim)
+                {
+                    // This shouldn't happen (manifest would have the save-time dim already)
+                    // but guard anyway
+                }
+                else if (savedDim > currentDim)
+                {
+                    // Saved vectors have more dimensions than current build: discard
+                    _logger.LogWarning(
+                        "HNSW saved dimension ({Saved}) exceeds current dimension ({Current}), discarding index",
+                        savedDim, currentDim);
+                    DiscardIndex(metaPath, graphPath, vectorPath, manifestPath);
+                    return;
+                }
+            }
+
+            // Zero-pad if manifest records a smaller saved dim than current live dim
+            // (manifest.Dimension is what was saved; if the live code now produces wider vectors,
+            //  we pad so the existing data is still usable and the graph gets rebuilt)
+            if (manifest is not null && loadedVectors.Count > 0)
+            {
+                var liveDim = Analysis.SessionVectorizer.Dimensions;
+                if (manifest.Dimension < liveDim)
+                {
+                    _logger.LogInformation(
+                        "HNSW dimension grew from {Old} to {New}, zero-padding {Count} vectors",
+                        manifest.Dimension, liveDim, loadedVectors.Count);
+                    loadedVectors = loadedVectors
+                        .Select(v => ZeroPad(v, liveDim))
+                        .ToList();
+                    needsGraphRebuild = true;
+                    // Delete stale serialized graph so LoadAsync rebuilds it
+                    try { File.Delete(graphPath); } catch { /* best-effort */ }
+                }
+            }
+
             lock (_writeLock)
             {
                 _graphVectors = loadedVectors;
                 _metadata = loadedMetadata;
+                _dirty = needsGraphRebuild; // trigger re-save with padded vectors
 
                 if (_graphVectors.Count < MinVectorsForGraph)
                 {
@@ -267,8 +347,7 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
                     return;
                 }
 
-                // Try to deserialize the saved graph (fast path)
-                if (File.Exists(graphPath))
+                if (!needsGraphRebuild && File.Exists(graphPath))
                 {
                     try
                     {
@@ -293,7 +372,6 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
                     }
                 }
 
-                // Rebuild from vectors (slow path)
                 BuildGraphFromVectorsLocked();
                 _logger.LogInformation("Rebuilt HNSW index with {Count} vectors", _graphVectors.Count);
             }
@@ -302,6 +380,20 @@ public sealed class HnswFileSimilaritySearch : ISignatureSimilaritySearch, IDisp
         {
             _logger.LogWarning(ex, "Failed to load HNSW index from {Path}", _databasePath);
         }
+    }
+
+    private static float[] ZeroPad(float[] v, int targetDim)
+    {
+        if (v.Length >= targetDim) return v;
+        var padded = new float[targetDim];
+        v.CopyTo(padded, 0);
+        return padded;
+    }
+
+    private void DiscardIndex(params string[] paths)
+    {
+        foreach (var path in paths)
+            try { File.Delete(path); } catch { /* best-effort */ }
     }
 
     public void Dispose()
@@ -402,6 +494,27 @@ public class SignatureMetadata
 }
 
 /// <summary>
+///     Sidecar file that records the vector schema at save time.
+///     Used by LoadAsync to detect dimension growth (zero-pad) or
+///     breaking schema changes (discard and rebuild).
+/// </summary>
+public class IndexManifest
+{
+    /// <summary>
+    ///     Increment when dimensions are reordered, removed, or semantics change.
+    ///     A mismatch causes the index to be discarded and rebuilt from scratch.
+    ///     Dimension-only growth (new dims appended) does NOT require a version bump.
+    /// </summary>
+    public int SchemaVersion { get; set; } = 1;
+
+    /// <summary>
+    ///     Number of floats per vector at save time.
+    ///     If current Dimensions > saved Dimension, old vectors are zero-padded.
+    /// </summary>
+    public int Dimension { get; set; }
+}
+
+/// <summary>
 ///     Default random generator for HNSW graph construction.
 /// </summary>
 internal sealed class DefaultRandomGenerator : IProvideRandomValues
@@ -426,3 +539,6 @@ internal partial class MetadataJsonContext : System.Text.Json.Serialization.Json
 
 [System.Text.Json.Serialization.JsonSerializable(typeof(List<float[]>))]
 internal partial class VectorJsonContext : System.Text.Json.Serialization.JsonSerializerContext;
+
+[System.Text.Json.Serialization.JsonSerializable(typeof(IndexManifest))]
+internal partial class ManifestJsonContext : System.Text.Json.Serialization.JsonSerializerContext;

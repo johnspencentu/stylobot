@@ -353,7 +353,9 @@
       "Bash(sqlite3 /Users/scottgalloway/RiderProjects/stylobot/Mostlylucid.BotDetection.Demo/bin/Debug/net10.0/dashboard.db 'SELECT bot_name, risk_band, risk_justification, printf\\('\\\\''%.2f'\\\\'',bot_probability\\) as prob, printf\\('\\\\''%.2f'\\\\'',threat_score\\) as threat FROM detections ORDER BY timestamp DESC LIMIT 3;')",
       "Bash(kill 53714)",
       "Bash(sqlite3 /Users/scottgalloway/RiderProjects/stylobot/Mostlylucid.BotDetection.Demo/bin/Debug/net10.0/dashboard.db 'SELECT bot_name, risk_band, risk_justification, printf\\('\\\\''%.2f'\\\\'',bot_probability\\) as prob, printf\\('\\\\''%.2f'\\\\'',threat_score\\) as threat FROM detections ORDER BY timestamp DESC LIMIT 4;')",
-      "Bash(kill 54218)"
+      "Bash(kill 54218)",
+      "Bash(/tmp/search_detectors.sh)",
+      "Bash(awk -F'|' '{print $2}')"
     ]
   }
 }
